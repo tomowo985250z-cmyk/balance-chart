@@ -1,0 +1,55 @@
+﻿:root {
+  background: #e7e9ed;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+object {
+  display: block;
+  width: min(100%, 210mm);
+  aspect-ratio: 210 / 297;
+  background: #fff;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 16%);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@media (max-width: 600px) {
+  body {
+    min-width: 0;
+    padding: 0;
+    place-items: start center;
+  }
+
+  object {
+    width: 100%;
+    box-shadow: none;
+  }
+}
+
+@media print {
+  :root {
+    background: #fff;
+  }
+
+  body {
+    padding: 0;
+  }
+
+  object {
+    width: 210mm;
+    box-shadow: none;
+  }
+}
