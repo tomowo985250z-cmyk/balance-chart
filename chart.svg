@@ -1,0 +1,388 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 794 1123" role="img" aria-labelledby="chart-title chart-description">
+  <title id="chart-title">バランスチャート</title>
+  <desc id="chart-description">12方向、半径0.1から1.0までの極座標チャート</desc>
+
+  <defs>
+    <marker id="hovArrowHead" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="18" markerHeight="15" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L10 4 L0 8 Z" fill="#d60000" />
+    </marker>
+    <marker id="cruiseArrowHead" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="18" markerHeight="15" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L10 4 L0 8 Z" fill="#0066ff" />
+    </marker>
+  </defs>
+  <g id="backgroundLayer">
+    <rect id="pageBackground" width="794" height="1123" fill="#ffffff" />
+  </g>
+
+  <g id="chartLayer" fill="none" stroke="#1a1a1a" stroke-width="1" transform="translate(397 520) scale(0.80) translate(-397 -520) translate(0 -41)">
+    <circle id="ring01" cx="397" cy="561" r="30" />
+    <circle id="ring02" cx="397" cy="561" r="60" />
+    <circle id="ring03" cx="397" cy="561" r="90" />
+    <circle id="ring04" cx="397" cy="561" r="120" />
+    <circle id="ring05" cx="397" cy="561" r="150" />
+    <circle id="ring06" cx="397" cy="561" r="180" />
+    <circle id="ring07" cx="397" cy="561" r="210" />
+    <circle id="ring08" cx="397" cy="561" r="240" />
+    <circle id="ring09" cx="397" cy="561" r="270" />
+    <g id="ring10">
+      <circle id="outerCircle" cx="397" cy="561" r="300" stroke-width="1.8" />
+    </g>
+
+    <line id="axis00" x1="397" y1="561" x2="397" y2="261" />
+    <line id="axis01" x1="397" y1="561" x2="547" y2="301.2" />
+    <line id="axis02" x1="397" y1="561" x2="656.8" y2="411" />
+    <line id="axis03" x1="397" y1="561" x2="697" y2="561" />
+    <line id="axis04" x1="397" y1="561" x2="656.8" y2="711" />
+    <line id="axis05" x1="397" y1="561" x2="547" y2="820.8" />
+    <line id="axis06" x1="397" y1="561" x2="397" y2="861" />
+    <line id="axis07" x1="397" y1="561" x2="247" y2="820.8" />
+    <line id="axis08" x1="397" y1="561" x2="137.2" y2="711" />
+    <line id="axis09" x1="397" y1="561" x2="97" y2="561" />
+    <line id="axis10" x1="397" y1="561" x2="137.2" y2="411" />
+    <line id="axis11" x1="397" y1="561" x2="247" y2="301.2" />
+  </g>
+
+  <g id="hovLayer" fill="none" stroke="#d60000" stroke-width="3" stroke-linejoin="round">
+    <g id="hovGroup" transform="rotate(0 397 520)" style="cursor: grab;">
+      <!-- 操作用の透明リング: 赤い外側の図形付近ならどこからでもドラッグを開始できる -->
+      <circle id="hovRotationHandle" cx="397" cy="520" r="358" fill="none" stroke="transparent" stroke-width="44" pointer-events="stroke" style="touch-action: none;" />
+      <g id="hovContent" transform="translate(397 520) scale(1.02) translate(-397 -520)">
+      <g id="hovHexagon">
+        <line id="hovArrowBody00" x1="397" y1="170" x2="700.1" y2="345" marker-start="url(#hovArrowHead)" marker-end="url(#hovArrowHead)" />
+        <line id="hovArrowBody01" x1="700.1" y1="345" x2="700.1" y2="695" marker-start="url(#hovArrowHead)" marker-end="url(#hovArrowHead)" />
+        <line id="hovArrowBody02" x1="700.1" y1="695" x2="397" y2="870" marker-start="url(#hovArrowHead)" marker-end="url(#hovArrowHead)" />
+        <line id="hovArrowBody03" x1="397" y1="870" x2="93.9" y2="695" marker-start="url(#hovArrowHead)" marker-end="url(#hovArrowHead)" />
+        <line id="hovArrowBody04" x1="93.9" y1="695" x2="93.9" y2="345" marker-start="url(#hovArrowHead)" marker-end="url(#hovArrowHead)" />
+        <line id="hovArrowBody05" x1="93.9" y1="345" x2="397" y2="170" marker-start="url(#hovArrowHead)" marker-end="url(#hovArrowHead)" />
+      </g>
+      <g id="hovTypeLabels" fill="#d60000" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="11.53" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text id="hovTypeLabel1a" x="566.2" y="227.1" transform="rotate(30 566.2 227.1)">HOV</text>
+        <text id="hovTypeLabel1b" x="228.0" y="812.9" transform="rotate(30 228.0 812.9)">HOV</text>
+        <text id="hovTypeLabel2a" x="735.1" y="520" transform="rotate(90 735.1 520)">HOV</text>
+        <text id="hovTypeLabel2b" x="58.9" y="520" transform="rotate(90 58.9 520)">HOV</text>
+        <text id="hovTypeLabel3a" x="566.2" y="812.9" transform="rotate(-30 566.2 812.9)">HOV</text>
+        <text id="hovTypeLabel3b" x="228.0" y="227.1" transform="rotate(-30 228.0 227.1)">HOV</text>
+      </g>
+      <g id="hovDirectionLabels" fill="#d60000" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="10.71" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text id="hovUpLabel3a" x="642.8" y="745.6" transform="rotate(-30 642.8 745.6)">UP</text>
+        <text id="hovDownLabel3a" x="469.6" y="845.6" transform="rotate(-30 469.6 845.6)">DOWN</text>
+        <text id="hovUpLabel3b" x="324.6" y="194.4" transform="rotate(-30 324.6 194.4)">UP</text>
+        <text id="hovDownLabel3b" x="151.4" y="294.4" transform="rotate(-30 151.4 294.4)">DOWN</text>
+        <text id="hovDownLabel1a" x="642.8" y="294.4" transform="rotate(30 642.8 294.4)">DOWN</text>
+        <text id="hovUpLabel1a" x="469.6" y="194.4" transform="rotate(30 469.6 194.4)">UP</text>
+        <text id="hovDownLabel1b" x="324.6" y="845.6" transform="rotate(30 324.6 845.6)">DOWN</text>
+        <text id="hovUpLabel1b" x="151.4" y="745.6" transform="rotate(30 151.4 745.6)">UP</text>
+        <text id="hovUpLabel2a" x="715.1" y="620" transform="rotate(90 715.1 620)">UP</text>
+        <text id="hovDownLabel2a" x="715.1" y="420" transform="rotate(90 715.1 420)">DOWN</text>
+        <text id="hovUpLabel2b" x="78.9" y="620" transform="rotate(90 78.9 620)">UP</text>
+        <text id="hovDownLabel2b" x="78.9" y="420" transform="rotate(90 78.9 420)">DOWN</text>
+      </g>
+      <g id="hovSideLabels" fill="#1a1a1a" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="14.82" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text id="hovSideLabel1a" x="556.2" y="244.4" transform="rotate(30 556.2 244.4)">1</text>
+        <text id="hovSideLabel1b" x="238.0" y="795.6" transform="rotate(30 238.0 795.6)">1</text>
+        <text id="hovSideLabel2a" x="715.1" y="520" transform="rotate(90 715.1 520)">2</text>
+        <text id="hovSideLabel2b" x="78.9" y="520" transform="rotate(90 78.9 520)">2</text>
+        <text id="hovSideLabel3a" x="556.2" y="795.6" transform="rotate(-30 556.2 795.6)">3</text>
+        <text id="hovSideLabel3b" x="238.0" y="244.4" transform="rotate(-30 238.0 244.4)">3</text>
+      </g>
+      </g>
+    </g>
+  </g>
+
+  <g id="cruiseLayer" fill="none" stroke="#0066ff" stroke-width="3" stroke-linejoin="round">
+    <g id="cruiseGroup" transform="rotate(0 397 520)" style="cursor: grab;">
+      <!-- 操作用の透明リング: 青い内側の図形付近ならどこからでもドラッグを開始できる -->
+      <circle id="cruiseRotationHandle" cx="397" cy="520" r="294" fill="none" stroke="transparent" stroke-width="44" pointer-events="stroke" style="touch-action: none;" />
+      <g id="cruiseContent" transform="translate(397 520) scale(0.84) translate(-397 -520)">
+      <g id="cruiseHexagon">
+        <line id="cruiseArrowBody00" x1="397" y1="170" x2="700.1" y2="345" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
+        <line id="cruiseArrowBody01" x1="700.1" y1="345" x2="700.1" y2="695" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
+        <line id="cruiseArrowBody02" x1="700.1" y1="695" x2="397" y2="870" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
+        <line id="cruiseArrowBody03" x1="397" y1="870" x2="93.9" y2="695" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
+        <line id="cruiseArrowBody04" x1="93.9" y1="695" x2="93.9" y2="345" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
+        <line id="cruiseArrowBody05" x1="93.9" y1="345" x2="397" y2="170" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
+      </g>
+      <g id="cruiseTypeLabels" fill="#0066ff" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text id="cruiseTypeLabel1a" x="566.2" y="227.1" transform="rotate(30 566.2 227.1)">巡航</text>
+        <text id="cruiseTypeLabel1b" x="228.0" y="812.9" transform="rotate(30 228.0 812.9)">巡航</text>
+        <text id="cruiseTypeLabel2a" x="735.1" y="520" transform="rotate(90 735.1 520)">巡航</text>
+        <text id="cruiseTypeLabel2b" x="58.9" y="520" transform="rotate(90 58.9 520)">巡航</text>
+        <text id="cruiseTypeLabel3a" x="566.2" y="812.9" transform="rotate(-30 566.2 812.9)">巡航</text>
+        <text id="cruiseTypeLabel3b" x="228.0" y="227.1" transform="rotate(-30 228.0 227.1)">巡航</text>
+      </g>
+      <g id="cruiseDirectionLabels" fill="#0066ff" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="13" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text id="cruiseUpLabel3a" x="642.8" y="745.6" transform="rotate(-30 642.8 745.6)">UP</text>
+        <text id="cruiseDownLabel3a" x="469.6" y="845.6" transform="rotate(-30 469.6 845.6)">DOWN</text>
+        <text id="cruiseUpLabel3b" x="324.6" y="194.4" transform="rotate(-30 324.6 194.4)">UP</text>
+        <text id="cruiseDownLabel3b" x="151.4" y="294.4" transform="rotate(-30 151.4 294.4)">DOWN</text>
+        <text id="cruiseDownLabel1a" x="642.8" y="294.4" transform="rotate(30 642.8 294.4)">DOWN</text>
+        <text id="cruiseUpLabel1a" x="469.6" y="194.4" transform="rotate(30 469.6 194.4)">UP</text>
+        <text id="cruiseDownLabel1b" x="324.6" y="845.6" transform="rotate(30 324.6 845.6)">DOWN</text>
+        <text id="cruiseUpLabel1b" x="151.4" y="745.6" transform="rotate(30 151.4 745.6)">UP</text>
+        <text id="cruiseUpLabel2a" x="715.1" y="620" transform="rotate(90 715.1 620)">UP</text>
+        <text id="cruiseDownLabel2a" x="715.1" y="420" transform="rotate(90 715.1 420)">DOWN</text>
+        <text id="cruiseUpLabel2b" x="78.9" y="620" transform="rotate(90 78.9 620)">UP</text>
+        <text id="cruiseDownLabel2b" x="78.9" y="420" transform="rotate(90 78.9 420)">DOWN</text>
+      </g>
+      <g id="cruiseSideLabels" fill="#1a1a1a" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="18" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+        <text id="cruiseSideLabel1a" x="556.2" y="244.4" transform="rotate(30 556.2 244.4)">1</text>
+        <text id="cruiseSideLabel1b" x="238.0" y="795.6" transform="rotate(30 238.0 795.6)">1</text>
+        <text id="cruiseSideLabel2a" x="715.1" y="520" transform="rotate(90 715.1 520)">2</text>
+        <text id="cruiseSideLabel2b" x="78.9" y="520" transform="rotate(90 78.9 520)">2</text>
+        <text id="cruiseSideLabel3a" x="556.2" y="795.6" transform="rotate(-30 556.2 795.6)">3</text>
+        <text id="cruiseSideLabel3b" x="238.0" y="244.4" transform="rotate(-30 238.0 244.4)">3</text>
+      </g>
+      </g>
+    </g>
+  </g>
+  <g id="dotLayer" style="pointer-events: none;"></g>
+
+  <g id="tableLayer" transform="translate(397 520) scale(0.80) translate(-397 -520) translate(0 -41)" fill="#1a1a1a" font-family="Arial, 'Noto Sans JP', sans-serif">
+    <g id="radiusLabels" fill="#000000" font-size="12" font-weight="700" text-anchor="start">
+      <text id="radiusLabel01" x="407" y="525">0.1</text>
+      <text id="radiusLabel02" x="407" y="495">0.2</text>
+      <text id="radiusLabel03" x="407" y="465">0.3</text>
+      <text id="radiusLabel04" x="407" y="435">0.4</text>
+      <text id="radiusLabel05" x="407" y="405">0.5</text>
+      <text id="radiusLabel06" x="407" y="375">0.6</text>
+      <text id="radiusLabel07" x="407" y="345">0.7</text>
+      <text id="radiusLabel08" x="407" y="315">0.8</text>
+      <text id="radiusLabel09" x="407" y="285">0.9</text>
+      <text id="radiusLabel10" x="407" y="255">1.0</text>
+    </g>
+
+    <g id="clockLabels" fill="#1a1a1a" font-size="20" font-weight="700" text-anchor="middle" dominant-baseline="middle">
+      <text id="clock00" x="397" y="248">12</text>
+      <text id="clock01" x="553.5" y="289.9">1</text>
+      <text id="clock02" x="668.1" y="404.5">2</text>
+      <text id="clock03" x="710" y="561">3</text>
+      <text id="clock04" x="668.1" y="717.5">4</text>
+      <text id="clock05" x="553.5" y="832.1">5</text>
+      <text id="clock06" x="397" y="874">6</text>
+      <text id="clock07" x="240.5" y="832.1">7</text>
+      <text id="clock08" x="125.9" y="717.5">8</text>
+      <text id="clock09" x="84" y="561">9</text>
+      <text id="clock10" x="125.9" y="404.5">10</text>
+      <text id="clock11" x="240.5" y="289.9">11</text>
+    </g>
+  </g>
+  <script><![CDATA[
+    (() => {
+      const svg = document.documentElement;
+      const centerX = 397;
+      const centerY = 520;
+      const angles = { hov: 0, cruise: 0 };
+      let active = null;
+      const baseViewBox = { x: 0, y: 0, width: 794, height: 1123 };
+      let pinchStartDistance = 0;
+      let pinchStartZoom = 1;
+      let zoom = 1;
+      let pinching = false;
+      let rotationTouchActive = false;
+      let panning = false;
+      let panStart = null;
+
+      svg.style.touchAction = 'pan-y';
+
+      function clamp(value, minimum, maximum) {
+        return Math.min(maximum, Math.max(minimum, value));
+      }
+
+      function setViewBox(x, y, width, height) {
+        svg.setAttribute('viewBox', `${
+          clamp(x, baseViewBox.x, baseViewBox.x + baseViewBox.width - width)
+        } ${
+          clamp(y, baseViewBox.y, baseViewBox.y + baseViewBox.height - height)
+        } ${width} ${height}`);
+      }
+
+      function currentViewBox() {
+        const values = (svg.getAttribute('viewBox') || '0 0 794 1123').trim().split(/[ ,]+/).map(Number);
+        return { x: values[0], y: values[1], width: values[2], height: values[3] };
+      }
+
+      function setZoom(nextZoom) {
+        zoom = Math.min(3, Math.max(1, nextZoom));
+        // 拡大中はブラウザのページスクロールではなく、チャート内のパンを優先する。
+        svg.style.touchAction = zoom > 1 ? 'none' : 'pan-y';
+        // touch-action の判定対象は埋め込み先の object なので、そちらも同じ状態にする。
+        if (window.frameElement) window.frameElement.style.touchAction = zoom > 1 ? 'none' : 'pan-y';
+        const width = baseViewBox.width / zoom;
+        const height = baseViewBox.height / zoom;
+        const x = centerX - width / 2;
+        const y = (baseViewBox.y + baseViewBox.height / 2) - height / 2;
+        setViewBox(x, y, width, height);
+      }
+
+      function touchDistance(touches) {
+        return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
+      }
+
+      // iPhone Safariでは、回転開始後に止めてもページがスクロールすることがあるため、
+      // リングへ触れた瞬間（キャプチャ段階）からスクロールを停止する。
+      svg.addEventListener('touchstart', (event) => {
+        if (event.touches.length === 2) {
+          rotationTouchActive = false;
+          return;
+        }
+        if (zoom <= 1 && event.touches.length === 1 && svg.dataset.rotationLocked !== 'true'
+          && event.target.closest('#hovRotationHandle, #cruiseRotationHandle')) {
+          rotationTouchActive = true;
+          event.preventDefault();
+        }
+      }, { capture: true, passive: false });
+
+      svg.addEventListener('touchmove', (event) => {
+        if (rotationTouchActive && event.touches.length === 1) event.preventDefault();
+      }, { capture: true, passive: false });
+
+      svg.addEventListener('touchend', (event) => {
+        if (event.touches.length === 0) rotationTouchActive = false;
+      }, { capture: true });
+
+      svg.addEventListener('touchcancel', () => {
+        rotationTouchActive = false;
+      }, { capture: true });
+
+      svg.addEventListener('touchstart', (event) => {
+        if (event.touches.length === 2) {
+          event.preventDefault();
+          pinching = true;
+          svg.dataset.pinching = 'true';
+          pinchStartDistance = touchDistance(event.touches);
+          pinchStartZoom = zoom;
+          active = null;
+          panning = false;
+          panStart = null;
+          return;
+        }
+
+        if (event.touches.length === 1 && zoom > 1) {
+          const viewBox = currentViewBox();
+          panning = true;
+          panStart = { x: event.touches[0].clientX, y: event.touches[0].clientY, viewBox };
+          svg.dataset.panning = 'true';
+          event.preventDefault();
+          return;
+        }
+
+        if (event.touches.length === 1 && event.target.closest('#hovRotationHandle, #cruiseRotationHandle')) {
+          event.preventDefault();
+        }
+      }, { passive: false });
+
+      svg.addEventListener('touchmove', (event) => {
+        if (pinching && event.touches.length === 2) {
+          event.preventDefault();
+          setZoom(pinchStartZoom * touchDistance(event.touches) / pinchStartDistance);
+          return;
+        }
+
+        if (panning && event.touches.length === 1 && panStart) {
+          const rect = svg.getBoundingClientRect();
+          const dx = (event.touches[0].clientX - panStart.x) * panStart.viewBox.width / rect.width;
+          const dy = (event.touches[0].clientY - panStart.y) * panStart.viewBox.height / rect.height;
+          setViewBox(panStart.viewBox.x - dx, panStart.viewBox.y - dy, panStart.viewBox.width, panStart.viewBox.height);
+          event.preventDefault();
+          return;
+        }
+
+        if (active) event.preventDefault();
+      }, { passive: false });
+
+      svg.addEventListener('touchend', (event) => {
+        if (event.touches.length >= 2) return;
+        pinching = false;
+        delete svg.dataset.pinching;
+        if (event.touches.length === 0) {
+          panning = false;
+          panStart = null;
+          delete svg.dataset.panning;
+        }
+      });
+
+      function pointerAngle(event) {
+        const point = svg.createSVGPoint();
+        point.x = event.clientX;
+        point.y = event.clientY;
+        const position = point.matrixTransform(svg.getScreenCTM().inverse());
+        return Math.atan2(position.y - centerY, position.x - centerX) * 180 / Math.PI;
+      }
+
+      svg.addEventListener('pointerdown', (event) => {
+        if (svg.dataset.rotationLocked === 'true' || pinching || zoom > 1) return;
+        const target = event.target;
+        const handle = target.closest('#hovRotationHandle, #cruiseRotationHandle');
+        if (!handle) return;
+        const group = handle.closest('#hovGroup, #cruiseGroup');
+
+        const name = group.id === 'hovGroup' ? 'hov' : 'cruise';
+        active = { group, name, pointerId: event.pointerId, startAngle: pointerAngle(event), groupAngle: angles[name] };
+        svg.setPointerCapture(event.pointerId);
+        group.style.cursor = 'grabbing';
+        event.preventDefault();
+      });
+
+      svg.addEventListener('pointermove', (event) => {
+        if (!active || event.pointerId !== active.pointerId) return;
+        if (pinching) return;
+        if (svg.dataset.rotationLocked === 'true') {
+          stopRotation(event);
+          return;
+        }
+        const angle = active.groupAngle + pointerAngle(event) - active.startAngle;
+        angles[active.name] = angle;
+        active.group.setAttribute('transform', `rotate(${angle} ${centerX} ${centerY})`);
+        event.preventDefault();
+      });
+
+      function stopRotation(event) {
+        if (!active || event.pointerId !== active.pointerId) return;
+        if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+        active.group.style.cursor = 'grab';
+        active = null;
+      }
+
+      svg.addEventListener('pointerup', stopRotation);
+      svg.addEventListener('pointercancel', stopRotation);
+    })();
+  ]]></script>
+</svg>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
