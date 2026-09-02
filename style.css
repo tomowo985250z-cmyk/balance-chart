@@ -178,6 +178,8 @@ object {
   box-shadow: 0 12px 32px rgb(0 0 0 / 28%);
 }
 .time-picker-title { margin: 0 0 10px; text-align: center; font-weight: 700; }
+.time-wheels { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.time-separator { color: #252a32; font-size: 28px; font-weight: 700; }
 .time-wheel-window {
   position: relative;
   height: 240px;
@@ -215,7 +217,7 @@ object {
   scroll-snap-align: center;
 }
 .time-wheel-option[aria-selected='true'] { color: #1f5faa; font-weight: 700; }
-.time-picker-panel > button { width: 100%; margin-top: 12px; }
+.time-picker-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
 
 @media (max-width: 600px) {
   html,
