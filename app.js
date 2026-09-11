@@ -109,7 +109,8 @@ function openMemoPicker(index) {
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
   activeMemoIndex = index;
-  selectedMemoValue = memoValues[index] || options[0];
+  const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1') : options[0];
+  selectedMemoValue = memoValues[index] || initialValue;
   memoPickerTitle.textContent = `調整量 ${index + 1} を選択`;
   renderMemoWheel(options, selectedMemoValue);
   memoPicker.hidden = false;
