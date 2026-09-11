@@ -60,7 +60,7 @@ const MEMO_OPTIONS = [
 ];
 
 function getThirdMemoOptions() {
-  return memoValues[1] === 'LINK' ? ['2', '1', '1/2', '1/4'] : memoValues[1] === 'TAB' ? ['3', '2', '1'] : [];
+  return memoValues[1] === 'LINK' ? ['3', '2', '1', '3/4', '2/3', '1/2', '1/3', '1/4', '1/8'] : memoValues[1] === 'TAB' ? ['3', '2', '1'] : [];
 }
 
 function updateMemoButtons() {
