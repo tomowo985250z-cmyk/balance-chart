@@ -1,5 +1,5 @@
 ﻿:root {
-  background: #e7e9ed;
+  background: #edf1f5;
 }
 
 * {
@@ -97,12 +97,14 @@ body {
 
 .dot-list { display: flex; flex-direction: column; flex-wrap: nowrap; min-width: 0; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .dot-list:empty { display: none; }
-.dot-list li { display: grid; min-width: 0; gap: 7px; padding: 4px 6px; border-radius: 5px; background: #fff; font-size: 14px; }
+.dot-list li { display: flex; flex-flow: row nowrap; align-items: center; min-width: 0; max-width: 100%; gap: 6px; padding: 4px 6px; border-radius: 5px; background: #fff; font-size: 14px; white-space: nowrap; overflow-x: auto; }
 .dot-result-row, .dot-adjustment-row { display: flex; align-items: center; gap: 7px; }
-.dot-result-row { min-width: 0; flex-wrap: nowrap; gap: 4px; white-space: nowrap; overflow-x: auto; }
-.dot-result-row > span { flex: 1 0 auto; }
+.dot-result-row { flex: 1 0 auto; min-width: 0; flex-flow: row nowrap; gap: 3px; white-space: nowrap; }
+.dot-result-row > span { flex: 1 0 auto; width: auto; white-space: nowrap; }
+.dot-result-row > span > span { display: inline; white-space: nowrap; }
 .dot-list .dot-result-row button { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 4px; font-size: 14px; white-space: nowrap; }
-.dot-adjustment-row { padding-top: 7px; border-top: 1px solid #d9dee6; }
+.dot-adjustment-row { flex: 0 0 auto; flex-wrap: nowrap; gap: 3px; padding-left: 6px; border-left: 1px solid #d9dee6; white-space: nowrap; }
+.dot-list .dot-adjustment-row button { flex: 0 0 auto; min-width: 44px; min-height: 44px; white-space: nowrap; }
 .dot-memo { color: #4d5663; font-weight: 700; }
 .dot-list .swatch { width: 10px; height: 10px; border-radius: 50%; }
 .dot-list button { min-height: auto; padding: 2px 6px; background: #fff; cursor: pointer; }
@@ -282,6 +284,53 @@ object {
 }
 #confirmTimePicker { background: #1f5faa; color: #fff; }
 
+/* Surrounding controls only: keep chart typography and geometry unchanged. */
+.dot-form, .adjustment-form, .dot-list, .rotation-lock, .time-picker, .results-heading {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", "Segoe UI", sans-serif;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.dot-form, .adjustment-form { border: 1px solid #cbd5e1; box-shadow: none; }
+.dot-set { border-width: 2px; border-radius: 8px; }
+.dot-set-red { background: #fff7f7; }
+.dot-set-blue { background: #f3f8ff; }
+.dot-set legend, .memo-set legend { font-size: 17px; font-weight: 800; }
+.memo-set { min-width: 0; margin: 0; padding: 7px; border: 2px solid #cbd5e1; border-radius: 8px; }
+.dot-form input, .dot-form select, .dot-form button, .adjustment-form button {
+  min-height: 44px; border-radius: 8px; font-weight: 700; text-align: center;
+}
+.dot-form input { background: #fff; color: #172b42; font-size: 20px; }
+.dot-form .time-wheel-trigger { background: #fff; color: #172b42; border-color: #8b9bb0; font-size: 20px; }
+.dot-form .dot-set-red input, .dot-form .dot-set-red .time-wheel-trigger { color: #a61924; }
+.dot-form .dot-set-blue input, .dot-form .dot-set-blue .time-wheel-trigger { color: #1259a8; }
+.memo-wheel-trigger { color: #172b42; border-color: #8b9bb0; font-size: 15px; padding-inline: 4px; }
+#memoFour { font-weight: 800; background: #eaf0f7; border-color: #71849b; }
+.dot-form button, .adjustment-form button, .dot-list button, .time-picker button { touch-action: manipulation; cursor: pointer; }
+.dot-form :disabled, .adjustment-form :disabled, .dot-list button:disabled { color: #667487; background: #e5eaf0; border-color: #bdc7d3; cursor: not-allowed; }
+.dot-form :focus-visible, .adjustment-form :focus-visible, .dot-list button:focus-visible, .time-picker button:focus-visible {
+  outline: 3px solid #336da7; outline-offset: 2px;
+}
+#cancelCruiseAddition { background: #fff; color: #304b6c; border-color: #8b9bb0; }
+.dot-message { font-weight: 600; line-height: 1.4; }
+.dot-message:empty { display: none; }
+.results-heading { margin: 0; padding: 0 6px; color: #172b42; font-size: 16px; font-weight: 800; }
+.results-heading:has(+ .dot-list:empty) { display: none; }
+.dot-list li { box-shadow: inset 0 0 0 1px #cbd5e1; border-radius: 8px; color: #172b42; }
+.dot-result-row > span { font-weight: 700; }
+.dot-label-red, .dot-label-blue { font-weight: 800; }
+.dot-list button { border-radius: 8px; color: #8e2732; border-color: #c6a6ac; font-weight: 700; text-align: center; }
+.dot-list .add-cruise-button { color: #1259a8; background: #edf5ff; border-color: #92b4dc; }
+.dot-memo { color: #344b64; font-weight: 700; }
+.dot-list .dot-adjustment-row button { font-size: 14px; }
+.rotation-lock { min-height: 44px; border-radius: 8px; border-color: #8b9bb0; font-weight: 700; }
+.guide-toggle[aria-pressed='true'], .rotation-lock:has(input:checked) { background: #eaf3ff; border-color: #1f5faa; }
+.time-picker-title { font-size: 18px; font-weight: 800; color: #172b42; }
+.time-wheel-option { font-family: inherit; font-weight: 600; }
+.time-wheel-option[aria-selected='true'] { font-weight: 800; background: #eaf3ff; }
+#memoWheel [data-value='UP'], #memoWheel [data-value='DOWN'] { font-weight: 800; letter-spacing: .06em; }
+.time-picker-actions button { border-radius: 8px; text-align: center; }
+#confirmMemoPicker { background: #1f5faa; color: #fff; }
+
 @media (max-width: 600px) {
   html,
   body {
@@ -355,8 +404,12 @@ object {
   .dot-list {
     padding: 0 6px;
   }
-  .dot-list li { font-size: 13px; padding: 4px; }
-  .dot-list .dot-result-row button { font-size: 13px; }
+  .dot-list li { font-size: 14px; padding: 4px; }
+  .dot-list .dot-result-row button { font-size: 14px; }
+}
+
+@media (max-width: 360px) {
+  .dot-list li, .dot-list .dot-result-row button, .dot-list .dot-adjustment-row button { font-size: 13px; }
 }
 
 @media print {
@@ -370,6 +423,7 @@ object {
 
   .dot-form,
   .adjustment-form,
+  .results-heading,
   .dot-list { display: none; }
 
   .app { width: 210mm; }
