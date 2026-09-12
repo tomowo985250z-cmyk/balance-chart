@@ -482,7 +482,7 @@ function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection)
   };
 }
 
-function appendDirectionArrowMarkers() {
+function appendDirectionArrowMarkers(target) {
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
   [['red', DOT_COLORS.red], ['blue', DOT_COLORS.blue]].forEach(([name, color]) => {
     const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
@@ -499,10 +499,17 @@ function appendDirectionArrowMarkers() {
     marker.append(arrow);
     defs.append(marker);
   });
-  dotOverlay.append(defs);
+  target.append(defs);
 }
 
 function renderDirectionLines() {
+  let guideLayer = dotOverlay.querySelector('.direction-lines');
+  if (!guideLayer) {
+    guideLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    guideLayer.setAttribute('class', 'direction-lines');
+    dotOverlay.prepend(guideLayer);
+  }
+  guideLayer.replaceChildren();
   const redDots = [];
   const blueDots = [];
   // 基準線の候補は、現在の最終結果番号にある赤・青ドットだけに限定する。
@@ -549,7 +556,7 @@ function renderDirectionLines() {
   const selected = candidates[0];
   if (!selected) return;
 
-  appendDirectionArrowMarkers();
+  appendDirectionArrowMarkers(guideLayer);
   [{ line: selected.redLine, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }, { line: selected.blueLine, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' }].forEach(({ line, color, marker }) => {
     const directionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     directionLine.setAttribute('class', 'guide-direction-line');
@@ -564,7 +571,7 @@ function renderDirectionLines() {
     directionLine.setAttribute('opacity', '0.9');
     directionLine.setAttribute('marker-end', `url(#${marker})`);
     directionLine.style.pointerEvents = 'none';
-    dotOverlay.append(directionLine);
+    guideLayer.append(directionLine);
   });
 }
 
@@ -789,6 +796,22 @@ function setupRotationControls() {
     { group: cruiseGroup, handle: cruiseHandle, name: 'cruise' }
   ];
   let activeRotation = null;
+  let rotationFrame = null;
+  let pendingPointer = null;
+  let rotationChanged = false;
+
+  function flushRotation() {
+    if (rotationFrame !== null) cancelAnimationFrame(rotationFrame);
+    rotationFrame = null;
+    if (!activeRotation || !pendingPointer) return;
+    const angle = activeRotation.startGroupAngle + getPointerAngle(pendingPointer) - activeRotation.startPointerAngle;
+    pendingPointer = null;
+    if (activeRotation.name === 'hov') hovAngle = angle;
+    else cruiseAngle = angle;
+    setGroupRotation(activeRotation.group, angle);
+    renderDirectionLines();
+    rotationChanged = true;
+  }
 
   // 透明リング上だけは回転ドラッグ、それ以外は縦スクロールにする。
   groups.forEach((state) => {
@@ -807,15 +830,14 @@ function setupRotationControls() {
 
   function finishRotation(event) {
     if (!activeRotation || event.pointerId !== activeRotation.pointerId) return;
-
+    flushRotation();
+    activeRotation.handle.style.cursor = 'grab';
+    activeRotation = null;
+    if (rotationChanged) saveRotation();
+    rotationChanged = false;
     if (svg.hasPointerCapture(event.pointerId)) {
       svg.releasePointerCapture(event.pointerId);
     }
-
-    activeRotation.handle.style.cursor = 'grab';
-    activeRotation = null;
-    // 回転完了時にも最終角度で基準線の対応・距離を確定し直す。
-    renderDots();
   }
 
   groups.forEach((state) => {
@@ -827,6 +849,7 @@ function setupRotationControls() {
       }
       event.preventDefault();
 
+      if (activeRotation) finishRotation({ pointerId: activeRotation.pointerId });
       activeRotation = {
         ...state,
         pointerId: event.pointerId,
@@ -848,21 +871,16 @@ function setupRotationControls() {
     }
 
     event.preventDefault();
-    const angle = activeRotation.startGroupAngle + getPointerAngle(event) - activeRotation.startPointerAngle;
-
-    if (activeRotation.name === 'hov') {
-      hovAngle = angle;
-    } else {
-      cruiseAngle = angle;
-    }
-
-    setGroupRotation(activeRotation.group, angle);
-    saveRotation();
-    renderDots();
+    pendingPointer = { clientX: event.clientX, clientY: event.clientY };
+    if (rotationFrame === null) rotationFrame = requestAnimationFrame(flushRotation);
   });
 
   svg.addEventListener('pointerup', finishRotation);
   svg.addEventListener('pointercancel', finishRotation);
+  svg.addEventListener('lostpointercapture', finishRotation);
+  window.addEventListener('pagehide', () => {
+    if (activeRotation) finishRotation({ pointerId: activeRotation.pointerId });
+  });
 }
 
 renderDots();
@@ -876,8 +894,8 @@ window.addEventListener('message', (event) => {
     && Number.isFinite(message.hovAngle) && Number.isFinite(message.cruiseAngle)) {
     hovAngle = message.hovAngle;
     cruiseAngle = message.cruiseAngle;
-    saveRotation();
-    renderDots();
+    if (message.finished) saveRotation();
+    renderDirectionLines();
   }
   if (message?.type === 'balance-chart-viewbox' && typeof message.viewBox === 'string') {
     dotOverlay.setAttribute('viewBox', message.viewBox);

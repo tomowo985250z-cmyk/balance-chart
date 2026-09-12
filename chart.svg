@@ -174,6 +174,9 @@
       const angles = { hov: 0, cruise: 0 };
       const rotationStorageKey = 'balance-chart-rotation-v1';
       let active = null;
+      let rotationFrame = null;
+      let pendingPointer = null;
+      let rotationChanged = false;
       const baseViewBox = { x: 0, y: 0, width: 794, height: 1123 };
       let pinchStartDistance = 0;
       let pinchStartZoom = 1;
@@ -193,20 +196,23 @@
       document.getElementById('hovGroup').setAttribute('transform', `rotate(${angles.hov} ${centerX} ${centerY})`);
       document.getElementById('cruiseGroup').setAttribute('transform', `rotate(${angles.cruise} ${centerX} ${centerY})`);
 
-      function notifyRotations() {
+      function notifyRotations(finished = false) {
         if (svg.dataset.rotationManagedByParent === 'true') return;
         window.parent.postMessage({
-          type: 'balance-chart-rotation', hovAngle: angles.hov, cruiseAngle: angles.cruise
+          type: 'balance-chart-rotation', hovAngle: angles.hov, cruiseAngle: angles.cruise, finished
         }, '*');
       }
 
       function saveRotations() {
-        try {
-          localStorage.setItem(rotationStorageKey, JSON.stringify({ hovAngle: angles.hov, cruiseAngle: angles.cruise }));
-        } catch {
-          // 保存に失敗しても、現在の表示は継続する。
+        // 埋め込み時の保存は親ページだけが担当する。
+        if (window.parent === window) {
+          try {
+            localStorage.setItem(rotationStorageKey, JSON.stringify({ hovAngle: angles.hov, cruiseAngle: angles.cruise }));
+          } catch {
+            // 保存に失敗しても、現在の表示は継続する。
+          }
         }
-        notifyRotations();
+        notifyRotations(true);
       }
 
       svg.style.touchAction = 'pan-y';
@@ -291,7 +297,7 @@
           svg.dataset.pinching = 'true';
           pinchStartDistance = touchDistance(event.touches);
           pinchStartZoom = zoom;
-          active = null;
+          if (active) stopRotation({ pointerId: active.pointerId });
           panning = false;
           panStart = null;
           return;
@@ -349,6 +355,18 @@
         return Math.atan2(position.y - centerY, position.x - centerX) * 180 / Math.PI;
       }
 
+      function flushRotation() {
+        if (rotationFrame !== null) cancelAnimationFrame(rotationFrame);
+        rotationFrame = null;
+        if (!active || !pendingPointer) return;
+        const angle = active.groupAngle + pointerAngle(pendingPointer) - active.startAngle;
+        pendingPointer = null;
+        angles[active.name] = angle;
+        active.group.setAttribute('transform', `rotate(${angle} ${centerX} ${centerY})`);
+        rotationChanged = true;
+        notifyRotations();
+      }
+
       svg.addEventListener('pointerdown', (event) => {
         if (svg.dataset.rotationManagedByParent === 'true') return;
         if (svg.dataset.rotationLocked === 'true' || pinching || zoom > 1) return;
@@ -358,6 +376,7 @@
         const group = handle.closest('#hovGroup, #cruiseGroup');
 
         const name = group.id === 'hovGroup' ? 'hov' : 'cruise';
+        if (active) stopRotation({ pointerId: active.pointerId });
         active = { group, name, pointerId: event.pointerId, startAngle: pointerAngle(event), groupAngle: angles[name] };
         svg.setPointerCapture(event.pointerId);
         group.style.cursor = 'grabbing';
@@ -371,22 +390,27 @@
           stopRotation(event);
           return;
         }
-        const angle = active.groupAngle + pointerAngle(event) - active.startAngle;
-        angles[active.name] = angle;
-        active.group.setAttribute('transform', `rotate(${angle} ${centerX} ${centerY})`);
-        saveRotations();
+        pendingPointer = { clientX: event.clientX, clientY: event.clientY };
+        if (rotationFrame === null) rotationFrame = requestAnimationFrame(flushRotation);
         event.preventDefault();
       });
 
       function stopRotation(event) {
         if (!active || event.pointerId !== active.pointerId) return;
-        if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+        flushRotation();
         active.group.style.cursor = 'grab';
         active = null;
+        if (rotationChanged) saveRotations();
+        rotationChanged = false;
+        if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
       }
 
       svg.addEventListener('pointerup', stopRotation);
       svg.addEventListener('pointercancel', stopRotation);
+      svg.addEventListener('lostpointercapture', stopRotation);
+      window.addEventListener('pagehide', () => {
+        if (active) stopRotation({ pointerId: active.pointerId });
+      });
     })();
   ]]></script>
 </svg>

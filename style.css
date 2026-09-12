@@ -95,16 +95,17 @@ body {
 .adjustment-form > button { min-height: 36px; background: #1f5faa; color: #fff; border-color: #1f5faa; font-weight: 700; cursor: pointer; }
 .dot-message { margin: 0; color: #b00020; font-size: 13px; }
 
-.dot-list { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.dot-list { display: flex; flex-direction: column; flex-wrap: nowrap; min-width: 0; gap: 7px; margin: 0; padding: 0; list-style: none; }
 .dot-list:empty { display: none; }
-.dot-list li { display: grid; gap: 7px; padding: 8px; border-radius: 5px; background: #fff; font-size: 14px; }
+.dot-list li { display: grid; min-width: 0; gap: 7px; padding: 4px 6px; border-radius: 5px; background: #fff; font-size: 14px; }
 .dot-result-row, .dot-adjustment-row { display: flex; align-items: center; gap: 7px; }
+.dot-result-row { min-width: 0; flex-wrap: nowrap; gap: 4px; white-space: nowrap; overflow-x: auto; }
+.dot-result-row > span { flex: 1 0 auto; }
+.dot-list .dot-result-row button { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 4px; font-size: 14px; white-space: nowrap; }
 .dot-adjustment-row { padding-top: 7px; border-top: 1px solid #d9dee6; }
 .dot-memo { color: #4d5663; font-weight: 700; }
 .dot-list .swatch { width: 10px; height: 10px; border-radius: 50%; }
 .dot-list button { min-height: auto; padding: 2px 6px; background: #fff; cursor: pointer; }
-.dot-list .add-cruise-button { min-height: 44px; padding: 6px 9px; }
-.dot-result-row:has(.add-cruise-button) { flex-wrap: wrap; }
 #cancelCruiseAddition { min-height: 44px; }
 #cancelCruiseAddition[hidden], #cruiseAdditionMessage[hidden] { display: none; }
 .dot-label-red { color: #b00000; font-weight: 700; }
@@ -352,8 +353,10 @@ object {
   }
 
   .dot-list {
-    padding: 0 12px;
+    padding: 0 6px;
   }
+  .dot-list li { font-size: 13px; padding: 4px; }
+  .dot-list .dot-result-row button { font-size: 13px; }
 }
 
 @media print {
