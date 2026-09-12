@@ -103,12 +103,12 @@
         <line id="cruiseArrowBody05" x1="93.9" y1="345" x2="397" y2="170" marker-start="url(#cruiseArrowHead)" marker-end="url(#cruiseArrowHead)" />
       </g>
       <g id="cruiseTypeLabels" fill="#0066ff" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="19.25" font-weight="700" text-anchor="middle" dominant-baseline="middle">
-        <text id="cruiseTypeLabel1a" x="571.06" y="218.68" transform="rotate(30 571.06 218.68)">巡航</text>
-        <text id="cruiseTypeLabel1b" x="220.93" y="825.14" transform="rotate(30 220.93 825.14)">巡航</text>
-        <text id="cruiseTypeLabel2a" x="744.97" y="520.00" transform="rotate(90 744.97 520.00)">巡航</text>
-        <text id="cruiseTypeLabel2b" x="44.72" y="520.00" transform="rotate(90 44.72 520.00)">巡航</text>
-        <text id="cruiseTypeLabel3a" x="573.21" y="825.05" transform="rotate(150 573.21 825.05)">巡航</text>
-        <text id="cruiseTypeLabel3b" x="223.09" y="218.60" transform="rotate(150 223.09 218.60)">巡航</text>
+        <text id="cruiseTypeLabel1a" x="570.90" y="218.96" transform="rotate(30 570.90 218.96)">巡航</text>
+        <text id="cruiseTypeLabel1b" x="221.09" y="824.86" transform="rotate(30 221.09 824.86)">巡航</text>
+        <text id="cruiseTypeLabel2a" x="744.65" y="520.00" transform="rotate(90 744.65 520.00)">巡航</text>
+        <text id="cruiseTypeLabel2b" x="45.05" y="520.00" transform="rotate(90 45.05 520.00)">巡航</text>
+        <text id="cruiseTypeLabel3a" x="570.89" y="821.03" transform="rotate(150 570.89 821.03)">巡航</text>
+        <text id="cruiseTypeLabel3b" x="221.09" y="215.14" transform="rotate(150 221.09 215.14)">巡航</text>
       </g>
       <g id="cruiseDirectionLabels" fill="#0066ff" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="17.88" font-weight="700" text-anchor="middle" dominant-baseline="middle">
         <text id="cruiseUpLabel3a" x="642.8" y="745.6" transform="rotate(-30 642.8 745.6)">UP</text>
@@ -125,12 +125,12 @@
         <text id="cruiseDownLabel2b" x="78.9" y="420" transform="rotate(90 78.9 420)">DOWN</text>
       </g>
       <g id="cruiseSideLabels" fill="#1a1a1a" stroke="none" font-family="Arial, 'Noto Sans JP', sans-serif" font-size="24.75" font-weight="700" text-anchor="middle" dominant-baseline="middle">
-        <text id="cruiseSideLabel1a" x="556.89" y="243.21" transform="rotate(30 556.89 243.21)">1</text>
-        <text id="cruiseSideLabel1b" x="234.75" y="801.22" transform="rotate(30 234.75 801.22)">1</text>
-        <text id="cruiseSideLabel2a" x="716.64" y="520.00" transform="rotate(90 716.64 520.00)">2</text>
-        <text id="cruiseSideLabel2b" x="72.34" y="520.00" transform="rotate(90 72.34 520.00)">2</text>
-        <text id="cruiseSideLabel3a" x="559.39" y="801.13" transform="rotate(150 559.39 801.13)">3</text>
-        <text id="cruiseSideLabel3b" x="237.27" y="243.13" transform="rotate(150 237.27 243.13)">3</text>
+        <text id="cruiseSideLabel1a" x="556.73" y="243.49" transform="rotate(30 556.73 243.49)">1</text>
+        <text id="cruiseSideLabel1b" x="234.91" y="800.94" transform="rotate(30 234.91 800.94)">1</text>
+        <text id="cruiseSideLabel2a" x="716.32" y="520.00" transform="rotate(90 716.32 520.00)">2</text>
+        <text id="cruiseSideLabel2b" x="72.67" y="520.00" transform="rotate(90 72.67 520.00)">2</text>
+        <text id="cruiseSideLabel3a" x="556.72" y="796.50" transform="rotate(150 556.72 796.50)">3</text>
+        <text id="cruiseSideLabel3b" x="234.92" y="239.06" transform="rotate(150 234.92 239.06)">3</text>
       </g>
       </g>
     </g>
