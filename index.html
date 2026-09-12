@@ -39,6 +39,10 @@
     <div class="chart-wrap">
       <object data="chart.svg?v=20260909-13" type="image/svg+xml" aria-label="バランスチャート"></object>
       <svg id="dotOverlay" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+      <button id="guideToggle" class="rotation-lock guide-toggle" type="button" aria-pressed="false">
+        <span class="rotation-lock-track" aria-hidden="true"></span>
+        <span id="guideToggleText">ガイド OFF</span>
+      </button>
       <label class="rotation-lock">
         <input id="rotationLock" type="checkbox" role="switch" />
         <span class="rotation-lock-track" aria-hidden="true"></span>

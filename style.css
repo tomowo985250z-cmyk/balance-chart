@@ -154,6 +154,12 @@ object {
   touch-action: manipulation;
 }
 
+.guide-toggle { left: 14px; right: auto; font-family: inherit; }
+#dotOverlay:not(.guides-visible) .guide-direction-line { display: none; }
+.guide-toggle[aria-pressed='true'] .rotation-lock-track { background: #1f5faa; }
+.guide-toggle[aria-pressed='true'] .rotation-lock-track::after { transform: translateX(12px); }
+.guide-toggle:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
+
 .rotation-lock input {
   position: absolute;
   opacity: 0;
@@ -299,6 +305,8 @@ object {
     bottom: 10px;
     min-height: 44px;
   }
+
+  .guide-toggle { left: 10px; right: auto; }
 
   .dot-form {
     gap: 8px;

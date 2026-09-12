@@ -12,6 +12,20 @@ const chartObject = document.querySelector('object[type="image/svg+xml"]');
 const chartWrap = document.querySelector('.chart-wrap');
 const dotOverlay = document.getElementById('dotOverlay');
 const rotationLock = document.getElementById('rotationLock');
+const guideToggle = document.getElementById('guideToggle');
+const guideToggleText = document.getElementById('guideToggleText');
+
+function setGuidesVisible(visible) {
+  dotOverlay.classList.toggle('guides-visible', visible);
+  guideToggle.setAttribute('aria-pressed', String(visible));
+  guideToggleText.textContent = visible ? 'ガイド ON' : 'ガイド OFF';
+}
+
+guideToggle.addEventListener('click', () => {
+  setGuidesVisible(guideToggle.getAttribute('aria-pressed') !== 'true');
+});
+setGuidesVisible(false);
+window.addEventListener('pageshow', () => setGuidesVisible(false));
 const dotForm = document.getElementById('dotForm');
 const adjustmentForm = document.getElementById('adjustmentForm');
 const redInputs = ['redHourInput', 'redMinuteInput', 'redValueInput'].map((id) => document.getElementById(id));
@@ -490,6 +504,7 @@ function renderDirectionLines() {
   appendDirectionArrowMarkers();
   [{ line: selected.redLine, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }, { line: selected.blueLine, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' }].forEach(({ line, color, marker }) => {
     const directionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    directionLine.setAttribute('class', 'guide-direction-line');
     directionLine.setAttribute('x1', String(line.start.x));
     directionLine.setAttribute('y1', String(line.start.y));
     directionLine.setAttribute('x2', String(line.end.x));
