@@ -103,6 +103,10 @@ body {
 .dot-memo { color: #4d5663; font-weight: 700; }
 .dot-list .swatch { width: 10px; height: 10px; border-radius: 50%; }
 .dot-list button { min-height: auto; padding: 2px 6px; background: #fff; cursor: pointer; }
+.dot-list .add-cruise-button { min-height: 44px; padding: 6px 9px; }
+.dot-result-row:has(.add-cruise-button) { flex-wrap: wrap; }
+#cancelCruiseAddition { min-height: 44px; }
+#cancelCruiseAddition[hidden], #cruiseAdditionMessage[hidden] { display: none; }
 .dot-label-red { color: #b00000; font-weight: 700; }
 .dot-label-blue { color: #0057c8; font-weight: 700; }
 

@@ -41,6 +41,54 @@ const minuteWheel = document.getElementById('minuteWheel');
 const closeTimePicker = document.getElementById('closeTimePicker');
 const confirmTimePicker = document.getElementById('confirmTimePicker');
 const dotSets = [];
+let cruiseAdditionTarget = null;
+let cruiseInputDraft = null;
+const cancelCruiseAddition = document.getElementById('cancelCruiseAddition');
+const cruiseAdditionMessage = document.getElementById('cruiseAdditionMessage');
+const hovFieldset = document.querySelector('.dot-set-red');
+
+function updateCruiseAdditionUI() {
+  const index = dotSets.indexOf(cruiseAdditionTarget);
+  if (cruiseAdditionTarget && (index < 0 || !cruiseAdditionTarget.red || cruiseAdditionTarget.blue)) {
+    finishCruiseAddition();
+    return;
+  }
+  const active = Boolean(cruiseAdditionTarget);
+  hovFieldset.disabled = active;
+  cancelCruiseAddition.hidden = !active;
+  cruiseAdditionMessage.hidden = !active;
+  cruiseAdditionMessage.textContent = active ? `結果 ${index + 1} に巡航を追加します。巡航の数値・時計角を入力してください。` : '';
+  addDotButton.textContent = active ? `結果 ${index + 1} に巡航を追加` : 'ドットを追加';
+}
+
+function finishCruiseAddition() {
+  cruiseAdditionTarget = null;
+  if (cruiseInputDraft) {
+    blueInputs.forEach((input, index) => {
+      input.value = cruiseInputDraft[index];
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  cruiseInputDraft = null;
+  dotMessage.textContent = '';
+  updateCruiseAdditionUI();
+}
+
+function startCruiseAddition(set) {
+  if (!dotSets.includes(set) || !set.red || set.blue || getDotCount() >= MAX_DOTS) return;
+  if (!cruiseAdditionTarget) cruiseInputDraft = blueInputs.map((input) => input.value);
+  cruiseAdditionTarget = set;
+  blueInputs.forEach((input) => {
+    input.value = '';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  dotMessage.textContent = '';
+  updateCruiseAdditionUI();
+  dotForm.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  blueInputs[2].focus({ preventScroll: true });
+}
+
+cancelCruiseAddition.addEventListener('click', finishCruiseAddition);
 const memoButtons = ['memoOne', 'memoTwo', 'memoThree', 'memoFour'].map((id) => document.getElementById(id));
 const memoPicker = document.getElementById('memoPicker');
 const memoPickerTitle = document.getElementById('memoPickerTitle');
@@ -521,6 +569,7 @@ function renderDirectionLines() {
 }
 
 function renderDots() {
+  updateCruiseAdditionUI();
   dotList.replaceChildren(...dotSets.map((set, index) => {
     const item = document.createElement('li');
     const label = document.createElement('span');
@@ -540,6 +589,16 @@ function renderDots() {
     const resultRow = document.createElement('div');
     resultRow.className = 'dot-result-row';
     resultRow.append(label, remove);
+    if (set.red && !set.blue) {
+      const addCruise = document.createElement('button');
+      addCruise.type = 'button';
+      addCruise.className = 'add-cruise-button';
+      addCruise.textContent = '巡航を追加';
+      addCruise.setAttribute('aria-label', `結果${index + 1}に巡航を追加`);
+      addCruise.disabled = getDotCount() >= MAX_DOTS;
+      addCruise.addEventListener('click', () => startCruiseAddition(set));
+      resultRow.append(addCruise);
+    }
     item.append(resultRow);
     set.adjustments?.forEach((adjustment, adjustmentIndex) => {
       const adjustmentRow = document.createElement('div');
@@ -629,6 +688,27 @@ function renderDots() {
 
 dotForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (cruiseAdditionTarget) {
+    const target = cruiseAdditionTarget;
+    if (!dotSets.includes(target) || !target.red || target.blue) {
+      finishCruiseAddition();
+      return;
+    }
+    if (getDotCount() >= MAX_DOTS) {
+      dotMessage.textContent = `ドットは最大${MAX_DOTS}個まで追加できます。`;
+      return;
+    }
+    const blue = readDotInput(blueInputs, 'blue');
+    if (blueInputs.some((input) => input.value === '') || !blue) {
+      dotMessage.textContent = '巡航の時計角（時間は1〜12、分は00〜59）と0以上の数値をすべて入力してください。';
+      return;
+    }
+    target.blue = blue;
+    saveDotSets();
+    finishCruiseAddition();
+    renderDots();
+    return;
+  }
   if (getDotCount() >= MAX_DOTS) {
     dotMessage.textContent = `ドットは最大${MAX_DOTS}個まで追加できます。`;
     return;
