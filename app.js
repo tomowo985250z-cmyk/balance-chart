@@ -139,12 +139,12 @@ function formatMemoInputValue(value, index) {
 
 function updateMemoButtons() {
   memoButtons.forEach((button, index) => {
-    button.textContent = `${index + 1}: ${formatMemoInputValue(memoValues[index], index)}`;
+    button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
   });
   const thirdOptions = getThirdMemoOptions();
   memoButtons[2].disabled = thirdOptions.length === 0;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
-  memoButtons[2].textContent = `3: ${formatMemoInputValue(memoValues[2], 2)}`;
+  memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
 }
 
 function renderMemoWheel(options, selected, index) {
