@@ -15,8 +15,9 @@
   </g>
 
   <g id="chartLayer" fill="none" stroke="#1a1a1a" stroke-width="1" transform="translate(397 520) scale(0.80) translate(-397 -520) translate(0 -41)">
+    <circle id="ring02Fill" cx="397" cy="561" r="60" fill="#1a1a1a" fill-opacity="0.05" stroke="none" pointer-events="none" />
     <circle id="ring01" cx="397" cy="561" r="30" />
-    <circle id="ring02" cx="397" cy="561" r="60" />
+    <circle id="ring02" cx="397" cy="561" r="60" stroke-width="1.8" />
     <circle id="ring03" cx="397" cy="561" r="90" />
     <circle id="ring04" cx="397" cy="561" r="120" />
     <circle id="ring05" cx="397" cy="561" r="150" />
