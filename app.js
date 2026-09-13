@@ -692,7 +692,7 @@ function renderDots() {
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('fill', DOT_COLORS[dot.color]);
       label.setAttribute('font-family', "Arial, 'Noto Sans JP', sans-serif");
-      label.setAttribute('font-size', '14');
+      label.setAttribute('font-size', '16');
       label.setAttribute('font-weight', '700');
       label.setAttribute('stroke', '#ffffff');
       label.setAttribute('stroke-width', '3');
