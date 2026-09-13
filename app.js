@@ -587,85 +587,6 @@ function renderDirectionLines() {
   });
 }
 
-function moveAdjustment(source, adjustment, target) {
-  if (source === target || !dotSets.includes(source) || !dotSets.includes(target)) return false;
-  const index = source.adjustments?.indexOf(adjustment) ?? -1;
-  if (index < 0) return false;
-  source.adjustments.splice(index, 1);
-  target.adjustments ??= [];
-  target.adjustments.unshift(adjustment);
-  saveDotSets();
-  return true;
-}
-
-function attachAdjustmentDrag(handle, row, source, adjustment) {
-  let drag = null;
-  let frame = 0;
-  function clearTarget() {
-    drag?.targetRow?.classList.remove('adjustment-drop-target');
-  }
-  function findTarget() {
-    clearTarget();
-    drag.target = null;
-    drag.targetRow = null;
-    [...dotList.children].forEach((item, index) => {
-      const rect = item.getBoundingClientRect();
-      if (drag.x >= rect.left && drag.x <= rect.right && drag.y >= rect.top && drag.y <= rect.bottom && dotSets[index] !== source) {
-        drag.target = dotSets[index];
-        drag.targetRow = item.querySelector('.dot-result-row');
-      }
-    });
-    drag.targetRow?.classList.add('adjustment-drop-target');
-  }
-  function tick() {
-    if (!drag) return;
-    if (!handle.isConnected) {
-      finish({ pointerId: drag.id }, true);
-      return;
-    }
-    if (drag.moved) {
-      if (drag.y < 64) window.scrollBy(0, -8);
-      else if (drag.y > window.innerHeight - 64) window.scrollBy(0, 8);
-      findTarget();
-    }
-    frame = requestAnimationFrame(tick);
-  }
-  function finish(event, cancelled = false) {
-    if (!drag || event.pointerId !== drag.id) return;
-    if (!cancelled && drag.moved) {
-      drag.x = event.clientX;
-      drag.y = event.clientY;
-      findTarget();
-    }
-    const target = !cancelled && drag.moved ? drag.target : null;
-    const id = drag.id;
-    clearTarget();
-    drag = null;
-    cancelAnimationFrame(frame);
-    row.classList.remove('adjustment-dragging');
-    if (handle.hasPointerCapture(id)) handle.releasePointerCapture(id);
-    if (target && moveAdjustment(source, adjustment, target)) renderDots();
-  }
-  handle.addEventListener('pointerdown', (event) => {
-    if (drag || !event.isPrimary || event.button !== 0) return;
-    drag = { id: event.pointerId, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false };
-    handle.setPointerCapture(event.pointerId);
-    frame = requestAnimationFrame(tick);
-  });
-  handle.addEventListener('pointermove', (event) => {
-    if (!drag || event.pointerId !== drag.id) return;
-    drag.x = event.clientX;
-    drag.y = event.clientY;
-    if (Math.hypot(drag.x - drag.startX, drag.y - drag.startY) >= 6) {
-      drag.moved = true;
-      row.classList.add('adjustment-dragging');
-    }
-  });
-  handle.addEventListener('pointerup', (event) => finish(event));
-  handle.addEventListener('pointercancel', (event) => finish(event, true));
-  handle.addEventListener('lostpointercapture', (event) => finish(event, true));
-}
-
 function renderDots() {
   updateCruiseAdditionUI();
   dotList.replaceChildren(...dotSets.map((set, index) => {
@@ -705,12 +626,6 @@ function renderDots() {
     set.adjustments?.forEach((adjustment, adjustmentIndex) => {
       const adjustmentRow = document.createElement('div');
       adjustmentRow.className = 'dot-adjustment-row';
-      const dragHandle = document.createElement('button');
-      dragHandle.type = 'button';
-      dragHandle.className = 'adjustment-drag-handle';
-      dragHandle.textContent = '≡';
-      dragHandle.setAttribute('aria-label', `結果${index + 1}の調整量${adjustmentIndex + 1}を別の結果へドラッグして移動`);
-      attachAdjustmentDrag(dragHandle, adjustmentRow, set, adjustment);
       const adjustmentLabel = document.createElement('span');
       adjustmentLabel.className = 'dot-memo';
       adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}`;
@@ -719,7 +634,7 @@ function renderDots() {
       deleteAdjustment.textContent = '削除';
       deleteAdjustment.setAttribute('aria-label', `結果${index + 1}の調整量${adjustmentIndex + 1}を削除`);
       deleteAdjustment.addEventListener('click', () => { set.adjustments.splice(adjustmentIndex, 1); saveDotSets(); renderDots(); });
-      adjustmentRow.append(dragHandle, adjustmentLabel, deleteAdjustment);
+      adjustmentRow.append(adjustmentLabel, deleteAdjustment);
       item.append(adjustmentRow);
     });
     return item;
