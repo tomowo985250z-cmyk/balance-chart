@@ -125,17 +125,25 @@ function getThirdMemoOptions() {
   return memoValues[1] === 'LINK' ? ['3', '2', '1', '3/4', '2/3', '1/2', '1/3', '1/4', '1/8'] : memoValues[1] === 'TAB' ? ['3', '2', '1'] : [];
 }
 
+function formatMemoInputValue(value, index) {
+  if (!value) return '選択';
+  if (index === 0) return `BLD No.${value}`;
+  if (index === 2 && memoValues[1] === 'TAB') return `${value} 度`;
+  if (index === 2 && memoValues[1] === 'LINK') return `${value} Flat`;
+  return value;
+}
+
 function updateMemoButtons() {
   memoButtons.forEach((button, index) => {
-    button.textContent = `${index + 1}: ${memoValues[index] || '選択'}`;
+    button.textContent = `${index + 1}: ${formatMemoInputValue(memoValues[index], index)}`;
   });
   const thirdOptions = getThirdMemoOptions();
   memoButtons[2].disabled = thirdOptions.length === 0;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
-  memoButtons[2].textContent = `3: ${memoValues[2] || '選択'}`;
+  memoButtons[2].textContent = `3: ${formatMemoInputValue(memoValues[2], 2)}`;
 }
 
-function renderMemoWheel(options, selected) {
+function renderMemoWheel(options, selected, index) {
   memoWheel.replaceChildren();
   options.forEach((value) => {
     const option = document.createElement('button');
@@ -144,7 +152,7 @@ function renderMemoWheel(options, selected) {
     option.dataset.value = value;
     option.setAttribute('role', 'option');
     option.setAttribute('aria-selected', String(value === selected));
-    option.textContent = value;
+    option.textContent = formatMemoInputValue(value, index);
     option.addEventListener('click', () => option.scrollIntoView({ behavior: 'smooth', block: 'center' }));
     memoWheel.append(option);
     if (value === selected) requestAnimationFrame(() => option.scrollIntoView({ block: 'center' }));
@@ -174,7 +182,7 @@ function openMemoPicker(index) {
   const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1') : options[0];
   selectedMemoValue = memoValues[index] || initialValue;
   memoPickerTitle.textContent = `調整量 ${index + 1} を選択`;
-  renderMemoWheel(options, selectedMemoValue);
+  renderMemoWheel(options, selectedMemoValue, index);
   memoPicker.hidden = false;
 }
 
