@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260913-adjustment-target" />
+    <link rel="stylesheet" href="style.css?v=20260913-edit-entries" />
   </head>
   <body>
   <main class="app">
@@ -20,6 +20,8 @@
         <label class="clock-angle">時計角<span><select id="blueHourInput" aria-label="青の時"></select><select id="blueMinuteInput" aria-label="青の分"></select></span></label>
       </fieldset>
       <button id="addDotButton" type="submit">ドットを追加</button>
+      <button id="cancelResultEdit" type="button" hidden>編集をキャンセル</button>
+      <p id="resultEditMessage" class="edit-message" aria-live="polite" hidden></p>
       <button id="cancelCruiseAddition" type="button" hidden>巡航追加をキャンセル</button>
       <p id="cruiseAdditionMessage" class="dot-message" aria-live="polite" hidden></p>
       <p id="dotMessage" class="dot-message" aria-live="polite"></p>
@@ -37,6 +39,8 @@
         <option>結果なし</option>
       </select>
       <button id="addAdjustmentButton" type="submit">調整量を追加</button>
+      <button id="cancelAdjustmentEdit" type="button" hidden>編集をキャンセル</button>
+      <p id="adjustmentEditMessage" class="edit-message" aria-live="polite" hidden></p>
       <p id="adjustmentMessage" class="dot-message" aria-live="polite"></p>
     </form>
 
@@ -92,6 +96,15 @@
       </div>
     </form>
   </dialog>
-  <script src="app.js?v=20260913-latest-adjustment-target"></script>
+  <dialog id="editConfirmation" class="delete-confirmation" aria-labelledby="editConfirmationTitle">
+    <form method="dialog">
+      <p id="editConfirmationTitle"></p>
+      <div class="delete-confirmation-actions">
+        <button type="submit" value="cancel" autofocus>キャンセル</button>
+        <button type="submit" value="edit" class="confirm-delete-button">編集する</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="app.js?v=20260913-edit-entries"></script>
 </body>
 </html>

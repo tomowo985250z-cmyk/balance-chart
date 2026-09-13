@@ -470,3 +470,7 @@ object {
   font-size: 16px; font-weight: 700;
 }
 .delete-confirmation button:focus-visible { outline: 3px solid #71849b; outline-offset: 2px; }
+.edit-message { flex-basis: 100%; margin: 0; color: #45414f; font-size: 16px; font-weight: 800; }
+#cancelResultEdit, #cancelAdjustmentEdit { min-height: 44px; background: #fff; color: #45414f; border-color: #aaa6b4; }
+.dot-result-row, .dot-adjustment-row { cursor: pointer; }
+.dot-result-row:focus-visible, .dot-adjustment-row:focus-visible { outline: 3px solid #71849b; outline-offset: 2px; }

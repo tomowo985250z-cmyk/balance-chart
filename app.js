@@ -43,6 +43,8 @@ const confirmTimePicker = document.getElementById('confirmTimePicker');
 const dotSets = [];
 let cruiseAdditionTarget = null;
 let cruiseInputDraft = null;
+let resultEdit = null;
+let adjustmentEdit = null;
 const cancelCruiseAddition = document.getElementById('cancelCruiseAddition');
 const cruiseAdditionMessage = document.getElementById('cruiseAdditionMessage');
 const hovFieldset = document.querySelector('.dot-set-red');
@@ -58,7 +60,7 @@ function updateCruiseAdditionUI() {
   cancelCruiseAddition.hidden = !active;
   cruiseAdditionMessage.hidden = !active;
   cruiseAdditionMessage.textContent = active ? `結果 ${index + 1} に巡航を追加します。巡航の数値・時計角を入力してください。` : '';
-  addDotButton.textContent = active ? `結果 ${index + 1} に巡航を追加` : 'ドットを追加';
+  addDotButton.textContent = resultEdit ? '結果を更新' : active ? `結果 ${index + 1} に巡航を追加` : 'ドットを追加';
 }
 
 function finishCruiseAddition() {
@@ -76,6 +78,7 @@ function finishCruiseAddition() {
 
 function startCruiseAddition(set) {
   if (!dotSets.includes(set) || !set.red || set.blue || getDotCount() >= MAX_DOTS) return;
+  cancelEditing();
   if (!cruiseAdditionTarget) cruiseInputDraft = blueInputs.map((input) => input.value);
   cruiseAdditionTarget = set;
   blueInputs.forEach((input) => {
@@ -632,7 +635,113 @@ adjustmentTarget.addEventListener('change', () => {
   selectedAdjustmentTarget = dotSets[Number(adjustmentTarget.value)] ?? null;
 });
 
+const editConfirmation = document.getElementById('editConfirmation');
+let pendingEdit = null;
+const cancelResultEdit = document.getElementById('cancelResultEdit');
+const cancelAdjustmentEdit = document.getElementById('cancelAdjustmentEdit');
+const resultEditMessage = document.getElementById('resultEditMessage');
+const adjustmentEditMessage = document.getElementById('adjustmentEditMessage');
+const addAdjustmentButton = document.getElementById('addAdjustmentButton');
+
+function restoreInputs(inputs, values) {
+  inputs.forEach((input, index) => {
+    input.value = values[index];
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+function cancelEditing() {
+  if (resultEdit) restoreInputs([...redInputs, ...blueInputs], resultEdit.draft);
+  if (adjustmentEdit) {
+    memoValues.splice(0, 4, ...adjustmentEdit.draft);
+    selectedAdjustmentTarget = adjustmentEdit.draftTarget;
+    updateMemoButtons();
+  }
+  resultEdit = null;
+  adjustmentEdit = null;
+  dotMessage.textContent = '';
+  adjustmentMessage.textContent = '';
+  updateEditingUI();
+  updateAdjustmentTarget();
+  updateCruiseAdditionUI();
+  addDotButton.disabled = getDotCount() >= MAX_DOTS;
+}
+
+function updateEditingUI() {
+  cancelResultEdit.hidden = !resultEdit;
+  cancelAdjustmentEdit.hidden = !adjustmentEdit;
+  resultEditMessage.hidden = !resultEdit;
+  adjustmentEditMessage.hidden = !adjustmentEdit;
+  resultEditMessage.textContent = resultEdit ? `結果${dotSets.indexOf(resultEdit.set) + 1}を編集中` : '';
+  adjustmentEditMessage.textContent = adjustmentEdit ? `結果${dotSets.indexOf(adjustmentEdit.set) + 1}の調整量を編集中` : '';
+  addAdjustmentButton.textContent = adjustmentEdit ? '調整量を更新' : '調整量を追加';
+}
+
+function startResultEdit(set) {
+  if (!dotSets.includes(set)) return;
+  cancelEditing();
+  if (cruiseAdditionTarget) finishCruiseAddition();
+  resultEdit = { set, draft: [...redInputs, ...blueInputs].map(input => input.value) };
+  [set.red, set.blue].forEach((dot, index) => {
+    const values = dot ? [...dot.clock.split(':'), String(dot.radius)] : ['', '', ''];
+    if (dot) {
+      values[0] = String(Number(values[0]) || 12);
+      values[1] = String(Number(values[1]));
+    }
+    restoreInputs(index === 0 ? redInputs : blueInputs, values);
+  });
+  updateEditingUI();
+  updateCruiseAdditionUI();
+  addDotButton.disabled = false;
+  dotForm.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function startAdjustmentEdit(set, adjustment) {
+  if (!dotSets.includes(set) || !set.adjustments?.includes(adjustment)) return;
+  cancelEditing();
+  if (cruiseAdditionTarget) finishCruiseAddition();
+  adjustmentEdit = { set, adjustment, draft: [...memoValues], draftTarget: selectedAdjustmentTarget };
+  memoValues.splice(0, 4, ...Array.from({ length: 4 }, (_, index) => adjustment[index] || ''));
+  selectedAdjustmentTarget = set;
+  updateMemoButtons();
+  updateAdjustmentTarget();
+  updateEditingUI();
+  adjustmentForm.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function attachEditAction(row, message, action) {
+  row.tabIndex = 0;
+  row.setAttribute('aria-label', message);
+  const request = () => {
+    if (editConfirmation.open) return;
+    pendingEdit = action;
+    document.getElementById('editConfirmationTitle').textContent = message;
+    editConfirmation.returnValue = '';
+    editConfirmation.showModal();
+  };
+  row.addEventListener('click', event => {
+    if (!event.target.closest('button, select, input')) request();
+  });
+  row.addEventListener('keydown', event => {
+    if (event.target === row && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      request();
+    }
+  });
+}
+
+editConfirmation.addEventListener('close', () => {
+  const action = pendingEdit;
+  pendingEdit = null;
+  if (editConfirmation.returnValue === 'edit') action?.();
+});
+cancelResultEdit.addEventListener('click', cancelEditing);
+cancelAdjustmentEdit.addEventListener('click', cancelEditing);
+
 function renderDots() {
+  if ((resultEdit && !dotSets.includes(resultEdit.set)) ||
+      (adjustmentEdit && (!dotSets.includes(adjustmentEdit.set) || !adjustmentEdit.set.adjustments?.includes(adjustmentEdit.adjustment)))) cancelEditing();
+  updateEditingUI();
   updateAdjustmentTarget();
   updateCruiseAdditionUI();
   dotList.replaceChildren(...dotSets.map((set, index) => {
@@ -657,6 +766,7 @@ function renderDots() {
     remove.addEventListener('click', () => confirmDeletion(`結果${index + 1}を削除しますか？`, () => { dotSets.splice(index, 1); saveDotSets(); renderDots(); }));
     const resultRow = document.createElement('div');
     resultRow.className = 'dot-result-row';
+    attachEditAction(resultRow, `結果${index + 1}を編集しますか？`, () => startResultEdit(set));
     resultRow.append(label, remove);
     if (set.red && !set.blue) {
       const addCruise = document.createElement('button');
@@ -672,6 +782,7 @@ function renderDots() {
     set.adjustments?.forEach((adjustment, adjustmentIndex) => {
       const adjustmentRow = document.createElement('div');
       adjustmentRow.className = 'dot-adjustment-row';
+      attachEditAction(adjustmentRow, 'この調整量を編集しますか？', () => startAdjustmentEdit(set, adjustment));
       const adjustmentLabel = document.createElement('span');
       adjustmentLabel.className = 'dot-memo';
       adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}`;
@@ -687,7 +798,7 @@ function renderDots() {
   }));
 
   const isFull = getDotCount() >= MAX_DOTS;
-  addDotButton.disabled = isFull;
+  addDotButton.disabled = isFull && !resultEdit;
   if (isFull) dotMessage.textContent = `ドットは最大${MAX_DOTS}個まで追加できます。削除すると追加できます。`;
   else if (dotMessage.textContent.startsWith('ドットは最大')) dotMessage.textContent = '';
 
@@ -757,6 +868,31 @@ function renderDots() {
 
 dotForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (resultEdit) {
+    const target = resultEdit.set;
+    if (!dotSets.includes(target)) { cancelEditing(); return; }
+    if ([redInputs, blueInputs].some(inputs => inputs.some(input => input.value === '') && inputs.some(input => input.value !== ''))) {
+      dotMessage.textContent = 'HOV・巡航はそれぞれ時計角と数値をすべて入力するか、すべて空欄にしてください。';
+      return;
+    }
+    const red = readDotInput(redInputs, 'red');
+    const blue = readDotInput(blueInputs, 'blue');
+    if (red === undefined || blue === undefined || (!red && !blue)) {
+      dotMessage.textContent = 'HOVまたは巡航の時計角と0以上の数値をすべて入力してください。';
+      return;
+    }
+    const count = getDotCount() - Number(Boolean(target.red)) - Number(Boolean(target.blue)) + Number(Boolean(red)) + Number(Boolean(blue));
+    if (count > MAX_DOTS) {
+      dotMessage.textContent = `ドットは最大${MAX_DOTS}個までです。`;
+      return;
+    }
+    target.red = red;
+    target.blue = blue;
+    saveDotSets();
+    cancelEditing();
+    renderDots();
+    return;
+  }
   if (cruiseAdditionTarget) {
     const target = cruiseAdditionTarget;
     if (!dotSets.includes(target) || !target.red || target.blue) {
@@ -819,6 +955,21 @@ adjustmentForm.addEventListener('submit', (event) => {
     return;
   }
   const targetSet = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  if (adjustmentEdit) {
+    const { set, adjustment } = adjustmentEdit;
+    const index = set.adjustments?.indexOf(adjustment) ?? -1;
+    if (!dotSets.includes(set) || index < 0) { cancelEditing(); return; }
+    if (set === targetSet) set.adjustments.splice(index, 1, [...memoValues]);
+    else {
+      set.adjustments.splice(index, 1);
+      targetSet.adjustments ??= [];
+      targetSet.adjustments.push([...memoValues]);
+    }
+    saveDotSets();
+    cancelEditing();
+    renderDots();
+    return;
+  }
   targetSet.adjustments ??= [];
   targetSet.adjustments.push([...memoValues]);
   saveDotSets();
