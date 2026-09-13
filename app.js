@@ -796,6 +796,7 @@ dotForm.addEventListener('submit', (event) => {
   }
 
   dotSets.push({ red, blue, adjustments: [] });
+  selectedAdjustmentTarget = null;
   saveDotSets();
   [...redInputs, ...blueInputs].forEach((input) => {
     input.value = '';
