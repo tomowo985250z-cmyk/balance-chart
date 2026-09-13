@@ -67,7 +67,7 @@ body {
 .dot-set-blue label { color: #0057c8; }
 .memo-set { display: flex; gap: 7px; color: #30343b; }
 .memo-set legend { padding: 0 4px; font-weight: 700; }
-.memo-wheel-trigger { min-width: 58px; background: #fff; color: #30343b; }
+.memo-wheel-trigger { display: flex; align-items: flex-start; justify-content: center; min-width: 58px; background: #fff; color: #30343b; }
 .memo-wheel-trigger:disabled { color: #77808d; border-color: #c8cdd5; background: #f1f3f6; }
 
 .dot-form input,
