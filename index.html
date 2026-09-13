@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260912-ui-2" />
+    <link rel="stylesheet" href="style.css?v=20260913-background-scale" />
   </head>
   <body>
   <main class="app">
@@ -39,8 +39,14 @@
 
     <h2 id="resultsHeading" class="results-heading">結果</h2>
     <ul id="dotList" class="dot-list" aria-labelledby="resultsHeading"></ul>
+    <div class="background-scale-controls" role="group" aria-label="背景の拡大縮小">
+      <span>背景 <output id="backgroundScaleValue" aria-live="polite">100%</output></span>
+      <button id="backgroundScaleDown" type="button" aria-label="背景を縮小">－</button>
+      <button id="backgroundScaleReset" type="button">リセット</button>
+      <button id="backgroundScaleUp" type="button" aria-label="背景を拡大">＋</button>
+    </div>
     <div class="chart-wrap">
-      <object data="chart.svg?v=20260909-13" type="image/svg+xml" aria-label="バランスチャート"></object>
+      <object data="chart.svg?v=20260913-background-scale" type="image/svg+xml" aria-label="バランスチャート"></object>
       <svg id="dotOverlay" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
       <button id="guideToggle" class="rotation-lock guide-toggle" type="button" aria-pressed="false">
         <span class="rotation-lock-track" aria-hidden="true"></span>
@@ -80,6 +86,6 @@
     </div>
   </main>
 
-  <script src="app.js?v=20260909-58"></script>
+  <script src="app.js?v=20260913-background-scale"></script>
 </body>
 </html>

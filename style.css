@@ -114,6 +114,20 @@ body {
 .dot-label-red { color: #b00000; font-weight: 700; }
 .dot-label-blue { color: #0057c8; font-weight: 700; }
 
+.background-scale-controls {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font: 700 14px -apple-system, BlinkMacSystemFont, "Yu Gothic", sans-serif;
+  color: #172b42;
+}
+.background-scale-controls > span { min-width: 90px; font-variant-numeric: tabular-nums; }
+.background-scale-controls button {
+  min-width: 44px; min-height: 44px; padding: 6px 10px; border: 1px solid #8b9bb0;
+  border-radius: 8px; background: #fff; color: #172b42; font: inherit;
+  text-align: center; touch-action: manipulation; cursor: pointer;
+}
+.background-scale-controls button:disabled { color: #667487; background: #e5eaf0; cursor: not-allowed; }
+.background-scale-controls button:focus-visible { outline: 3px solid #336da7; outline-offset: 2px; }
+
 .chart-wrap {
   position: relative;
   width: 100%;
@@ -425,6 +439,7 @@ object {
   .dot-form,
   .adjustment-form,
   .results-heading,
+  .background-scale-controls,
   .dot-list { display: none; }
 
   .app { width: 210mm; }

@@ -12,6 +12,32 @@ const chartObject = document.querySelector('object[type="image/svg+xml"]');
 const chartWrap = document.querySelector('.chart-wrap');
 const dotOverlay = document.getElementById('dotOverlay');
 const rotationLock = document.getElementById('rotationLock');
+let backgroundScaleStep = 10;
+const backgroundScaleValue = document.getElementById('backgroundScaleValue');
+const backgroundScaleDown = document.getElementById('backgroundScaleDown');
+const backgroundScaleUp = document.getElementById('backgroundScaleUp');
+
+function updateBackgroundScale() {
+  backgroundScaleValue.textContent = `${backgroundScaleStep * 10}%`;
+  backgroundScaleDown.disabled = backgroundScaleStep === 5;
+  backgroundScaleUp.disabled = backgroundScaleStep === 20;
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-background-scale', scale: backgroundScaleStep / 10 }, '*');
+}
+
+backgroundScaleDown.addEventListener('click', () => {
+  backgroundScaleStep = Math.max(5, backgroundScaleStep - 1);
+  updateBackgroundScale();
+});
+backgroundScaleUp.addEventListener('click', () => {
+  backgroundScaleStep = Math.min(20, backgroundScaleStep + 1);
+  updateBackgroundScale();
+});
+document.getElementById('backgroundScaleReset').addEventListener('click', () => {
+  backgroundScaleStep = 10;
+  updateBackgroundScale();
+});
+chartObject.addEventListener('load', updateBackgroundScale);
+updateBackgroundScale();
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 
