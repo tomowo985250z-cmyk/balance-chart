@@ -125,12 +125,16 @@ function getThirdMemoOptions() {
   return memoValues[1] === 'LINK' ? ['3', '2', '1', '3/4', '2/3', '1/2', '1/3', '1/4', '1/8'] : memoValues[1] === 'TAB' ? ['3', '2', '1'] : [];
 }
 
-function formatMemoInputValue(value, index) {
-  if (!value) return '選択';
-  if (index === 0) return `BLD No.${value}`;
-  if (index === 2 && memoValues[1] === 'TAB') return `${value} 度`;
-  if (index === 2 && memoValues[1] === 'LINK') return `${value} Flat`;
+function formatMemoValue(value, index, type) {
+  if (!value) return '';
+  if (index === 0) return `No.${value} BLD`;
+  if (index === 2 && type === 'TAB') return `${value} 度`;
+  if (index === 2 && type === 'LINK') return `${value} Flat`;
   return value;
+}
+
+function formatMemoInputValue(value, index) {
+  return formatMemoValue(value, index, memoValues[1]) || '選択';
 }
 
 function updateMemoButtons() {
@@ -620,7 +624,7 @@ function renderDots() {
       adjustmentRow.className = 'dot-adjustment-row';
       const adjustmentLabel = document.createElement('span');
       adjustmentLabel.className = 'dot-memo';
-      adjustmentLabel.textContent = `調整量: ${adjustment.join(' ／ ')}`;
+      adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}`;
       const deleteAdjustment = document.createElement('button');
       deleteAdjustment.type = 'button';
       deleteAdjustment.textContent = '削除';
