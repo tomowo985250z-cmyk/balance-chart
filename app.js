@@ -587,6 +587,24 @@ function renderDirectionLines() {
   });
 }
 
+const deleteConfirmation = document.getElementById('deleteConfirmation');
+const deleteConfirmationTitle = document.getElementById('deleteConfirmationTitle');
+let pendingDeletion = null;
+
+function confirmDeletion(message, action) {
+  if (deleteConfirmation.open) return;
+  pendingDeletion = action;
+  deleteConfirmationTitle.textContent = message;
+  deleteConfirmation.returnValue = '';
+  deleteConfirmation.showModal();
+}
+
+deleteConfirmation.addEventListener('close', () => {
+  const action = pendingDeletion;
+  pendingDeletion = null;
+  if (deleteConfirmation.returnValue === 'delete') action?.();
+});
+
 function renderDots() {
   updateCruiseAdditionUI();
   dotList.replaceChildren(...dotSets.map((set, index) => {
@@ -608,7 +626,7 @@ function renderDots() {
     remove.type = 'button';
     remove.textContent = '削除';
     remove.setAttribute('aria-label', `セット${index + 1}を削除`);
-    remove.addEventListener('click', () => { dotSets.splice(index, 1); saveDotSets(); renderDots(); });
+    remove.addEventListener('click', () => confirmDeletion(`結果${index + 1}を削除しますか？`, () => { dotSets.splice(index, 1); saveDotSets(); renderDots(); }));
     const resultRow = document.createElement('div');
     resultRow.className = 'dot-result-row';
     resultRow.append(label, remove);
@@ -633,7 +651,7 @@ function renderDots() {
       deleteAdjustment.type = 'button';
       deleteAdjustment.textContent = '削除';
       deleteAdjustment.setAttribute('aria-label', `結果${index + 1}の調整量${adjustmentIndex + 1}を削除`);
-      deleteAdjustment.addEventListener('click', () => { set.adjustments.splice(adjustmentIndex, 1); saveDotSets(); renderDots(); });
+      deleteAdjustment.addEventListener('click', () => confirmDeletion(`結果${index + 1}の調整量${adjustmentIndex + 1}を削除しますか？`, () => { set.adjustments.splice(adjustmentIndex, 1); saveDotSets(); renderDots(); }));
       adjustmentRow.append(adjustmentLabel, deleteAdjustment);
       item.append(adjustmentRow);
     });

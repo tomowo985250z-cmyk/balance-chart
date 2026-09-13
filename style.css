@@ -427,7 +427,7 @@ object {
 }
 
 @media print {
-  :root {
+:root {
     background: #fff;
   }
 
@@ -447,3 +447,19 @@ object {
     box-shadow: none;
   }
 }
+
+.delete-confirmation {
+  width: min(360px, calc(100% - 32px)); padding: 20px;
+  border: 2px solid #aaa6b4; border-radius: 12px; background: #fff; color: #292631;
+  font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans JP', sans-serif;
+}
+.delete-confirmation::backdrop { background: rgb(0 0 0 / 40%); }
+.delete-confirmation p { margin: 0 0 20px; font-size: 18px; font-weight: 700; line-height: 1.5; }
+.delete-confirmation-actions { display: flex; gap: 12px; }
+.delete-confirmation button {
+  flex: 1; min-height: 48px; padding: 10px 4px; border: 1px solid #aaa6b4;
+  border-radius: 8px; background: #f8f7fa; color: #292631;
+  font: inherit; font-size: 16px; font-weight: 700; touch-action: manipulation;
+}
+.delete-confirmation .confirm-delete-button { background: #45414f; border-color: #34303e; color: #fff; }
+.delete-confirmation button:focus-visible { outline: 3px solid #71849b; outline-offset: 2px; }

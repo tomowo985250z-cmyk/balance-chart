@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260913-green-border-glow" />
+    <link rel="stylesheet" href="style.css?v=20260913-delete-confirmation" />
   </head>
   <body>
   <main class="app">
@@ -80,6 +80,15 @@
     </div>
   </main>
 
-  <script src="app.js?v=20260913-result-borders"></script>
+  <dialog id="deleteConfirmation" class="delete-confirmation" aria-labelledby="deleteConfirmationTitle">
+    <form method="dialog">
+      <p id="deleteConfirmationTitle"></p>
+      <div class="delete-confirmation-actions">
+        <button type="submit" value="cancel" autofocus>キャンセル</button>
+        <button type="submit" value="delete" class="confirm-delete-button">削除する</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="app.js?v=20260913-delete-confirmation"></script>
 </body>
 </html>
