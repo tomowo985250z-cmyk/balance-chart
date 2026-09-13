@@ -3,9 +3,6 @@
   <desc id="chart-description">12方向、半径0.1から1.0までの極座標チャート</desc>
 
   <defs>
-    <clipPath id="backgroundCircleClip" clipPathUnits="userSpaceOnUse">
-      <circle cx="397" cy="520" r="240" />
-    </clipPath>
     <marker id="hovArrowHead" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="18" markerHeight="15" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
       <path d="M0 0 L10 4 L0 8 Z" fill="#d60000" />
     </marker>
@@ -13,8 +10,6 @@
       <path d="M0 0 L10 4 L0 8 Z" fill="#0066ff" />
     </marker>
   </defs>
-  <g clip-path="url(#backgroundCircleClip)">
-  <g data-background-scale="true">
   <g id="backgroundLayer">
     <rect id="pageBackground" width="794" height="1123" fill="#ffffff" />
   </g>
@@ -47,8 +42,6 @@
     <line id="axis11" x1="397" y1="561" x2="247" y2="301.2" />
   </g>
 
-  </g>
-  </g>
   <g id="hovLayer" fill="none" stroke="#d60000" stroke-width="3" stroke-linejoin="round">
     <g id="hovGroup" transform="rotate(0 397 520)" style="cursor: grab;">
       <!-- 操作用の透明リング: 赤い外側の図形付近ならどこからでもドラッグを開始できる -->
@@ -142,8 +135,6 @@
       </g>
     </g>
   </g>
-  <g clip-path="url(#backgroundCircleClip)">
-  <g data-background-scale="true">
   <g id="dotLayer" style="pointer-events: none;"></g>
 
   <g id="tableLayer" transform="translate(397 520) scale(0.80) translate(-397 -520) translate(0 -41)" fill="#1a1a1a" font-family="Arial, 'Noto Sans JP', sans-serif">
@@ -174,8 +165,6 @@
       <text id="clock10" x="125.9" y="404.5">10</text>
       <text id="clock11" x="240.5" y="289.9">11</text>
     </g>
-  </g>
-  </g>
   </g>
   <script><![CDATA[
     (() => {
@@ -231,12 +220,6 @@
       // 親ページの回転ロックスイッチは、object 内のSVGへメッセージで受け取る。
       window.addEventListener('message', (event) => {
         if (event.source !== window.parent) return;
-        if (event.data?.type === 'balance-chart-background-scale' && Number.isFinite(event.data.scale)) {
-          const scale = Math.min(2, Math.max(0.5, event.data.scale));
-          svg.querySelectorAll('[data-background-scale]').forEach((layer) => {
-            layer.setAttribute('transform', `translate(${centerX} ${centerY}) scale(${scale}) translate(${-centerX} ${-centerY})`);
-          });
-        }
         if (event.data?.type === 'balance-chart-request-rotation') notifyRotations();
         if (event.data?.type === 'balance-chart-rotation-lock') {
           svg.dataset.rotationLocked = String(Boolean(event.data.locked));
