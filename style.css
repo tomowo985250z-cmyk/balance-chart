@@ -462,4 +462,11 @@ object {
   font: inherit; font-size: 16px; font-weight: 700; touch-action: manipulation;
 }
 .delete-confirmation .confirm-delete-button { background: #45414f; border-color: #34303e; color: #fff; }
+#adjustmentTarget {
+  min-height: 48px; max-width: 100%; padding: 10px 8px;
+  border: 1px solid #8b9bb0; border-radius: 8px;
+  background: #fff; color: #292631;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px; font-weight: 700;
+}
 .delete-confirmation button:focus-visible { outline: 3px solid #71849b; outline-offset: 2px; }

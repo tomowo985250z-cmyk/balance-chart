@@ -605,7 +605,35 @@ deleteConfirmation.addEventListener('close', () => {
   if (deleteConfirmation.returnValue === 'delete') action?.();
 });
 
+const adjustmentTarget = document.getElementById('adjustmentTarget');
+let selectedAdjustmentTarget = null;
+
+function updateAdjustmentTarget() {
+  if (!dotSets.includes(selectedAdjustmentTarget)) selectedAdjustmentTarget = null;
+  const target = selectedAdjustmentTarget ?? dotSets.at(-1);
+  adjustmentTarget.replaceChildren();
+  adjustmentTarget.disabled = !dotSets.length;
+  if (!dotSets.length) {
+    const option = document.createElement('option');
+    option.textContent = '結果なし';
+    adjustmentTarget.append(option);
+    return;
+  }
+  dotSets.forEach((set, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `結果${index + 1}の後に追加`;
+    option.selected = set === target;
+    adjustmentTarget.append(option);
+  });
+}
+
+adjustmentTarget.addEventListener('change', () => {
+  selectedAdjustmentTarget = dotSets[Number(adjustmentTarget.value)] ?? null;
+});
+
 function renderDots() {
+  updateAdjustmentTarget();
   updateCruiseAdditionUI();
   dotList.replaceChildren(...dotSets.map((set, index) => {
     const item = document.createElement('li');
@@ -789,9 +817,9 @@ adjustmentForm.addEventListener('submit', (event) => {
     adjustmentMessage.textContent = '調整量の4項目をすべて選択してください。';
     return;
   }
-  const latestSet = dotSets.at(-1);
-  latestSet.adjustments ??= [];
-  latestSet.adjustments.push([...memoValues]);
+  const targetSet = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  targetSet.adjustments ??= [];
+  targetSet.adjustments.push([...memoValues]);
   saveDotSets();
   memoValues.fill('');
   updateMemoButtons();

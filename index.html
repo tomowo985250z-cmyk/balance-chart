@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260913-delete-confirmation" />
+    <link rel="stylesheet" href="style.css?v=20260913-adjustment-target" />
   </head>
   <body>
   <main class="app">
@@ -33,6 +33,9 @@
         <button class="memo-wheel-trigger" id="memoThree" type="button" disabled>選択</button>
         <button class="memo-wheel-trigger" id="memoFour" type="button">選択</button>
       </fieldset>
+      <select id="adjustmentTarget" aria-label="調整量の追加先" disabled>
+        <option>結果なし</option>
+      </select>
       <button id="addAdjustmentButton" type="submit">調整量を追加</button>
       <p id="adjustmentMessage" class="dot-message" aria-live="polite"></p>
     </form>
@@ -89,6 +92,6 @@
       </div>
     </form>
   </dialog>
-  <script src="app.js?v=20260913-delete-confirmation"></script>
+  <script src="app.js?v=20260913-adjustment-target"></script>
 </body>
 </html>
