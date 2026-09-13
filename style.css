@@ -334,6 +334,13 @@ object {
 .dot-list .add-cruise-button { color: #1259a8; background: #edf5ff; border-color: #92b4dc; }
 .dot-memo { color: #344b64; font-weight: 700; }
 .dot-list .dot-adjustment-row button { font-size: 14px; }
+.dot-list .dot-adjustment-row .adjustment-drag-handle {
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-touch-callout: none; cursor: grab; font-size: 22px;
+  color: #45414f; border-color: #aaa6b4;
+}
+.adjustment-dragging { opacity: 0.6; }
+.dot-result-row.adjustment-drop-target { outline: 2px dashed #45414f; outline-offset: 2px; }
 .rotation-lock { min-height: 44px; border-radius: 8px; border-color: #8b9bb0; font-weight: 700; }
 .guide-toggle[aria-pressed='true'], .rotation-lock:has(input:checked) { background: #eaf3ff; border-color: #1f5faa; }
 .time-picker-title { font-size: 18px; font-weight: 800; color: #172b42; }
