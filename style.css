@@ -328,7 +328,7 @@ object {
 .dot-result-row { padding: 4px 6px; box-shadow: inset 0 0 0 2px #aaa6b4; border-radius: 8px; background: #f8f7fa; }
 .dot-result-row > span { font-weight: 700; }
 .dot-list li.result-within-limit > .dot-result-row { box-shadow: inset 0 0 0 4px #47845a, 0 0 9px rgb(71 132 90 / 32%); }
-.dot-list li.result-hov-within-limit > .dot-result-row { box-shadow: inset 0 0 0 3px #d2d7de, 0 0 6px rgb(210 215 222 / 35%); }
+.dot-list li.result-hov-within-limit > .dot-result-row { box-shadow: inset 0 0 0 2px #47845a, 0 0 6px rgb(71 132 90 / 12%); }
 .dot-label-red, .dot-label-blue { font-weight: 800; }
 .dot-list button { border-radius: 8px; color: #8e2732; border-color: #c6a6ac; font-weight: 700; text-align: center; }
 .dot-list .add-cruise-button { color: #1259a8; background: #edf5ff; border-color: #92b4dc; }
