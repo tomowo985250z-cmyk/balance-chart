@@ -591,12 +591,16 @@ function renderDots() {
   updateCruiseAdditionUI();
   dotList.replaceChildren(...dotSets.map((set, index) => {
     const item = document.createElement('li');
+    const hovWithin = Boolean(set.red && set.red.radius <= 0.2);
+    const bothWithin = Boolean(hovWithin && set.blue && set.blue.radius <= 0.2);
+    if (bothWithin) item.classList.add('result-within-limit');
     const label = document.createElement('span');
     label.textContent = `結果 ${index + 1}: `;
     [set.red, set.blue].filter(Boolean).forEach((dot, dotIndex) => {
       if (dotIndex) label.append(' ／ ');
       const dotLabel = document.createElement('span');
       dotLabel.className = `dot-label-${dot.color}`;
+      if (dot.color === 'red' && hovWithin) dotLabel.classList.add('hov-within-limit');
       dotLabel.textContent = `${dot.color === 'red' ? 'HOV' : '巡航'} ${dot.radius} ${dot.clock}`;
       label.append(dotLabel);
     });
@@ -619,6 +623,21 @@ function renderDots() {
       resultRow.append(addCruise);
     }
     item.append(resultRow);
+    if (hovWithin) {
+      const status = document.createElement('div');
+      status.className = 'result-limit-status';
+      const hovStatus = document.createElement('strong');
+      hovStatus.className = 'hov-limit-status';
+      hovStatus.textContent = 'HOV 0.2 IPS以内';
+      status.append(hovStatus);
+      if (bothWithin) {
+        const bothStatus = document.createElement('strong');
+        bothStatus.className = 'both-limit-status';
+        bothStatus.textContent = '0.2 IPS以内（許容内）';
+        status.append(bothStatus);
+      }
+      item.append(status);
+    }
     set.adjustments?.forEach((adjustment, adjustmentIndex) => {
       const adjustmentRow = document.createElement('div');
       adjustmentRow.className = 'dot-adjustment-row';
