@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260913-green-border-levels" />
+    <link rel="stylesheet" href="style.css?v=20260914-two-pages" />
   </head>
   <body>
   <main class="app">
@@ -46,8 +46,15 @@
 
     <h2 id="resultsHeading" class="results-heading">結果</h2>
     <ul id="dotList" class="dot-list" aria-labelledby="resultsHeading"></ul>
+    <div class="chart-navigation" aria-label="チャート画面">
+      <h2 id="chartTitle">ピッチリンク用</h2>
+      <div class="chart-pages" aria-label="ページ切替">
+        <button type="button" class="chart-page is-active" data-page="0" aria-label="ピッチリンク用を表示" aria-current="page"></button>
+        <button type="button" class="chart-page" data-page="1" aria-label="トリムタブ用を表示"></button>
+      </div>
+    </div>
     <div class="chart-wrap">
-      <object data="chart.svg?v=20260913-ips-boundary-trial" type="image/svg+xml" aria-label="バランスチャート"></object>
+      <object data="chart.svg?v=20260914-two-pages" type="image/svg+xml" aria-label="バランスチャート"></object>
       <svg id="dotOverlay" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
       <button id="guideToggle" class="rotation-lock guide-toggle" type="button" aria-pressed="false">
         <span class="rotation-lock-track" aria-hidden="true"></span>
@@ -105,6 +112,6 @@
       </div>
     </form>
   </dialog>
-  <script src="app.js?v=20260913-edit-entries"></script>
+  <script src="app.js?v=20260914-two-pages"></script>
 </body>
 </html>

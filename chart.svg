@@ -186,6 +186,7 @@
       let rotationTouchActive = false;
       let panning = false;
       let panStart = null;
+      let swipeStart = null;
 
       try {
         const saved = JSON.parse(localStorage.getItem(rotationStorageKey) || '{}');
@@ -224,6 +225,13 @@
         if (event.data?.type === 'balance-chart-request-rotation') notifyRotations();
         if (event.data?.type === 'balance-chart-rotation-lock') {
           svg.dataset.rotationLocked = String(Boolean(event.data.locked));
+        }
+        if (event.data?.type === 'balance-chart-set-rotation' &&
+          Number.isFinite(event.data.hovAngle) && Number.isFinite(event.data.cruiseAngle)) {
+          angles.hov = event.data.hovAngle;
+          angles.cruise = event.data.cruiseAngle;
+          document.getElementById('hovGroup').setAttribute('transform', `rotate(${angles.hov} ${centerX} ${centerY})`);
+          document.getElementById('cruiseGroup').setAttribute('transform', `rotate(${angles.cruise} ${centerX} ${centerY})`);
         }
       });
 
@@ -268,6 +276,11 @@
       // iPhone Safariでは、回転開始後に止めてもページがスクロールすることがあるため、
       // リングへ触れた瞬間（キャプチャ段階）からスクロールを停止する。
       svg.addEventListener('touchstart', (event) => {
+        swipeStart = null;
+        if (event.touches.length === 1 && zoom <= 1 &&
+          (svg.dataset.rotationLocked === 'true' || !event.target.closest('#hovRotationHandle, #cruiseRotationHandle'))) {
+          swipeStart = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+        }
         if (event.touches.length === 2) {
           rotationTouchActive = false;
           return;
@@ -338,6 +351,14 @@
       }, { passive: false });
 
       svg.addEventListener('touchend', (event) => {
+        if (swipeStart && event.changedTouches.length === 1 && event.touches.length === 0 && !pinching) {
+          const dx = event.changedTouches[0].clientX - swipeStart.x;
+          const dy = event.changedTouches[0].clientY - swipeStart.y;
+          if (Math.abs(dx) >= 55 && Math.abs(dx) >= Math.abs(dy) * 1.4) {
+            window.parent.postMessage({ type: 'balance-chart-swipe', direction: dx < 0 ? 1 : -1 }, '*');
+          }
+        }
+        swipeStart = null;
         if (event.touches.length >= 2) return;
         pinching = false;
         delete svg.dataset.pinching;

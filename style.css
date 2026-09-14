@@ -120,6 +120,27 @@ body {
   aspect-ratio: 210 / 297;
 }
 
+.chart-navigation {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 0 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+}
+.chart-navigation h2 { margin: 0; color: #292631; font-size: 18px; }
+.chart-pages { display: flex; gap: 12px; align-items: center; }
+.chart-page {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #abb3bf;
+  cursor: pointer;
+}
+.chart-page.is-active { background: #45414f; }
+.chart-page:focus-visible { outline: 2px solid #1f5faa; outline-offset: 3px; }
+
 object {
   position: relative;
   z-index: 0;

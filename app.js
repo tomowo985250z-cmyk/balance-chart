@@ -10,6 +10,11 @@ const CHART_RADIUS = 240;
 const CENTER_DISTANCE_THRESHOLD = 0.2;
 const chartObject = document.querySelector('object[type="image/svg+xml"]');
 const chartWrap = document.querySelector('.chart-wrap');
+const chartTitle = document.getElementById('chartTitle');
+const chartPageButtons = [...document.querySelectorAll('.chart-page')];
+const chartNames = ['ピッチリンク用', 'トリムタブ用'];
+let currentChartPage = 0;
+const pageRotations = [{ hovAngle: 0, cruiseAngle: 0 }, { hovAngle: 0, cruiseAngle: 0 }];
 const dotOverlay = document.getElementById('dotOverlay');
 const rotationLock = document.getElementById('rotationLock');
 const guideToggle = document.getElementById('guideToggle');
@@ -208,23 +213,50 @@ updateMemoButtons();
 function loadRotation() {
   try {
     const saved = JSON.parse(localStorage.getItem(ROTATION_STORAGE_KEY) || '{}');
-    hovAngle = Number.isFinite(saved.hovAngle) ? saved.hovAngle : 0;
-    cruiseAngle = Number.isFinite(saved.cruiseAngle) ? saved.cruiseAngle : 0;
+    const pages = Array.isArray(saved.pages) ? saved.pages : [saved];
+    pages.slice(0, 2).forEach((page, index) => {
+      pageRotations[index].hovAngle = Number.isFinite(page?.hovAngle) ? page.hovAngle : 0;
+      pageRotations[index].cruiseAngle = Number.isFinite(page?.cruiseAngle) ? page.cruiseAngle : 0;
+    });
   } catch {
-    hovAngle = 0;
-    cruiseAngle = 0;
+    // 保存値が壊れていても初期角度で表示する。
   }
+  hovAngle = pageRotations[0].hovAngle;
+  cruiseAngle = pageRotations[0].cruiseAngle;
 }
 
 function saveRotation() {
+  pageRotations[currentChartPage] = { hovAngle, cruiseAngle };
   try {
-    localStorage.setItem(ROTATION_STORAGE_KEY, JSON.stringify({ hovAngle, cruiseAngle }));
+    localStorage.setItem(ROTATION_STORAGE_KEY, JSON.stringify({ pages: pageRotations }));
   } catch {
     // 保存領域を利用できない場合は、この表示中だけ回転角を保持する。
   }
 }
 
 loadRotation();
+
+function showChartPage(page) {
+  if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
+  saveRotation();
+  currentChartPage = page;
+  ({ hovAngle, cruiseAngle } = pageRotations[page]);
+  const svgDocument = chartObject.contentDocument;
+  if (svgDocument) {
+    setGroupRotation(svgDocument.getElementById('hovGroup'), hovAngle);
+    setGroupRotation(svgDocument.getElementById('cruiseGroup'), cruiseAngle);
+  }
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle }, '*');
+  chartTitle.textContent = chartNames[page];
+  chartPageButtons.forEach((button, index) => {
+    button.classList.toggle('is-active', index === page);
+    if (index === page) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  renderDirectionLines();
+}
+
+chartPageButtons.forEach((button, index) => button.addEventListener('click', () => showChartPage(index)));
 
 function populateTimeSelect(select, minimum, maximum) {
   const placeholder = document.createElement('option');
@@ -1114,6 +1146,9 @@ window.addEventListener('message', (event) => {
   if (message?.type === 'balance-chart-viewbox' && typeof message.viewBox === 'string') {
     dotOverlay.setAttribute('viewBox', message.viewBox);
   }
+  if (message?.type === 'balance-chart-swipe' && (message.direction === -1 || message.direction === 1)) {
+    showChartPage(currentChartPage + message.direction);
+  }
 });
 
 if (chartObject.contentDocument) {
@@ -1122,6 +1157,9 @@ if (chartObject.contentDocument) {
   chartObject.addEventListener('load', setupRotationControls, { once: true });
 }
 chartObject.addEventListener('load', updateRotationLock);
+chartObject.addEventListener('load', () => {
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle }, '*');
+});
 function requestChartRotation() {
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-request-rotation' }, '*');
 }
