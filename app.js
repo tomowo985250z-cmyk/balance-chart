@@ -12,7 +12,7 @@ const chartObject = document.querySelector('object[type="image/svg+xml"]');
 const chartWrap = document.querySelector('.chart-wrap');
 const chartTitle = document.getElementById('chartTitle');
 const chartPageButtons = [...document.querySelectorAll('.chart-page')];
-const chartNames = ['ピッチリンク用', 'トリムタブ用'];
+const chartNames = ['現在の調整：ピッチリンク', '現在の調整：トリムタブ'];
 let currentChartPage = 0;
 const pageRotations = [{ hovAngle: 0, cruiseAngle: 0 }, { hovAngle: 0, cruiseAngle: 0 }];
 const dotOverlay = document.getElementById('dotOverlay');
@@ -135,9 +135,9 @@ function getThirdMemoOptions() {
 
 function formatMemoValue(value, index, type) {
   if (!value) return '';
-  if (index === 0) return `No.${value} BLD`;
+  if (index === 0) return `No.${value}`;
   if (index === 2 && type === 'TAB') return `${value} 度`;
-  if (index === 2 && type === 'LINK') return `${value} Flat`;
+  if (index === 2 && type === 'LINK') return `${value} フラット`;
   return value;
 }
 
@@ -522,11 +522,53 @@ function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection)
   return {
     centerDistance,
     pointsTowardCenter: centerProgress >= 0,
+    base: center,
+    unit: { x: vector.x / Math.sqrt(vectorLengthSquared), y: vector.y / Math.sqrt(vectorLengthSquared) },
+    maxTravel: Math.max(0, endT * Math.sqrt(vectorLengthSquared)),
     direction,
     number: segment.number,
     start: lineStart,
     end: arrowTip
   };
+}
+
+function getGuideDistances(redLine, blueLine, blueDistanceRatio) {
+  const red = { x: redLine.base.x - CHART_CENTER_X, y: redLine.base.y - CHART_CENTER_Y };
+  const blue = { x: blueLine.base.x - CHART_CENTER_X, y: blueLine.base.y - CHART_CENTER_Y };
+  const redProjection = red.x * redLine.unit.x + red.y * redLine.unit.y;
+  const blueProjection = blue.x * blueLine.unit.x + blue.y * blueLine.unit.y;
+  const redSquared = red.x * red.x + red.y * red.y;
+  const blueSquared = blue.x * blue.x + blue.y * blue.y;
+  const limit = Math.min(redLine.maxTravel, blueLine.maxTravel / blueDistanceRatio);
+  const thresholdSquared = (CENTER_DISTANCE_THRESHOLD * CHART_RADIUS) ** 2;
+  const interval = (projection, squared, speed) => {
+    const perpendicularSquared = squared - projection * projection;
+    if (perpendicularSquared > thresholdSquared) return null;
+    const offset = Math.sqrt(Math.max(0, thresholdSquared - perpendicularSquared)) / speed;
+    return [-projection / speed - offset, -projection / speed + offset];
+  };
+  const redInterval = interval(redProjection, redSquared, 1);
+  const blueInterval = interval(blueProjection, blueSquared, blueDistanceRatio);
+  const lower = Math.max(0, redInterval?.[0] ?? Infinity, blueInterval?.[0] ?? Infinity);
+  const upper = Math.min(limit, redInterval?.[1] ?? -Infinity, blueInterval?.[1] ?? -Infinity);
+  const withinCenterThreshold = lower <= upper;
+  const distancesAt = (travel) => {
+    const redDistance = Math.sqrt(Math.max(0, redSquared + 2 * redProjection * travel + travel * travel)) / CHART_RADIUS;
+    const blueTravel = blueDistanceRatio * travel;
+    const blueDistance = Math.sqrt(Math.max(0, blueSquared + 2 * blueProjection * blueTravel + blueTravel * blueTravel)) / CHART_RADIUS;
+    return { redDistance, blueDistance, maxCenterDistance: Math.max(redDistance, blueDistance), distance: redDistance + blueDistance };
+  };
+  // 赤を t、青を指定比率の t だけ進め、両点のうち遠い方の中心距離を最小化する。
+  let left = withinCenterThreshold ? lower : 0;
+  let right = withinCenterThreshold ? upper : limit;
+  for (let step = 0; step < 48; step += 1) {
+    const first = left + (right - left) / 3;
+    const second = right - (right - left) / 3;
+    if (distancesAt(first).maxCenterDistance > distancesAt(second).maxCenterDistance) left = first;
+    else right = second;
+  }
+  const travel = (left + right) / 2;
+  return { ...distancesAt(travel), withinCenterThreshold };
 }
 
 function appendDirectionArrowMarkers(target) {
@@ -583,23 +625,14 @@ function renderDirectionLines() {
     .map((blue) => ({
       redLine: red.line,
       blueLine: blue.line,
-      bothTowardCenter: red.line.pointsTowardCenter && blue.line.pointsTowardCenter,
-      withinCenterThreshold: red.line.centerDistance <= CENTER_DISTANCE_THRESHOLD
-        && blue.line.centerDistance <= CENTER_DISTANCE_THRESHOLD,
-      maxCenterDistance: Math.max(red.line.centerDistance, blue.line.centerDistance),
-      distance: red.line.centerDistance + blue.line.centerDistance,
-      distanceDifference: Math.abs(red.line.centerDistance - blue.line.centerDistance),
-      redIndex: red.index,
-      blueIndex: blue.index
+      guideDistances: getGuideDistances(red.line, blue.line, currentChartPage === 0 ? 2 : 3)
     })))
-    .sort((first, second) => Number(second.bothTowardCenter) - Number(first.bothTowardCenter)
-      || Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
-      || first.maxCenterDistance - second.maxCenterDistance
-      || first.distance - second.distance
-      || first.distanceDifference - second.distanceDifference
-      || first.redIndex - second.redIndex
-      || first.blueIndex - second.blueIndex);
-  // 同番号・同UP/DOWNの組を選び、中心への向きにかかわらず矢印を表示する。
+    .sort((first, second) => {
+      return Number(second.guideDistances.withinCenterThreshold) - Number(first.guideDistances.withinCenterThreshold)
+        || first.guideDistances.maxCenterDistance - second.guideDistances.maxCenterDistance
+        || first.guideDistances.distance - second.guideDistances.distance;
+    });
+  // 同番号・同UP/DOWNの組から、各画面の距離比で中心に最も近い組を選ぶ。
   const selected = candidates[0];
   if (!selected) return;
 

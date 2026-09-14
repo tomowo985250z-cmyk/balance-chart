@@ -123,11 +123,18 @@ body {
 .chart-navigation {
   display: grid;
   justify-items: center;
-  gap: 5px;
-  padding: 8px 0 2px;
+  gap: 6px;
+  padding: 12px 6px 4px;
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
 }
-.chart-navigation h2 { margin: 0; color: #292631; font-size: 18px; }
+.chart-navigation h2 {
+  margin: 0;
+  color: #292631;
+  font-size: clamp(21px, 5.5vw, 28px);
+  font-weight: 800;
+  text-align: center;
+}
+.chart-swipe-hint { margin: 0; color: #586473; font-size: 13px; font-weight: 600; }
 .chart-pages { display: flex; gap: 12px; align-items: center; }
 .chart-page {
   width: 10px;

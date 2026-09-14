@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260914-two-pages" />
+    <link rel="stylesheet" href="style.css?v=20260914-chart-heading" />
   </head>
   <body>
   <main class="app">
@@ -47,7 +47,8 @@
     <h2 id="resultsHeading" class="results-heading">結果</h2>
     <ul id="dotList" class="dot-list" aria-labelledby="resultsHeading"></ul>
     <div class="chart-navigation" aria-label="チャート画面">
-      <h2 id="chartTitle">ピッチリンク用</h2>
+      <h2 id="chartTitle">現在の調整：ピッチリンク</h2>
+      <p class="chart-swipe-hint">← 左右にスワイプして切替 →</p>
       <div class="chart-pages" aria-label="ページ切替">
         <button type="button" class="chart-page is-active" data-page="0" aria-label="ピッチリンク用を表示" aria-current="page"></button>
         <button type="button" class="chart-page" data-page="1" aria-label="トリムタブ用を表示"></button>
@@ -112,6 +113,6 @@
       </div>
     </form>
   </dialog>
-  <script src="app.js?v=20260914-two-pages"></script>
+  <script src="app.js?v=20260914-chart-heading"></script>
 </body>
 </html>
