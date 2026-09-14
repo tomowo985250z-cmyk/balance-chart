@@ -1,6 +1,13 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 794 1123" role="img" aria-labelledby="chart-title chart-description">
   <title id="chart-title">バランスチャート</title>
   <desc id="chart-description">12方向、半径0.1から1.0までの極座標チャート</desc>
+  <style>
+    .trim-tab #hovLayer { display: none; }
+    .trim-tab #cruiseLayer { stroke: #7b2cbf; }
+    .trim-tab #cruiseArrowHead path,
+    .trim-tab #cruiseTypeLabels,
+    .trim-tab #cruiseDirectionLabels { fill: #7b2cbf; }
+  </style>
 
   <defs>
     <marker id="hovArrowHead" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="18" markerHeight="15" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
@@ -228,6 +235,7 @@
         }
         if (event.data?.type === 'balance-chart-set-rotation' &&
           Number.isFinite(event.data.hovAngle) && Number.isFinite(event.data.cruiseAngle)) {
+          svg.classList.toggle('trim-tab', event.data.page === 1);
           angles.hov = event.data.hovAngle;
           angles.cruise = event.data.cruiseAngle;
           document.getElementById('hovGroup').setAttribute('transform', `rotate(${angles.hov} ${centerX} ${centerY})`);

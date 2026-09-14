@@ -170,6 +170,10 @@ object {
   pointer-events: none;
 }
 
+#dotOverlay.trim-tab .chart-dot-blue { fill: #7b2cbf; }
+#dotOverlay.trim-tab .guide-direction-line[marker-end='url(#blueDirectionLineArrow)'] { stroke: #7b2cbf; }
+#dotOverlay.trim-tab #blueDirectionLineArrow path { fill: #7b2cbf; }
+
 .rotation-lock {
   position: absolute;
   right: 14px;

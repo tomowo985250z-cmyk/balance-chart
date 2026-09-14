@@ -240,13 +240,14 @@ function showChartPage(page) {
   if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
   saveRotation();
   currentChartPage = page;
+  dotOverlay.classList.toggle('trim-tab', page === 1);
   ({ hovAngle, cruiseAngle } = pageRotations[page]);
   const svgDocument = chartObject.contentDocument;
   if (svgDocument) {
     setGroupRotation(svgDocument.getElementById('hovGroup'), hovAngle);
     setGroupRotation(svgDocument.getElementById('cruiseGroup'), cruiseAngle);
   }
-  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle }, '*');
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page }, '*');
   chartTitle.textContent = chartNames[page];
   chartPageButtons.forEach((button, index) => {
     button.classList.toggle('is-active', index === page);
@@ -571,9 +572,9 @@ function getGuideDistances(redLine, blueLine, blueDistanceRatio) {
   return { ...distancesAt(travel), withinCenterThreshold };
 }
 
-function appendDirectionArrowMarkers(target) {
+function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  [['red', DOT_COLORS.red], ['blue', DOT_COLORS.blue]].forEach(([name, color]) => {
+  [['red', DOT_COLORS.red], ['blue', blueColor]].forEach(([name, color]) => {
     const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
     marker.setAttribute('id', `${name}DirectionLineArrow`);
     marker.setAttribute('viewBox', '0 0 10 10');
@@ -618,26 +619,53 @@ function renderDirectionLines() {
       getLines(finalSet.blue, 'blue').forEach((line) => blueDots.push({ index: finalIndex, line }));
     }
   }
-  const candidates = redDots.flatMap((red) => blueDots
-    .filter((blue) => red.line && blue.line
-      && red.line.number === blue.line.number
-      && red.line.direction === blue.line.direction)
-    .map((blue) => ({
-      redLine: red.line,
-      blueLine: blue.line,
-      guideDistances: getGuideDistances(red.line, blue.line, currentChartPage === 0 ? 2 : 3)
-    })))
-    .sort((first, second) => {
-      return Number(second.guideDistances.withinCenterThreshold) - Number(first.guideDistances.withinCenterThreshold)
-        || first.guideDistances.maxCenterDistance - second.guideDistances.maxCenterDistance
-        || first.guideDistances.distance - second.guideDistances.distance;
-    });
-  // 同番号・同UP/DOWNの組から、各画面の距離比で中心に最も近い組を選ぶ。
-  const selected = candidates[0];
-  if (!selected) return;
+  let selectedLines;
+  if (currentChartPage === 1) {
+    // トリムタブは巡航線だけを、矢印方向で到達できる中心距離で選ぶ。
+    const selected = blueDots.sort((first, second) =>
+      Number(second.line.centerDistance <= CENTER_DISTANCE_THRESHOLD) - Number(first.line.centerDistance <= CENTER_DISTANCE_THRESHOLD)
+      || first.line.centerDistance - second.line.centerDistance)[0];
+    if (!selected) return;
+    selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
+  } else if (redDots.length && !blueDots.length) {
+    // 赤のみの場合はドットを起点に、矢印方向の線分上で中心に最も近い点を評価する。
+    const centerDistance = (line) => {
+      const dx = CHART_CENTER_X - line.base.x;
+      const dy = CHART_CENTER_Y - line.base.y;
+      const travel = Math.max(0, Math.min(line.maxTravel, dx * line.unit.x + dy * line.unit.y));
+      return Math.hypot(dx - travel * line.unit.x, dy - travel * line.unit.y) / CHART_RADIUS;
+    };
+    const selected = redDots.map(({ line }) => ({ line, distance: centerDistance(line) }))
+      .sort((first, second) =>
+        Number(second.distance <= CENTER_DISTANCE_THRESHOLD) - Number(first.distance <= CENTER_DISTANCE_THRESHOLD)
+        || first.distance - second.distance)[0];
+    selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
+  } else {
+    const candidates = redDots.flatMap((red) => blueDots
+      .filter((blue) => red.line && blue.line
+        && red.line.number === blue.line.number
+        && red.line.direction === blue.line.direction)
+      .map((blue) => ({
+        redLine: red.line,
+        blueLine: blue.line,
+        guideDistances: getGuideDistances(red.line, blue.line, 2)
+      })))
+      .sort((first, second) => {
+        return Number(second.guideDistances.withinCenterThreshold) - Number(first.guideDistances.withinCenterThreshold)
+          || first.guideDistances.maxCenterDistance - second.guideDistances.maxCenterDistance
+          || first.guideDistances.distance - second.guideDistances.distance;
+      });
+    // ピッチリンクは同番号・同UP/DOWNの赤青ペアを選ぶ。
+    const selected = candidates[0];
+    if (!selected) return;
+    selectedLines = [
+      { line: selected.redLine, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' },
+      { line: selected.blueLine, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' }
+    ];
+  }
 
-  appendDirectionArrowMarkers(guideLayer);
-  [{ line: selected.redLine, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }, { line: selected.blueLine, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' }].forEach(({ line, color, marker }) => {
+  appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);
+  selectedLines.forEach(({ line, color, marker }) => {
     const directionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     directionLine.setAttribute('class', 'guide-direction-line');
     directionLine.setAttribute('x1', String(line.start.x));
@@ -906,6 +934,7 @@ function renderDots() {
       circle.setAttribute('cy', String(y));
       circle.setAttribute('r', '4');
       circle.setAttribute('fill', DOT_COLORS[dot.color]);
+      circle.classList.add(`chart-dot-${dot.color}`);
       circle.setAttribute('stroke', '#ffffff');
       circle.setAttribute('stroke-width', '2');
       circle.style.pointerEvents = 'none';
@@ -917,6 +946,7 @@ function renderDots() {
       label.setAttribute('y', String(labelPosition.y));
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('fill', DOT_COLORS[dot.color]);
+      label.classList.add(`chart-dot-${dot.color}`);
       label.setAttribute('font-family', "Arial, 'Noto Sans JP', sans-serif");
       label.setAttribute('font-size', '16');
       label.setAttribute('font-weight', '700');
@@ -1191,7 +1221,7 @@ if (chartObject.contentDocument) {
 }
 chartObject.addEventListener('load', updateRotationLock);
 chartObject.addEventListener('load', () => {
-  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle }, '*');
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page: currentChartPage }, '*');
 });
 function requestChartRotation() {
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-request-rotation' }, '*');
