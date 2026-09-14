@@ -233,6 +233,10 @@
         if (event.data?.type === 'balance-chart-rotation-lock') {
           svg.dataset.rotationLocked = String(Boolean(event.data.locked));
         }
+        if (event.data?.type === 'balance-chart-auto-mode') {
+          svg.dataset.trimAutoMode = String(Boolean(event.data.trimActive));
+          svg.dataset.pitchAutoMode = String(Boolean(event.data.pitchActive));
+        }
         if (event.data?.type === 'balance-chart-set-rotation' &&
           Number.isFinite(event.data.hovAngle) && Number.isFinite(event.data.cruiseAngle)) {
           svg.classList.toggle('trim-tab', event.data.page === 1);
@@ -294,7 +298,9 @@
           return;
         }
         if (zoom <= 1 && event.touches.length === 1 && svg.dataset.rotationLocked !== 'true'
-          && event.target.closest('#hovRotationHandle, #cruiseRotationHandle')) {
+          && event.target.closest('#hovRotationHandle, #cruiseRotationHandle')
+          && svg.dataset.pitchAutoMode !== 'true'
+          && !(svg.dataset.trimAutoMode === 'true' && event.target.closest('#cruiseRotationHandle'))) {
           rotationTouchActive = true;
           event.preventDefault();
         }
@@ -406,6 +412,7 @@
         const group = handle.closest('#hovGroup, #cruiseGroup');
 
         const name = group.id === 'hovGroup' ? 'hov' : 'cruise';
+        if (svg.dataset.pitchAutoMode === 'true' || (name === 'cruise' && svg.dataset.trimAutoMode === 'true')) return;
         if (active) stopRotation({ pointerId: active.pointerId });
         active = { group, name, pointerId: event.pointerId, startAngle: pointerAngle(event), groupAngle: angles[name] };
         svg.setPointerCapture(event.pointerId);
@@ -416,7 +423,8 @@
       svg.addEventListener('pointermove', (event) => {
         if (!active || event.pointerId !== active.pointerId) return;
         if (pinching) return;
-        if (svg.dataset.rotationLocked === 'true') {
+        if (svg.dataset.rotationLocked === 'true' || svg.dataset.pitchAutoMode === 'true'
+          || (active.name === 'cruise' && svg.dataset.trimAutoMode === 'true')) {
           stopRotation(event);
           return;
         }

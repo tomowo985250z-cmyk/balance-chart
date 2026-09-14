@@ -17,6 +17,16 @@ let currentChartPage = 0;
 const pageRotations = [{ hovAngle: 0, cruiseAngle: 0 }, { hovAngle: 0, cruiseAngle: 0 }];
 const dotOverlay = document.getElementById('dotOverlay');
 const rotationLock = document.getElementById('rotationLock');
+const trimModeToggle = document.getElementById('trimModeToggle');
+const pitchModeToggle = document.getElementById('pitchModeToggle');
+let pitchAutoMode = false;
+const pitchAutoReady = { red: false, blue: false };
+const manualPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
+const autoPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
+let trimAutoMode = false;
+let trimAutoReady = false;
+let manualTrimCruiseAngle = 0;
+let autoTrimCruiseAngle = 0;
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 
@@ -226,7 +236,9 @@ function loadRotation() {
 }
 
 function saveRotation() {
-  pageRotations[currentChartPage] = { hovAngle, cruiseAngle };
+  pageRotations[currentChartPage] = currentChartPage === 0
+    ? { ...manualPitchAngles }
+    : { hovAngle, cruiseAngle: manualTrimCruiseAngle };
   try {
     localStorage.setItem(ROTATION_STORAGE_KEY, JSON.stringify({ pages: pageRotations }));
   } catch {
@@ -235,6 +247,41 @@ function saveRotation() {
 }
 
 loadRotation();
+Object.assign(manualPitchAngles, pageRotations[0]);
+manualTrimCruiseAngle = pageRotations[1].cruiseAngle;
+
+function updatePitchModeUI() {
+  pitchModeToggle.hidden = currentChartPage !== 0;
+  const waiting = [!pitchAutoReady.red && 'HOV', !pitchAutoReady.blue && '巡航'].filter(Boolean);
+  pitchModeToggle.textContent = pitchAutoMode
+    ? `赤・青六角形：自動${waiting.length ? `（${waiting.join('・')}待ち）` : ''}`
+    : '赤・青六角形：手動';
+  pitchModeToggle.setAttribute('aria-pressed', String(pitchAutoMode));
+  updateRotationLock();
+}
+
+pitchModeToggle.addEventListener('click', () => {
+  pitchAutoMode = !pitchAutoMode;
+  if (pitchAutoMode) syncAutoPitchRotation();
+  else applyChartRotation(manualPitchAngles.hovAngle, manualPitchAngles.cruiseAngle);
+  updatePitchModeUI();
+  renderDirectionLines();
+});
+
+function updateTrimModeUI() {
+  trimModeToggle.hidden = currentChartPage !== 1;
+  trimModeToggle.textContent = `紫六角形：${trimAutoMode ? (trimAutoReady ? '自動' : '自動（条件待ち）') : '手動'}`;
+  trimModeToggle.setAttribute('aria-pressed', String(trimAutoMode));
+  updateRotationLock();
+}
+
+trimModeToggle.addEventListener('click', () => {
+  trimAutoMode = !trimAutoMode;
+  if (trimAutoMode) syncAutoTrimRotation();
+  else applyCruiseRotation(manualTrimCruiseAngle);
+  updateTrimModeUI();
+  renderDirectionLines();
+});
 
 function showChartPage(page) {
   if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
@@ -242,12 +289,16 @@ function showChartPage(page) {
   currentChartPage = page;
   dotOverlay.classList.toggle('trim-tab', page === 1);
   ({ hovAngle, cruiseAngle } = pageRotations[page]);
+  if (page === 0 && pitchAutoMode) syncAutoPitchRotation();
+  if (page === 1 && trimAutoMode) syncAutoTrimRotation();
   const svgDocument = chartObject.contentDocument;
   if (svgDocument) {
     setGroupRotation(svgDocument.getElementById('hovGroup'), hovAngle);
     setGroupRotation(svgDocument.getElementById('cruiseGroup'), cruiseAngle);
   }
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page }, '*');
+  updateTrimModeUI();
+  updatePitchModeUI();
   chartTitle.textContent = chartNames[page];
   chartPageButtons.forEach((button, index) => {
     button.classList.toggle('is-active', index === page);
@@ -372,10 +423,15 @@ function updateRotationLock() {
   if (svg) svg.dataset.rotationLocked = String(rotationLocked);
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-rotation-lock', locked: rotationLocked }, '*');
   rotationHandles.forEach((handle) => {
-    handle.style.pointerEvents = rotationLocked ? 'none' : 'stroke';
-    handle.setAttribute('pointer-events', rotationLocked ? 'none' : 'stroke');
-    handle.style.cursor = rotationLocked ? 'default' : 'grab';
+    const disabled = rotationLocked || (currentChartPage === 0 && pitchAutoMode)
+      || (currentChartPage === 1 && trimAutoMode && handle.id === 'cruiseRotationHandle');
+    handle.style.pointerEvents = disabled ? 'none' : 'stroke';
+    handle.setAttribute('pointer-events', disabled ? 'none' : 'stroke');
+    handle.style.cursor = disabled ? 'default' : 'grab';
   });
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-auto-mode',
+    trimActive: currentChartPage === 1 && trimAutoMode,
+    pitchActive: currentChartPage === 0 && pitchAutoMode }, '*');
 }
 
 rotationLock.addEventListener('change', updateRotationLock);
@@ -383,6 +439,7 @@ rotationLock.addEventListener('input', updateRotationLock);
 // 保存した回転角を復元した画面では、意図しない回転を防ぐためロックから開始する。
 rotationLock.checked = true;
 updateRotationLock();
+updatePitchModeUI();
 
 function getStoredDot(dot, color) {
   if (!dot || dot.color !== color || !Number.isFinite(dot.angle) || !Number.isFinite(dot.radius)
@@ -450,6 +507,92 @@ function getDotCoordinates(dot) {
     x: CHART_CENTER_X + dot.radius * CHART_RADIUS * Math.sin(angle),
     y: CHART_CENTER_Y - dot.radius * CHART_RADIUS * Math.cos(angle)
   };
+}
+
+function getLatestTrimSyncAngle() {
+  for (let index = dotSets.length - 2; index >= 0; index -= 1) {
+    const before = dotSets[index];
+    const after = dotSets[index + 1];
+    if (!before.blue || !after.blue) continue;
+    const adjustment = [...(before.adjustments || [])].reverse()
+      .find((values) => values[1] === 'TAB' && ['1', '2', '3'].includes(values[0])
+        && ['UP', 'DOWN'].includes(values[3]));
+    if (!adjustment) continue;
+    const start = getDotCoordinates(before.blue);
+    const end = getDotCoordinates(after.blue);
+    if (Math.hypot(end.x - start.x, end.y - start.y) < 0.001) continue;
+    const side = DIRECTION_ARROW_SEGMENTS.find((segment) => segment.number === Number(adjustment[0]));
+    const towardEnd = adjustment[3] === 'UP' ? side.upAtEnd : !side.upAtEnd;
+    const from = towardEnd ? side.start : side.end;
+    const to = towardEnd ? side.end : side.start;
+    return (Math.atan2(end.y - start.y, end.x - start.x)
+      - Math.atan2(to.y - from.y, to.x - from.x)) * 180 / Math.PI;
+  }
+  return null;
+}
+
+function getLatestLinkSyncAngle(color) {
+  for (let index = dotSets.length - 2; index >= 0; index -= 1) {
+    const before = dotSets[index];
+    const after = dotSets[index + 1];
+    if (!before[color] || !after[color]) continue;
+    const adjustment = [...(before.adjustments || [])].reverse()
+      .find((values) => values[1] === 'LINK' && ['1', '2', '3'].includes(values[0])
+        && ['UP', 'DOWN'].includes(values[3]));
+    if (!adjustment) continue;
+    const start = getDotCoordinates(before[color]);
+    const end = getDotCoordinates(after[color]);
+    if (Math.hypot(end.x - start.x, end.y - start.y) < 0.001) continue;
+    const side = DIRECTION_ARROW_SEGMENTS.find((segment) => segment.number === Number(adjustment[0]));
+    const towardEnd = adjustment[3] === 'UP' ? side.upAtEnd : !side.upAtEnd;
+    const from = towardEnd ? side.start : side.end;
+    const to = towardEnd ? side.end : side.start;
+    return (Math.atan2(end.y - start.y, end.x - start.x)
+      - Math.atan2(to.y - from.y, to.x - from.x)) * 180 / Math.PI;
+  }
+  return null;
+}
+
+function applyChartRotation(redAngle, blueAngle) {
+  hovAngle = redAngle;
+  cruiseAngle = blueAngle;
+  const svgDocument = chartObject.contentDocument;
+  if (svgDocument) {
+    setGroupRotation(svgDocument.getElementById('hovGroup'), redAngle);
+    setGroupRotation(svgDocument.getElementById('cruiseGroup'), blueAngle);
+  }
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page: currentChartPage }, '*');
+}
+
+function syncAutoPitchRotation() {
+  if (!pitchAutoMode) return;
+  const nextAngles = { hovAngle, cruiseAngle };
+  for (const [color, key] of [['red', 'hovAngle'], ['blue', 'cruiseAngle']]) {
+    const angle = getLatestLinkSyncAngle(color);
+    pitchAutoReady[color] = angle !== null;
+    if (angle !== null) {
+      autoPitchAngles[key] = angle;
+      nextAngles[key] = autoPitchAngles[key];
+    }
+  }
+  if (currentChartPage === 0) applyChartRotation(nextAngles.hovAngle, nextAngles.cruiseAngle);
+  updatePitchModeUI();
+}
+
+function applyCruiseRotation(angle) {
+  cruiseAngle = angle;
+  const group = chartObject.contentDocument?.getElementById('cruiseGroup');
+  if (group) setGroupRotation(group, angle);
+  chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle: angle, page: currentChartPage }, '*');
+}
+
+function syncAutoTrimRotation() {
+  if (!trimAutoMode) return;
+  const angle = getLatestTrimSyncAngle();
+  trimAutoReady = angle !== null;
+  if (angle !== null) autoTrimCruiseAngle = angle;
+  if (currentChartPage === 1) applyCruiseRotation(autoTrimCruiseAngle);
+  trimModeToggle.textContent = `紫六角形：${trimAutoReady ? '自動' : '自動（条件待ち）'}`;
 }
 
 function rotateAroundChartCenter(point, angle) {
@@ -832,6 +975,8 @@ cancelResultEdit.addEventListener('click', cancelEditing);
 cancelAdjustmentEdit.addEventListener('click', cancelEditing);
 
 function renderDots() {
+  syncAutoPitchRotation();
+  syncAutoTrimRotation();
   if ((resultEdit && !dotSets.includes(resultEdit.set)) ||
       (adjustmentEdit && (!dotSets.includes(adjustmentEdit.set) || !adjustmentEdit.set.adjustments?.includes(adjustmentEdit.adjustment)))) cancelEditing();
   updateEditingUI();
@@ -1115,8 +1260,15 @@ function setupRotationControls() {
     if (!activeRotation || !pendingPointer) return;
     const angle = activeRotation.startGroupAngle + getPointerAngle(pendingPointer) - activeRotation.startPointerAngle;
     pendingPointer = null;
-    if (activeRotation.name === 'hov') hovAngle = angle;
-    else cruiseAngle = angle;
+    if (activeRotation.name === 'hov') {
+      hovAngle = angle;
+      if (currentChartPage === 0) manualPitchAngles.hovAngle = angle;
+    }
+    else {
+      cruiseAngle = angle;
+      if (currentChartPage === 1) manualTrimCruiseAngle = angle;
+      else manualPitchAngles.cruiseAngle = angle;
+    }
     setGroupRotation(activeRotation.group, angle);
     renderDirectionLines();
     rotationChanged = true;
@@ -1152,7 +1304,9 @@ function setupRotationControls() {
   groups.forEach((state) => {
     state.handle.addEventListener('pointerdown', (event) => {
       const isZoomed = Number(svg.viewBox.baseVal.width) < 794;
-      if (rotationLocked || rotationLock.checked || svg.dataset.pinching === 'true' || isZoomed) {
+      if (rotationLocked || rotationLock.checked || (currentChartPage === 0 && pitchAutoMode)
+        || (currentChartPage === 1 && trimAutoMode && state.name === 'cruise')
+        || svg.dataset.pinching === 'true' || isZoomed) {
         event.stopImmediatePropagation();
         return;
       }
@@ -1201,8 +1355,14 @@ window.addEventListener('message', (event) => {
   const message = event.data;
   if (message?.type === 'balance-chart-rotation'
     && Number.isFinite(message.hovAngle) && Number.isFinite(message.cruiseAngle)) {
+    if ((currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
     hovAngle = message.hovAngle;
     cruiseAngle = message.cruiseAngle;
+    if (currentChartPage === 1) manualTrimCruiseAngle = cruiseAngle;
+    else {
+      manualPitchAngles.hovAngle = hovAngle;
+      manualPitchAngles.cruiseAngle = cruiseAngle;
+    }
     if (message.finished) saveRotation();
     renderDirectionLines();
   }
@@ -1222,6 +1382,7 @@ if (chartObject.contentDocument) {
 chartObject.addEventListener('load', updateRotationLock);
 chartObject.addEventListener('load', () => {
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page: currentChartPage }, '*');
+  updateRotationLock();
 });
 function requestChartRotation() {
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-request-rotation' }, '*');

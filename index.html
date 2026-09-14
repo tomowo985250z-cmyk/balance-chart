@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260914-trim-purple" />
+    <link rel="stylesheet" href="style.css?v=20260915-pitch-auto" />
   </head>
   <body>
   <main class="app">
@@ -55,12 +55,14 @@
       </div>
     </div>
     <div class="chart-wrap">
-      <object data="chart.svg?v=20260914-trim-purple" type="image/svg+xml" aria-label="バランスチャート"></object>
+      <object data="chart.svg?v=20260915-pitch-auto" type="image/svg+xml" aria-label="バランスチャート"></object>
       <svg id="dotOverlay" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
       <button id="guideToggle" class="rotation-lock guide-toggle" type="button" aria-pressed="false">
         <span class="rotation-lock-track" aria-hidden="true"></span>
         <span id="guideToggleText">ガイド OFF</span>
       </button>
+      <button id="pitchModeToggle" class="rotation-lock trim-mode-toggle pitch-mode-toggle" type="button" aria-pressed="false" hidden>赤・青六角形：手動</button>
+      <button id="trimModeToggle" class="rotation-lock trim-mode-toggle" type="button" aria-pressed="false" hidden>紫六角形：手動</button>
       <label class="rotation-lock">
         <input id="rotationLock" type="checkbox" role="switch" />
         <span class="rotation-lock-track" aria-hidden="true"></span>
@@ -113,6 +115,6 @@
       </div>
     </form>
   </dialog>
-  <script src="app.js?v=20260914-red-only-guide"></script>
+  <script src="app.js?v=20260915-pitch-auto"></script>
 </body>
 </html>
