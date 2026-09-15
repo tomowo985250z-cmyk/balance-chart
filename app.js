@@ -561,7 +561,7 @@ function getLatestTrimSyncAngle() {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!before.blue || !after.blue) continue;
-    if (!learning.isConfirmed(dotSets, after.learningId, 'blue')) continue;
+    // 自動回転への利用は学習の実調整指定とは独立させる。
     if (!getSingleAdjustment(before, 'TAB')) continue;
     const adjustment = before.adjustments[0];
     const start = getDotCoordinates(before.blue);
@@ -582,7 +582,7 @@ function getLatestLinkSyncAngle(color) {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!before[color] || !after[color]) continue;
-    if (!learning.isConfirmed(dotSets, after.learningId, color)) continue;
+    // 自動回転への利用は学習の実調整指定とは独立させる。
     if (!getSingleAdjustment(before, 'LINK')) continue;
     const adjustment = before.adjustments[0];
     const start = getDotCoordinates(before[color]);

@@ -577,6 +577,40 @@
     near(run('learning.inspect().pending[dotSets[0].learningId].predictions.red.angle'), run('BalanceLearning.wrap(getNominalAdjustmentAngle(1,"UP")+31)'), 'LINK snapshot never uses visible TAB HOV angle');
     near(run('learning.inspect().pending[dotSets[0].learningId].predictions.blue.angle'), run('BalanceLearning.wrap(getNominalAdjustmentAngle(1,"UP")+62)'), 'LINK snapshot never uses visible TAB cruise angle');
 
+    // 実調整未指定でも自動回転だけを開始し、学習には一切登録しない。
+    for (const type of ['LINK','TAB']) for (const direction of ['UP','DOWN']) {
+      run(`
+        learning.reset([]); dotSets.splice(0);
+        currentChartPage=${type==='LINK'?0:1}; pitchAutoMode=true; trimAutoMode=true;
+        dotSets.push({learningId:newLearningId(),
+          red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[['2','${type}','1','${direction}']]});
+        renderDots();
+      `);
+      assert(run('!pitchAutoReady.red && !pitchAutoReady.blue && !trimAutoReady'),type+'/'+direction+' waits without next measurement');
+      run(`
+        [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.6'];
+        [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.7'];
+        dotForm.requestSubmit();
+      `);
+      if (type==='LINK') {
+        assert(run('pitchAutoReady.red && pitchAutoReady.blue && !trimAutoReady'),'unmarked LINK starts red/blue, not TAB');
+        near(run('BalanceLearning.wrap(autoPitchAngles.hovAngle)'),direction==='UP'?-90:90,'LINK red unchanged angle formula');
+        near(run('BalanceLearning.wrap(autoPitchAngles.cruiseAngle)'),direction==='UP'?0:-180,'LINK blue unchanged angle formula');
+        assert(!run('pitchModeToggle.textContent.includes("待ち")'),'LINK waiting label clears after form submission');
+      } else {
+        assert(run('trimAutoReady && !pitchAutoReady.red && !pitchAutoReady.blue'),'unmarked TAB starts purple, not LINK');
+        near(run('BalanceLearning.wrap(autoTrimCruiseAngle)'),direction==='UP'?0:-180,'TAB unchanged angle formula');
+        assert(!run('trimModeToggle.textContent.includes("条件待ち")'),'TAB waiting label clears after form submission');
+      }
+      run('renderDots(); renderDots();');
+      assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().models).length===0 && Object.keys(learning.inspect().confirmed).length===0'),type+' unmarked history never trains or becomes confirmed');
+      assert(run('JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),type+' persisted learning excludes unmarked history');
+      run('dotSets[1].blue=null; renderDots();');
+      assert(run(type==='LINK'?'pitchAutoReady.red && !pitchAutoReady.blue':'!trimAutoReady'),type+' missing cruise retains correct waiting condition');
+      run('dotSets[1].red=dotSets[0].red; dotSets[1].blue=dotSets[0].blue; renderDots();');
+      assert(run('!pitchAutoReady.red && !pitchAutoReady.blue && !trimAutoReady'),type+' zero movement stays waiting');
+    }
+    groups.push('未指定履歴：LINK/TAB自動回転・UP/DOWN・入力後再評価・色独立・不足時待ち・学習保存への混入なし');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';
