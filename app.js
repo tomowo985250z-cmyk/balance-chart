@@ -129,6 +129,36 @@ const DIRECTION_ARROW_SEGMENTS = [
   { number: 2, start: { x: 93.9, y: 695 }, end: { x: 93.9, y: 345 }, upAtEnd: false },
   { number: 3, start: { x: 93.9, y: 345 }, end: { x: 397, y: 170 }, upAtEnd: true }
 ];
+function getNominalAdjustmentAngle(blade, direction) {
+  const side = DIRECTION_ARROW_SEGMENTS.find(segment => segment.number === blade);
+  const towardEnd = direction === 'UP' ? side.upAtEnd : !side.upAtEnd;
+  return Math.atan2(towardEnd ? side.end.y - side.start.y : side.start.y - side.end.y,
+    towardEnd ? side.end.x - side.start.x : side.start.x - side.end.x) * 180 / Math.PI;
+}
+const learning = BalanceLearning.create({
+  storage: { getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) },
+  coordinates: getDotCoordinates, nominalAngle: getNominalAdjustmentAngle, radius: CHART_RADIUS
+});
+const manualLearningReference = { LINK: {}, TAB: {} };
+let manualMessageChanges = { red: false, blue: false };
+let guidePredictionDebug = { fallback: true };
+window.balanceChartLearning = { inspect: () => ({ ...learning.inspect(), guides: structuredClone(guidePredictionDebug) }) };
+
+function getSingleAdjustment(set, type) {
+  const action = set?.adjustments?.length === 1 ? BalanceLearning.adjustment(set.adjustments[0]) : null;
+  return action?.type === type ? action : null;
+}
+
+function getLearnedRotation(type, color) {
+  const action = [...dotSets].reverse().map(set => getSingleAdjustment(set, type)).find(Boolean);
+  return learning.rotation(type, color, action?.blade ?? 1, action?.direction ?? 'UP');
+}
+
+function recordManualLearning(color, angle) {
+  const type = currentChartPage === 0 ? 'LINK' : 'TAB';
+  const reference = manualLearningReference[type][color];
+  if (Number.isFinite(reference)) learning.recordManual(type, color, reference, angle);
+}
 const DOT_STORAGE_KEY = 'balance-chart-dot-sets-v1';
 const ROTATION_STORAGE_KEY = 'balance-chart-rotation-v1';
 const MAX_DOTS = 14;
@@ -261,6 +291,9 @@ function updatePitchModeUI() {
 }
 
 pitchModeToggle.addEventListener('click', () => {
+  manualMessageChanges = { red: false, blue: false };
+  if (pitchAutoMode) Object.assign(manualLearningReference.LINK, { red: hovAngle, blue: cruiseAngle });
+  else manualLearningReference.LINK = {};
   pitchAutoMode = !pitchAutoMode;
   if (pitchAutoMode) syncAutoPitchRotation();
   else applyChartRotation(manualPitchAngles.hovAngle, manualPitchAngles.cruiseAngle);
@@ -276,6 +309,8 @@ function updateTrimModeUI() {
 }
 
 trimModeToggle.addEventListener('click', () => {
+  manualMessageChanges = { red: false, blue: false };
+  manualLearningReference.TAB = trimAutoMode ? { blue: cruiseAngle } : {};
   trimAutoMode = !trimAutoMode;
   if (trimAutoMode) syncAutoTrimRotation();
   else applyCruiseRotation(manualTrimCruiseAngle);
@@ -286,6 +321,7 @@ trimModeToggle.addEventListener('click', () => {
 function showChartPage(page) {
   if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
   saveRotation();
+  manualMessageChanges = { red: false, blue: false };
   currentChartPage = page;
   dotOverlay.classList.toggle('trim-tab', page === 1);
   ({ hovAngle, cruiseAngle } = pageRotations[page]);
@@ -447,6 +483,10 @@ function getStoredDot(dot, color) {
   return { clock: dot.clock.replace(/^0:/, '12:'), angle: dot.angle, radius: dot.radius, color };
 }
 
+function newLearningId() {
+  return globalThis.crypto?.randomUUID?.() ?? `result-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function loadDotSets() {
   try {
     const saved = JSON.parse(localStorage.getItem(DOT_STORAGE_KEY) || '[]');
@@ -454,6 +494,8 @@ function loadDotSets() {
 
     return saved.reduce((sets, set) => {
       const restored = {
+        learningId: typeof set?.learningId === 'string' && /^[a-zA-Z0-9-]{1,80}$/.test(set.learningId)
+          && !sets.some(item => item.learningId === set.learningId) ? set.learningId : newLearningId(),
         red: getStoredDot(set?.red, 'red'),
         blue: getStoredDot(set?.blue, 'blue'),
         adjustments: Array.isArray(set?.adjustments)
@@ -479,6 +521,8 @@ function saveDotSets() {
 }
 
 dotSets.push(...loadDotSets());
+// 既存の測定形式に任意IDだけを追加し、学習履歴と編集・削除を対応させる。
+saveDotSets();
 
 function parseDotInput(hourValue, minuteValue, value) {
   const hours = Number(hourValue);
@@ -514,10 +558,8 @@ function getLatestTrimSyncAngle() {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!before.blue || !after.blue) continue;
-    const adjustment = [...(before.adjustments || [])].reverse()
-      .find((values) => values[1] === 'TAB' && ['1', '2', '3'].includes(values[0])
-        && ['UP', 'DOWN'].includes(values[3]));
-    if (!adjustment) continue;
+    if (!getSingleAdjustment(before, 'TAB')) continue;
+    const adjustment = before.adjustments[0];
     const start = getDotCoordinates(before.blue);
     const end = getDotCoordinates(after.blue);
     if (Math.hypot(end.x - start.x, end.y - start.y) < 0.001) continue;
@@ -536,10 +578,8 @@ function getLatestLinkSyncAngle(color) {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!before[color] || !after[color]) continue;
-    const adjustment = [...(before.adjustments || [])].reverse()
-      .find((values) => values[1] === 'LINK' && ['1', '2', '3'].includes(values[0])
-        && ['UP', 'DOWN'].includes(values[3]));
-    if (!adjustment) continue;
+    if (!getSingleAdjustment(before, 'LINK')) continue;
+    const adjustment = before.adjustments[0];
     const start = getDotCoordinates(before[color]);
     const end = getDotCoordinates(after[color]);
     if (Math.hypot(end.x - start.x, end.y - start.y) < 0.001) continue;
@@ -568,7 +608,7 @@ function syncAutoPitchRotation() {
   if (!pitchAutoMode) return;
   const nextAngles = { hovAngle, cruiseAngle };
   for (const [color, key] of [['red', 'hovAngle'], ['blue', 'cruiseAngle']]) {
-    const angle = getLatestLinkSyncAngle(color);
+    const angle = getLearnedRotation('LINK', color) ?? getLatestLinkSyncAngle(color);
     pitchAutoReady[color] = angle !== null;
     if (angle !== null) {
       autoPitchAngles[key] = angle;
@@ -588,7 +628,7 @@ function applyCruiseRotation(angle) {
 
 function syncAutoTrimRotation() {
   if (!trimAutoMode) return;
-  const angle = getLatestTrimSyncAngle();
+  const angle = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
   trimAutoReady = angle !== null;
   if (angle !== null) autoTrimCruiseAngle = angle;
   if (currentChartPage === 1) applyCruiseRotation(autoTrimCruiseAngle);
@@ -676,33 +716,59 @@ function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection)
   };
 }
 
-function getGuideDistances(redLine, blueLine, blueDistanceRatio) {
+function getLatestPitchDistanceRatio() {
+  // 隣接する結果だけを比較し、最新の算出可能な移動距離比を使う。
+  for (let index = dotSets.length - 2; index >= 0; index -= 1) {
+    const before = dotSets[index];
+    const after = dotSets[index + 1];
+    if (!getSingleAdjustment(before, 'LINK')) continue;
+    if (!before.red || !before.blue || !after.red || !after.blue) continue;
+    const distances = ['red', 'blue'].map((color) => {
+      const start = getDotCoordinates(before[color]);
+      const end = getDotCoordinates(after[color]);
+      return Math.hypot(end.x - start.x, end.y - start.y);
+    });
+    const scale = Math.max(...distances);
+    if (!distances.every(Number.isFinite) || scale === 0) continue;
+    // 大きい方を1に正規化し、片方が0でも同じ比率で評価する。
+    return { red: distances[0] / scale, blue: distances[1] / scale };
+  }
+  return null;
+}
+
+function getGuideDistances(redLine, blueLine, distanceRatio) {
+  const { red: redSpeed, blue: blueSpeed } = distanceRatio;
   const red = { x: redLine.base.x - CHART_CENTER_X, y: redLine.base.y - CHART_CENTER_Y };
   const blue = { x: blueLine.base.x - CHART_CENTER_X, y: blueLine.base.y - CHART_CENTER_Y };
   const redProjection = red.x * redLine.unit.x + red.y * redLine.unit.y;
   const blueProjection = blue.x * blueLine.unit.x + blue.y * blueLine.unit.y;
   const redSquared = red.x * red.x + red.y * red.y;
   const blueSquared = blue.x * blue.x + blue.y * blue.y;
-  const limit = Math.min(redLine.maxTravel, blueLine.maxTravel / blueDistanceRatio);
+  const limit = Math.min(
+    redSpeed > 0 ? redLine.maxTravel / redSpeed : Infinity,
+    blueSpeed > 0 ? blueLine.maxTravel / blueSpeed : Infinity
+  );
   const thresholdSquared = (CENTER_DISTANCE_THRESHOLD * CHART_RADIUS) ** 2;
   const interval = (projection, squared, speed) => {
+    if (speed === 0) return squared <= thresholdSquared ? [-Infinity, Infinity] : null;
     const perpendicularSquared = squared - projection * projection;
     if (perpendicularSquared > thresholdSquared) return null;
     const offset = Math.sqrt(Math.max(0, thresholdSquared - perpendicularSquared)) / speed;
     return [-projection / speed - offset, -projection / speed + offset];
   };
-  const redInterval = interval(redProjection, redSquared, 1);
-  const blueInterval = interval(blueProjection, blueSquared, blueDistanceRatio);
+  const redInterval = interval(redProjection, redSquared, redSpeed);
+  const blueInterval = interval(blueProjection, blueSquared, blueSpeed);
   const lower = Math.max(0, redInterval?.[0] ?? Infinity, blueInterval?.[0] ?? Infinity);
   const upper = Math.min(limit, redInterval?.[1] ?? -Infinity, blueInterval?.[1] ?? -Infinity);
   const withinCenterThreshold = lower <= upper;
   const distancesAt = (travel) => {
-    const redDistance = Math.sqrt(Math.max(0, redSquared + 2 * redProjection * travel + travel * travel)) / CHART_RADIUS;
-    const blueTravel = blueDistanceRatio * travel;
+    const redTravel = redSpeed * travel;
+    const redDistance = Math.sqrt(Math.max(0, redSquared + 2 * redProjection * redTravel + redTravel * redTravel)) / CHART_RADIUS;
+    const blueTravel = blueSpeed * travel;
     const blueDistance = Math.sqrt(Math.max(0, blueSquared + 2 * blueProjection * blueTravel + blueTravel * blueTravel)) / CHART_RADIUS;
     return { redDistance, blueDistance, maxCenterDistance: Math.max(redDistance, blueDistance), distance: redDistance + blueDistance };
   };
-  // 赤を t、青を指定比率の t だけ進め、両点のうち遠い方の中心距離を最小化する。
+  // 赤・青を実測比率で進め、両点のうち遠い方の中心距離を最小化する。
   let left = withinCenterThreshold ? lower : 0;
   let right = withinCenterThreshold ? upper : limit;
   for (let step = 0; step < 48; step += 1) {
@@ -735,6 +801,50 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
   target.append(defs);
 }
 
+function getLearnedGuideLines(finalSet) {
+  const type = currentChartPage === 0 ? 'LINK' : 'TAB';
+  const automatic = currentChartPage === 0 ? pitchAutoMode : trimAutoMode;
+  guidePredictionDebug = { type, fallback: true, reason: automatic ? 'insufficient-samples' : 'manual-mode' };
+  if (!automatic || !finalSet) return null;
+  // 既存の評価対象を維持する（TABは巡航のみ、LINKはHOVのみ／赤青ペア）。
+  const colors = type === 'TAB' ? (finalSet.blue ? ['blue'] : [])
+    : finalSet.red ? (finalSet.blue ? ['red', 'blue'] : ['red']) : [];
+  if (!colors.length || colors.some(color => getLearnedRotation(type, color) === null)) return null;
+  const candidates = [];
+  for (const blade of [1, 2, 3]) {
+    for (const direction of ['UP', 'DOWN']) {
+      for (const amountText of BalanceLearning.amounts[type]) {
+        const { amount } = BalanceLearning.adjustment([String(blade), type, amountText, direction]);
+        const predictions = colors.map(color => {
+          const start = getDotCoordinates(finalSet[color]);
+          const prediction = learning.predict(type, color, blade, direction, amount, start);
+          if (!prediction) return null;
+          const currentDistance = Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS;
+          const predictedDistance = Math.hypot(prediction.position.x - CHART_CENTER_X, prediction.position.y - CHART_CENTER_Y) / CHART_RADIUS;
+          return { color, start, ...prediction, currentDistance, predictedDistance, improvement: currentDistance - predictedDistance };
+        });
+        if (predictions.some(prediction => !prediction)) continue;
+        const improvement = predictions.reduce((sum, prediction) => sum + prediction.improvement, 0);
+        // 一方の改善で他方の悪化を相殺しない。線の延長ではなく実際の調整量の終点を評価する。
+        const eligible = predictions.every(prediction => prediction.improvement >= -1e-6) && improvement > 1e-6;
+        candidates.push({ type, blade, direction, amount, amountText, predictions, improvement, eligible,
+          withinCenterThreshold: predictions.every(prediction => prediction.predictedDistance <= CENTER_DISTANCE_THRESHOLD),
+          maxCenterDistance: Math.max(...predictions.map(prediction => prediction.predictedDistance)),
+          distance: predictions.reduce((sum, prediction) => sum + prediction.predictedDistance, 0) });
+      }
+    }
+  }
+  const selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
+    Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
+    || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance)[0];
+  guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
+  return selected ? selected.predictions.map(prediction => ({
+    line: { base: prediction.start, start: prediction.start, end: prediction.position },
+    color: prediction.color === 'red' ? DOT_COLORS.red : type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue,
+    marker: `${prediction.color}DirectionLineArrow`
+  })) : [];
+}
+
 function renderDirectionLines() {
   let guideLayer = dotOverlay.querySelector('.direction-lines');
   if (!guideLayer) {
@@ -762,8 +872,10 @@ function renderDirectionLines() {
       getLines(finalSet.blue, 'blue').forEach((line) => blueDots.push({ index: finalIndex, line }));
     }
   }
-  let selectedLines;
-  if (currentChartPage === 1) {
+  let selectedLines = getLearnedGuideLines(finalSet);
+  if (selectedLines !== null) {
+    // 学習済み候補が全て悪化する場合は、旧候補で上書きしない。
+  } else if (currentChartPage === 1) {
     // トリムタブは巡航線だけを、矢印方向で到達できる中心距離で選ぶ。
     const selected = blueDots.sort((first, second) =>
       Number(second.line.centerDistance <= CENTER_DISTANCE_THRESHOLD) - Number(first.line.centerDistance <= CENTER_DISTANCE_THRESHOLD)
@@ -784,6 +896,8 @@ function renderDirectionLines() {
         || first.distance - second.distance)[0];
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
   } else {
+    // 初期状態でもガイドを表示する。実測LINK比があれば固定比より優先する。
+    const distanceRatio = getLatestPitchDistanceRatio() ?? { red: 1, blue: 2 };
     const candidates = redDots.flatMap((red) => blueDots
       .filter((blue) => red.line && blue.line
         && red.line.number === blue.line.number
@@ -791,7 +905,7 @@ function renderDirectionLines() {
       .map((blue) => ({
         redLine: red.line,
         blueLine: blue.line,
-        guideDistances: getGuideDistances(red.line, blue.line, 2)
+        guideDistances: getGuideDistances(red.line, blue.line, distanceRatio)
       })))
       .sort((first, second) => {
         return Number(second.guideDistances.withinCenterThreshold) - Number(first.guideDistances.withinCenterThreshold)
@@ -845,6 +959,15 @@ deleteConfirmation.addEventListener('close', () => {
   const action = pendingDeletion;
   pendingDeletion = null;
   if (deleteConfirmation.returnValue === 'delete') action?.();
+});
+
+document.getElementById('resetLearning').addEventListener('click', () => {
+  confirmDeletion('自動補正の学習値だけを初期化しますか？測定結果・調整量・設定は残ります。', () => {
+    learning.reset(dotSets);
+    manualLearningReference.LINK = {};
+    manualLearningReference.TAB = {};
+    renderDots();
+  });
 });
 
 const adjustmentTarget = document.getElementById('adjustmentTarget');
@@ -978,6 +1101,13 @@ cancelResultEdit.addEventListener('click', cancelEditing);
 cancelAdjustmentEdit.addEventListener('click', cancelEditing);
 
 function renderDots() {
+  learning.sync(dotSets, {
+    LINK: {
+      red: pitchAutoMode && pitchAutoReady.red ? autoPitchAngles.hovAngle : manualPitchAngles.hovAngle,
+      blue: pitchAutoMode && pitchAutoReady.blue ? autoPitchAngles.cruiseAngle : manualPitchAngles.cruiseAngle
+    },
+    TAB: { red: pageRotations[1].hovAngle, blue: trimAutoMode ? autoTrimCruiseAngle : manualTrimCruiseAngle }
+  });
   syncAutoPitchRotation();
   syncAutoTrimRotation();
   if ((resultEdit && !dotSets.includes(resultEdit.set)) ||
@@ -1174,7 +1304,7 @@ dotForm.addEventListener('submit', (event) => {
     return;
   }
 
-  dotSets.push({ red, blue, adjustments: [] });
+  dotSets.push({ learningId: newLearningId(), red, blue, adjustments: [] });
   selectedAdjustmentTarget = null;
   saveDotSets();
   [...redInputs, ...blueInputs].forEach((input) => {
@@ -1296,6 +1426,7 @@ function setupRotationControls() {
     if (!activeRotation || event.pointerId !== activeRotation.pointerId) return;
     flushRotation();
     activeRotation.handle.style.cursor = 'grab';
+    if (rotationChanged) recordManualLearning(activeRotation.name === 'hov' ? 'red' : 'blue', activeRotation.name === 'hov' ? hovAngle : cruiseAngle);
     activeRotation = null;
     if (rotationChanged) saveRotation();
     rotationChanged = false;
@@ -1359,6 +1490,13 @@ window.addEventListener('message', (event) => {
   if (message?.type === 'balance-chart-rotation'
     && Number.isFinite(message.hovAngle) && Number.isFinite(message.cruiseAngle)) {
     if ((currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
+    manualMessageChanges.red ||= hovAngle !== message.hovAngle;
+    manualMessageChanges.blue ||= cruiseAngle !== message.cruiseAngle;
+    if (message.finished) {
+      if (manualMessageChanges.red) recordManualLearning('red', message.hovAngle);
+      if (manualMessageChanges.blue) recordManualLearning('blue', message.cruiseAngle);
+      manualMessageChanges = { red: false, blue: false };
+    }
     hovAngle = message.hovAngle;
     cruiseAngle = message.cruiseAngle;
     if (currentChartPage === 1) manualTrimCruiseAngle = cruiseAngle;
@@ -1377,7 +1515,8 @@ window.addEventListener('message', (event) => {
   }
 });
 
-if (chartObject.contentDocument) {
+if (chartObject.contentDocument?.getElementById('hovRotationHandle')
+  && chartObject.contentDocument?.getElementById('cruiseRotationHandle')) {
   setupRotationControls();
 } else {
   chartObject.addEventListener('load', setupRotationControls, { once: true });

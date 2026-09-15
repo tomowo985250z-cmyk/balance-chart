@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260915-guide-overflow" />
+    <link rel="stylesheet" href="style.css?v=20260915-learning" />
   </head>
   <body>
   <main class="app">
@@ -53,6 +53,7 @@
         <button type="button" class="chart-page is-active" data-page="0" aria-label="ピッチリンク用を表示" aria-current="page"></button>
         <button type="button" class="chart-page" data-page="1" aria-label="トリムタブ用を表示"></button>
       </div>
+      <button id="resetLearning" class="learning-reset" type="button">自動補正の学習値をリセット</button>
     </div>
     <div class="chart-wrap">
       <object data="chart.svg?v=20260915-pitch-auto" type="image/svg+xml" aria-label="バランスチャート"></object>
@@ -115,6 +116,7 @@
       </div>
     </form>
   </dialog>
-  <script src="app.js?v=20260915-guide-overflow"></script>
+  <script src="learning.js?v=20260915-learning"></script>
+  <script src="app.js?v=20260915-learning"></script>
 </body>
 </html>
