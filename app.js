@@ -843,16 +843,13 @@ function getLearnedGuideLines(finalSet) {
   }
   let selected;
   if (type === 'LINK' && colors.length === 2) {
-    // 両方改善 > HOVのみ改善 > 巡航のみ改善 > 両方悪化（改善なし）。
-    const priority = candidate => Number(candidate.predictions[0].improvement > 1e-6) * 2
-      + Number(candidate.predictions[1].improvement > 1e-6);
-    const bestPriority = Math.max(...candidates.map(priority));
-    const preferred = candidates.filter(candidate => priority(candidate) === bestPriority);
-    const closestHov = Math.min(...preferred.map(candidate => candidate.predictions[0].predictedDistance));
-    // HOVが最良値から0.01 IPS以内なら、巡航をより悪化させない候補を採用する。
-    selected = preferred.filter(candidate => candidate.predictions[0].predictedDistance <= closestHov + 0.01)
+    // HOVが0.20 IPS以内の候補があれば、それ以外は選択対象に含めない。
+    const withinHovLimit = candidates.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD);
+    selected = withinHovLimit.length ? withinHovLimit
       .sort((first, second) => first.predictions[1].predictedDistance - second.predictions[1].predictedDistance
-        || first.predictions[0].predictedDistance - second.predictions[0].predictedDistance)[0];
+        || first.predictions[0].predictedDistance - second.predictions[0].predictedDistance)[0]
+      : candidates.sort((first, second) => first.predictions[0].predictedDistance - second.predictions[0].predictedDistance
+        || first.predictions[1].predictedDistance - second.predictions[1].predictedDistance)[0];
   } else {
     selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
       Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)

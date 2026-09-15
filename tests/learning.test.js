@@ -299,20 +299,20 @@
         } finally { learning.predict=originalPredict; currentChartPage=originalPage; }
       };
     `);
-    const categories = [[0.9,0.9],[0.4,1.4],[1.1,0.2],[1.2,1.2]];
-    for (let high=0;high<categories.length;high++) {
-      assert(run(`testCandidateSelection(${JSON.stringify([categories[high]])})`)===1, `LINK category ${high+1} considered`);
-      for (let low=high+1;low<categories.length;low++) {
-        assert(run(`testCandidateSelection(${JSON.stringify([categories[low],categories[high]])})`)===2,
-          `LINK priority ${high+1} beats ${low+1}`);
-      }
-    }
+    assert(run('testCandidateSelection([[0.19,0.30],[0.21,0.05]])')===1,'HOV 0.19 qualifies and beats 0.21 despite cruise');
+    assert(run('testCandidateSelection([[0.20,0.30],[0.21,0.05]])')===1,'HOV exact 0.20 qualifies');
+    assert(run('testCandidateSelection([[0.18,0.25],[0.19,0.10]])')===2,'inside HOV limit choose best cruise');
+    assert(run('testCandidateSelection([[0.19,0.30],[0.20,0.05]])')===2,'exact boundary stays eligible for cruise priority');
+    assert(run('testCandidateSelection([[0.20,0.30],[0.200000001,0.01]])')===1,'even slightly above 0.20 is excluded');
+    assert(run('testCandidateSelection([[0.195,0.30],[0.205,0.01]])')===1,'old 0.01 tolerance cannot cross HOV limit');
+    assert(run('testCandidateSelection([[0.21,0.30],[0.22,0.05]])')===1,'all above limit choose minimum HOV');
+    assert(run('testCandidateSelection([[0.4,1.4],[0.9,0.9]])')===1,'minimum HOV overrides old both-improving priority');
     assert(run('testCandidateSelection([[0.4,1.9],[0.42,1.1]])')===1,'HOV closest endpoint wins despite worse cruise');
-    assert(run('testCandidateSelection([[0.4,1.9],[0.405,1.1]])')===2,'similar HOV endpoints prefer better cruise');
+    assert(run('testCandidateSelection([[0.4,1.9],[0.405,1.1]])')===1,'above limit even small HOV differences take priority');
     assert(run('testCandidateSelection([[0.4,1.9],[0.4,1.1]])')===2,'equal HOV endpoints prefer better cruise');
     assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===2,'TAB still selects by cruise endpoint');
     assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
-    groups.push('LINK：4分類の全順位・HOV優先・同程度なら巡航優先・TAB維持');
+    groups.push('LINK：0.19/0.20/0.21境界・HOV上限厳守・上限内は巡航優先・TAB維持');
     // 両方悪化しかないLINK候補も、新仕様の最下位候補として評価する。
     run("window.centerGuides=getLearnedGuideLines({red:testDot(397,520,'red'),blue:testDot(397,520,'blue')});");
     assert(run('guidePredictionDebug.selected.predictions.every(p=>p.improvement<0)'), 'LINK both-worsening is last priority');
