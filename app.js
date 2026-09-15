@@ -813,9 +813,9 @@ function getLearnedGuideLines(finalSet) {
   const automatic = currentChartPage === 0 ? pitchAutoMode : trimAutoMode;
   guidePredictionDebug = { type, fallback: true, reason: automatic ? 'insufficient-samples' : 'manual-mode' };
   if (!automatic || !finalSet) return null;
-  // 既存の評価対象を維持する（TABは巡航のみ、LINKはHOVのみ／赤青ペア）。
+  // LINKはHOVだけで確定し、その後に同じ調整の巡航を求める。
   const colors = type === 'TAB' ? (finalSet.blue ? ['blue'] : [])
-    : finalSet.red ? (finalSet.blue ? ['red', 'blue'] : ['red']) : [];
+    : finalSet.red ? ['red'] : [];
   if (!colors.length || colors.some(color => getLearnedRotation(type, color) === null)) return null;
   const candidates = [];
   for (const blade of [1, 2, 3]) {
@@ -832,8 +832,8 @@ function getLearnedGuideLines(finalSet) {
         });
         if (predictions.some(prediction => !prediction)) continue;
         const improvement = predictions.reduce((sum, prediction) => sum + prediction.improvement, 0);
-        // LINKの赤青ペアは悪化側も含めて順位付けする。他の評価対象は従来どおり。
-        const eligible = (type === 'LINK' && colors.length === 2)
+        // LINKは悪化側も含めて順位付けする。TABは従来どおり。
+        const eligible = type === 'LINK'
           || (predictions.every(prediction => prediction.improvement >= -1e-6) && improvement > 1e-6);
         candidates.push({ type, blade, direction, amount, amountText, predictions, improvement, eligible,
           withinCenterThreshold: predictions.every(prediction => prediction.predictedDistance <= CENTER_DISTANCE_THRESHOLD),
@@ -843,7 +843,7 @@ function getLearnedGuideLines(finalSet) {
     }
   }
   let selected;
-  if (type === 'LINK' && colors.length === 2) {
+  if (type === 'LINK') {
     const epsilon = 1e-9; // IPS単位の幾何判定誤差。
     for (const candidate of candidates) {
       const hov = candidate.predictions[0];
@@ -864,13 +864,11 @@ function getLearnedGuideLines(finalSet) {
     const pool = passing.length ? passing : candidates;
     const closestPath = Math.min(...pool.map(candidate => candidate.hovPathDistance));
     const nearest = pool.filter(candidate => candidate.hovPathDistance <= closestPath + epsilon);
-    // 通過・最接近距離を優先した後だけ、既存の予測終点と巡航評価を使う。
+    // 実質同じ経路の場合もHOV予測だけを使い、巡航は参照しない。
     const withinHovLimit = nearest.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD);
     let finalists = withinHovLimit.length ? withinHovLimit : nearest;
-    for (const colorIndex of (withinHovLimit.length ? [1, 0] : [0, 1])) {
-      const minimum = Math.min(...finalists.map(candidate => candidate.predictions[colorIndex].predictedDistance));
-      finalists = finalists.filter(candidate => candidate.predictions[colorIndex].predictedDistance <= minimum + epsilon);
-    }
+    const minimum = Math.min(...finalists.map(candidate => candidate.predictions[0].predictedDistance));
+    finalists = finalists.filter(candidate => candidate.predictions[0].predictedDistance <= minimum + epsilon);
     // 実質同点だけはBLD番号→UP/DOWN→調整量の固定順。生成順には依存しない。
     selected = finalists.sort((first, second) => first.blade - second.blade
       || Number(first.direction === 'DOWN') - Number(second.direction === 'DOWN')
@@ -880,9 +878,22 @@ function getLearnedGuideLines(finalSet) {
       Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
       || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance)[0];
   }
+  // HOV確定後にのみ巡航を計算する。予測不能でもHOVを再選択しない。
+  if (type === 'LINK' && selected && finalSet.blue) {
+    const start = getDotCoordinates(finalSet.blue);
+    const prediction = learning.predict(type, 'blue', selected.blade, selected.direction, selected.amount, start);
+    if (prediction) {
+      const currentDistance = Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS;
+      const predictedDistance = Math.hypot(prediction.position.x - CHART_CENTER_X, prediction.position.y - CHART_CENTER_Y) / CHART_RADIUS;
+      selected.predictions.push({ color: 'blue', start, ...prediction, currentDistance, predictedDistance, improvement: currentDistance - predictedDistance });
+    } else {
+      const line = getDirectionLine(finalSet.blue, 'blue', null, selected.blade, selected.direction);
+      if (line) selected.predictions.push({ color: 'blue', start: line.start, position: line.end, fallbackLine: line });
+    }
+  }
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
-    line: { base: prediction.start, start: prediction.start, end: prediction.position },
+    line: prediction.fallbackLine ?? { base: prediction.start, start: prediction.start, end: prediction.position },
     color: prediction.color === 'red' ? DOT_COLORS.red : type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue,
     marker: `${prediction.color}DirectionLineArrow`
   })) : [];
@@ -925,43 +936,32 @@ function renderDirectionLines() {
       || first.line.centerDistance - second.line.centerDistance)[0];
     if (!selected) return;
     selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
-  } else if (redDots.length && !blueDots.length) {
-    // 赤のみの場合はドットを起点に、矢印方向の線分上で中心に最も近い点を評価する。
+  } else if (redDots.length) {
+    // 学習不足・手動時もHOVだけで確定し、巡航は対応する番号・方向を使う。
     const centerDistance = (line) => {
+      const vx = line.arrowTarget.x - line.base.x;
+      const vy = line.arrowTarget.y - line.base.y;
+      const length = Math.hypot(vx, vy);
+      const ux = length > 0 ? vx / length : 0, uy = length > 0 ? vy / length : 0;
       const dx = CHART_CENTER_X - line.base.x;
       const dy = CHART_CENTER_Y - line.base.y;
-      const travel = Math.max(0, Math.min(line.maxTravel, dx * line.unit.x + dy * line.unit.y));
-      return Math.hypot(dx - travel * line.unit.x, dy - travel * line.unit.y) / CHART_RADIUS;
+      const travel = Math.max(0, dx * ux + dy * uy);
+      return Math.hypot(dx - travel * ux, dy - travel * uy) / CHART_RADIUS;
     };
-    const selected = redDots.map(({ line }) => ({ line, distance: centerDistance(line) }))
-      .sort((first, second) =>
-        Number(second.distance <= CENTER_DISTANCE_THRESHOLD) - Number(first.distance <= CENTER_DISTANCE_THRESHOLD)
-        || first.distance - second.distance)[0];
+    const candidates = redDots.map(({ line }) => ({ line, distance: centerDistance(line) }));
+    const epsilon = 1e-9;
+    const passing = candidates.filter(candidate => candidate.distance <= CENTER_DISTANCE_THRESHOLD + epsilon);
+    const pool = passing.length ? passing : candidates;
+    const minimum = Math.min(...pool.map(candidate => candidate.distance));
+    const selected = pool.filter(candidate => candidate.distance <= minimum + epsilon)
+      .sort((first, second) => first.line.number - second.line.number
+        || Number(first.line.direction === 'DOWN') - Number(second.line.direction === 'DOWN'))[0];
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
+    const blue = blueDots.find(candidate => candidate.line.number === selected.line.number
+      && candidate.line.direction === selected.line.direction);
+    if (blue) selectedLines.push({ line: blue.line, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
-    // 初期状態でもガイドを表示する。実測LINK比があれば固定比より優先する。
-    const distanceRatio = getLatestPitchDistanceRatio() ?? { red: 1, blue: 2 };
-    const candidates = redDots.flatMap((red) => blueDots
-      .filter((blue) => red.line && blue.line
-        && red.line.number === blue.line.number
-        && red.line.direction === blue.line.direction)
-      .map((blue) => ({
-        redLine: red.line,
-        blueLine: blue.line,
-        guideDistances: getGuideDistances(red.line, blue.line, distanceRatio)
-      })))
-      .sort((first, second) => {
-        return Number(second.guideDistances.withinCenterThreshold) - Number(first.guideDistances.withinCenterThreshold)
-          || first.guideDistances.maxCenterDistance - second.guideDistances.maxCenterDistance
-          || first.guideDistances.distance - second.guideDistances.distance;
-      });
-    // ピッチリンクは同番号・同UP/DOWNの赤青ペアを選ぶ。
-    const selected = candidates[0];
-    if (!selected) return;
-    selectedLines = [
-      { line: selected.redLine, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' },
-      { line: selected.blueLine, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' }
-    ];
+    return;
   }
 
   appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);

@@ -302,18 +302,64 @@
     `);
     assert(run('testCandidateSelection([[0.19,0.30],[0.21,0.05]])')===1,'HOV 0.19 qualifies and beats 0.21 despite cruise');
     assert(run('testCandidateSelection([[0.20,0.30],[0.21,0.05]])')===1,'HOV exact 0.20 qualifies');
-    assert(run('testCandidateSelection([[0.18,0.25],[0.19,0.10]])')===2,'inside HOV limit choose best cruise');
-    assert(run('testCandidateSelection([[0.19,0.30],[0.20,0.05]])')===2,'exact boundary stays eligible for cruise priority');
+    assert(run('testCandidateSelection([[0.18,0.25],[0.19,0.10]])')===1,'inside HOV limit cruise cannot change HOV choice');
+    assert(run('testCandidateSelection([[0.19,0.30],[0.20,0.05]])')===1,'HOV endpoint tie-break ignores cruise');
     assert(run('testCandidateSelection([[0.20,0.30],[0.200000001,0.01]])')===1,'even slightly above 0.20 is excluded');
     assert(run('testCandidateSelection([[0.195,0.30],[0.205,0.01]])')===1,'old 0.01 tolerance cannot cross HOV limit');
     assert(run('testCandidateSelection([[0.21,0.30],[0.22,0.05]])')===1,'all above limit choose minimum HOV');
     assert(run('testCandidateSelection([[0.4,1.4],[0.9,0.9]])')===1,'minimum HOV overrides old both-improving priority');
     assert(run('testCandidateSelection([[0.4,1.9],[0.42,1.1]])')===1,'HOV closest endpoint wins despite worse cruise');
     assert(run('testCandidateSelection([[0.4,1.9],[0.405,1.1]])')===1,'above limit even small HOV differences take priority');
-    assert(run('testCandidateSelection([[0.4,1.9],[0.4,1.1]])')===2,'equal HOV endpoints prefer better cruise');
+    assert(run('testCandidateSelection([[0.4,1.9],[0.4,1.1]])')===1,'equal HOV endpoints use fixed tie-break, not cruise');
+    assert(run('testCandidateSelection([[0.4,0.01],[0.4,9]])')===1,'reversing cruise ranking preserves HOV');
+    run(`
+      window.testCruiseIndependence = mode => {
+        const originalPredict=learning.predict, originalRotation=getLearnedRotation;
+        const calls=[];
+        try {
+          getLearnedRotation=(type,color)=>color==='blue' && mode==='untrained' ? null : originalRotation(type,color);
+          learning.predict=(type,color,blade,direction,amount,start)=>{
+            calls.push(color);
+            if (color==='blue') return mode==='missing' || mode==='untrained' ? null
+              : {position:{x:CHART_CENTER_X+mode*CHART_RADIUS,y:CHART_CENTER_Y}};
+            return originalPredict(type,color,blade,direction,amount,start);
+          };
+          const guides=getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
+          const selected=guidePredictionDebug.selected;
+          return {key:[selected.blade,selected.direction,selected.amount],red:guides[0],count:guides.length,calls};
+        } finally { learning.predict=originalPredict; getLearnedRotation=originalRotation; }
+      };
+    `);
+    const cruiseBaseline=run('testCruiseIndependence(0)');
+    for (const mode of [10,-10,'missing','untrained']) {
+      const result=run(`testCruiseIndependence(${JSON.stringify(mode)})`);
+      assert(JSON.stringify(result.key)===JSON.stringify(cruiseBaseline.key) && JSON.stringify(result.red)===JSON.stringify(cruiseBaseline.red),`HOV unchanged with cruise ${mode}`);
+      assert(result.count===2 && result.calls.slice(0,-1).every(color=>color==='red') && result.calls.at(-1)==='blue',`cruise ${mode} evaluated only once after all HOV candidates`);
+    }
+    run(`
+      window.testFallbackIndependence = blueX => {
+        const savedSets=dotSets.slice(), originalLearned=getLearnedGuideLines;
+        try {
+          getLearnedGuideLines=()=>null;
+          dotSets.splice(0,dotSets.length,{red:testDot(637,520,'red'),
+            ...(blueX===null?{}:{blue:testDot(blueX,610,'blue')})});
+          renderDirectionLines();
+          const red=dotOverlay.querySelector('.guide-direction-line');
+          return ['x1','y1','x2','y2'].map(name=>red.getAttribute(name));
+        } finally {
+          dotSets.splice(0,dotSets.length,...savedSets);
+          getLearnedGuideLines=originalLearned;
+          renderDirectionLines();
+        }
+      };
+    `);
+    const fallbackHov=run('testFallbackIndependence(null)');
+    for (const blueX of [397,637,-100,1200,397]) {
+      assert(JSON.stringify(run(`testFallbackIndependence(${blueX})`))===JSON.stringify(fallbackHov),'fallback HOV unchanged by cruise position or presence');
+    }
     assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===2,'TAB still selects by cruise endpoint');
     assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
-    groups.push('LINK：0.19/0.20/0.21境界・HOV上限厳守・上限内は巡航優先・TAB維持');
+    groups.push('LINK：境界・HOV先行確定・巡航予測/学習不足/位置からの独立・TAB維持');
     run(`
       window.testPathSelection = paths => {
         const originalPredict=learning.predict, originalDirectionLine=getDirectionLine;
@@ -340,7 +386,7 @@
     near(tangent.candidates[0].distance,0.20,'exact tangent distance');
     assert(tangent.candidates[0].passes,'exact 0.20 tangent counts as crossing');
     assert(!run('testPathSelection([{end:[0.04,0.21],blue:0.5}]).candidates[0].passes'),'path outside 0.20 is rejected');
-    assert(run('testPathSelection([{end:[0.19,0],blue:0.3},{end:[0.18,0],blue:0.1}]).blade')===2,'equal paths use existing predicted endpoint and cruise tie-break');
+    assert(run('testPathSelection([{end:[0.19,0],blue:0.3},{end:[0.18,0],blue:0.1}]).blade')===2,'equal paths use HOV predicted endpoint tie-break');
     assert(!run('testPathSelection([{end:[1,0],blue:0.1}]).candidates[0].passes'),'zero-length direction stays at starting point');
     groups.push('HOV有向経路：通過優先・逆方向除外・接近性能・非通過時・接線境界');
     const pathAt = (distance, blue) => ({end:[distance*distance, distance*Math.sqrt(1-distance*distance)],blue});
