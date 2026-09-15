@@ -341,6 +341,32 @@
     assert(run('testPathSelection([{end:[0.19,0],blue:0.3},{end:[0.18,0],blue:0.1}]).blade')===2,'equal paths use existing predicted endpoint and cruise tie-break');
     assert(!run('testPathSelection([{end:[1,0],blue:0.1}]).candidates[0].passes'),'zero-length direction stays at starting point');
     groups.push('HOV有向経路：通過優先・逆方向除外・接近性能・非通過時・接線境界');
+    const pathAt = (distance, blue) => ({end:[distance*distance, distance*Math.sqrt(1-distance*distance)],blue});
+    assert(run(`testPathSelection(${JSON.stringify([pathAt(0.18,0.01),pathAt(0.05,1.3)])}).blade`)===2,'0.05 beats 0.18 despite worse cruise');
+    assert(run(`testPathSelection(${JSON.stringify([pathAt(0.05,0.01),pathAt(0.01,1.3)])}).blade`)===2,'0.01 beats 0.05 despite worse cruise');
+    assert(run(`testPathSelection(${JSON.stringify([pathAt(0.01,0.01),pathAt(0,1.3)])}).blade`)===2,'direct center crossing is highest priority');
+    near(run('testPathSelection([{end:[0,0],blue:1.3}]).candidates[0].distance'),0,'direct crossing reports zero');
+    run(`
+      window.testStableSelection = reverse => {
+        const originalPredict=learning.predict;
+        const originalAmounts=[...BalanceLearning.amounts.LINK];
+        try {
+          learning.predict=(type,color,blade) => ({position:{x:CHART_CENTER_X+(0.1-blade*1e-12)*CHART_RADIUS,y:CHART_CENTER_Y}});
+          let choose=getLearnedGuideLines;
+          if(reverse) {
+            BalanceLearning.amounts.LINK.reverse();
+            choose=eval('('+getLearnedGuideLines.toString().replace('[1, 2, 3]','[3, 2, 1]').replace("['UP', 'DOWN']","['DOWN', 'UP']")+')');
+          }
+          choose({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
+          const selected=guidePredictionDebug.selected;
+          return [selected.blade,selected.direction,selected.amount].join('/');
+        } finally {learning.predict=originalPredict; BalanceLearning.amounts.LINK.splice(0,Infinity,...originalAmounts);}
+      };
+    `);
+    assert(run('testStableSelection(false)')==='1/UP/0.125','practically equal candidates use fixed identity tie-break');
+    assert(run('testStableSelection(true)')==='1/UP/0.125','reversed blade/direction/amount order produces same winner');
+    assert(run('Array.from({length:10},(_,i)=>testStableSelection(i%2===0)).every(result=>result==="1/UP/0.125")'),'repeated recalculations remain stable');
+    groups.push('HOV最小距離順位・中心ゼロ・固定tie-break・生成順独立・反復安定');
     // 両方悪化しかないLINK候補も、新仕様の最下位候補として評価する。
     run("window.centerGuides=getLearnedGuideLines({red:testDot(397,520,'red'),blue:testDot(397,520,'blue')});");
     assert(run('guidePredictionDebug.selected.predictions.every(p=>p.improvement<0)'), 'LINK both-worsening is last priority');

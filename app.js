@@ -852,7 +852,8 @@ function getLearnedGuideLines(finalSet) {
       const x = hov.start.x - CHART_CENTER_X, y = hov.start.y - CHART_CENTER_Y;
       // 始点から矢印方向への半直線。反対側の最接近点は使用しない。
       const travel = Math.max(0, -(x * ux + y * uy));
-      candidate.hovPathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
+      const pathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
+      candidate.hovPathDistance = pathDistance <= epsilon ? 0 : pathDistance;
       candidate.hovPathPasses = candidate.hovPathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon;
     }
     const passing = candidates.filter(candidate => candidate.hovPathPasses);
@@ -861,11 +862,15 @@ function getLearnedGuideLines(finalSet) {
     const nearest = pool.filter(candidate => candidate.hovPathDistance <= closestPath + epsilon);
     // 通過・最接近距離を優先した後だけ、既存の予測終点と巡航評価を使う。
     const withinHovLimit = nearest.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD);
-    selected = withinHovLimit.length ? withinHovLimit
-      .sort((first, second) => first.predictions[1].predictedDistance - second.predictions[1].predictedDistance
-        || first.predictions[0].predictedDistance - second.predictions[0].predictedDistance)[0]
-      : nearest.sort((first, second) => first.predictions[0].predictedDistance - second.predictions[0].predictedDistance
-        || first.predictions[1].predictedDistance - second.predictions[1].predictedDistance)[0];
+    let finalists = withinHovLimit.length ? withinHovLimit : nearest;
+    for (const colorIndex of (withinHovLimit.length ? [1, 0] : [0, 1])) {
+      const minimum = Math.min(...finalists.map(candidate => candidate.predictions[colorIndex].predictedDistance));
+      finalists = finalists.filter(candidate => candidate.predictions[colorIndex].predictedDistance <= minimum + epsilon);
+    }
+    // 実質同点だけはBLD番号→UP/DOWN→調整量の固定順。生成順には依存しない。
+    selected = finalists.sort((first, second) => first.blade - second.blade
+      || Number(first.direction === 'DOWN') - Number(second.direction === 'DOWN')
+      || first.amount - second.amount)[0];
   } else {
     selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
       Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
