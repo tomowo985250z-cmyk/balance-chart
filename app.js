@@ -843,12 +843,28 @@ function getLearnedGuideLines(finalSet) {
   }
   let selected;
   if (type === 'LINK' && colors.length === 2) {
-    // HOVが0.20 IPS以内の候補があれば、それ以外は選択対象に含めない。
-    const withinHovLimit = candidates.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD);
+    const epsilon = 1e-9; // IPS単位の幾何判定誤差。
+    for (const candidate of candidates) {
+      const hov = candidate.predictions[0];
+      const dx = hov.position.x - hov.start.x, dy = hov.position.y - hov.start.y;
+      const length = Math.hypot(dx, dy);
+      const ux = length > 0 ? dx / length : 0, uy = length > 0 ? dy / length : 0;
+      const x = hov.start.x - CHART_CENTER_X, y = hov.start.y - CHART_CENTER_Y;
+      // 始点から矢印方向への半直線。反対側の最接近点は使用しない。
+      const travel = Math.max(0, -(x * ux + y * uy));
+      candidate.hovPathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
+      candidate.hovPathPasses = candidate.hovPathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon;
+    }
+    const passing = candidates.filter(candidate => candidate.hovPathPasses);
+    const pool = passing.length ? passing : candidates;
+    const closestPath = Math.min(...pool.map(candidate => candidate.hovPathDistance));
+    const nearest = pool.filter(candidate => candidate.hovPathDistance <= closestPath + epsilon);
+    // 通過・最接近距離を優先した後だけ、既存の予測終点と巡航評価を使う。
+    const withinHovLimit = nearest.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD);
     selected = withinHovLimit.length ? withinHovLimit
       .sort((first, second) => first.predictions[1].predictedDistance - second.predictions[1].predictedDistance
         || first.predictions[0].predictedDistance - second.predictions[0].predictedDistance)[0]
-      : candidates.sort((first, second) => first.predictions[0].predictedDistance - second.predictions[0].predictedDistance
+      : nearest.sort((first, second) => first.predictions[0].predictedDistance - second.predictions[0].predictedDistance
         || first.predictions[1].predictedDistance - second.predictions[1].predictedDistance)[0];
   } else {
     selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>

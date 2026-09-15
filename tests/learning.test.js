@@ -313,6 +313,34 @@
     assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===2,'TAB still selects by cruise endpoint');
     assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
     groups.push('LINK：0.19/0.20/0.21境界・HOV上限厳守・上限内は巡航優先・TAB維持');
+    run(`
+      window.testPathSelection = paths => {
+        const originalPredict=learning.predict;
+        try {
+          learning.predict=(type,color,blade,direction,amount) => {
+            const path=paths[blade-1];
+            if (!path || direction!=='UP' || amount!==1) return null;
+            const point=color==='red' ? path.end : [path.blue,0];
+            return {position:{x:CHART_CENTER_X+point[0]*CHART_RADIUS,y:CHART_CENTER_Y+point[1]*CHART_RADIUS}};
+          };
+          getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
+          return {blade:guidePredictionDebug.selected?.blade,
+            candidates:guidePredictionDebug.candidates.map(c=>({passes:c.hovPathPasses,distance:c.hovPathDistance}))};
+        } finally {learning.predict=originalPredict;}
+      };
+    `);
+    assert(run('testPathSelection([{end:[0.5,0],blue:1.3},{end:[1,0.5],blue:0.01}]).blade')===1,'forward crossing outranks excellent cruise without crossing');
+    assert(!run('testPathSelection([{end:[1.5,0],blue:0.01}]).candidates[0].passes'),'reverse extension through center is not a crossing');
+    assert(run('testPathSelection([{end:[0.5,0],blue:1.3}]).candidates[0].passes'),'ray crossing beyond predicted arrow endpoint counts');
+    assert(run('testPathSelection([{end:[0.5,0.05],blue:0.01},{end:[0.5,0],blue:1.3}]).blade')===2,'closest HOV path wins among crossing candidates');
+    assert(run('testPathSelection([{end:[0.5,0.4],blue:1.3},{end:[1,0.5],blue:0.01}]).blade')===1,'no crossing chooses closest forward path');
+    const tangent=run('testPathSelection([{end:[0.04,Math.sqrt(0.0384)],blue:0.5}])');
+    near(tangent.candidates[0].distance,0.20,'exact tangent distance');
+    assert(tangent.candidates[0].passes,'exact 0.20 tangent counts as crossing');
+    assert(!run('testPathSelection([{end:[0.04,0.21],blue:0.5}]).candidates[0].passes'),'path outside 0.20 is rejected');
+    assert(run('testPathSelection([{end:[0.19,0],blue:0.3},{end:[0.18,0],blue:0.1}]).blade')===2,'equal paths use existing predicted endpoint and cruise tie-break');
+    assert(!run('testPathSelection([{end:[1,0],blue:0.1}]).candidates[0].passes'),'zero-length direction stays at starting point');
+    groups.push('HOV有向経路：通過優先・逆方向除外・接近性能・非通過時・接線境界');
     // 両方悪化しかないLINK候補も、新仕様の最下位候補として評価する。
     run("window.centerGuides=getLearnedGuideLines({red:testDot(397,520,'red'),blue:testDot(397,520,'blue')});");
     assert(run('guidePredictionDebug.selected.predictions.every(p=>p.improvement<0)'), 'LINK both-worsening is last priority');
