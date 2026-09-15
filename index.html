@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260915-learning" />
+    <link rel="stylesheet" href="style.css?v=20260915-recent-confirmed" />
   </head>
   <body>
   <main class="app">
@@ -39,6 +39,7 @@
         <option>結果なし</option>
       </select>
       <button id="addAdjustmentButton" type="submit">調整量を追加</button>
+      <label class="actual-adjustment"><input id="actualAdjustment" type="checkbox" />実調整として記録（次の測定を学習）</label>
       <button id="cancelAdjustmentEdit" type="button" hidden>編集をキャンセル</button>
       <p id="adjustmentEditMessage" class="edit-message" aria-live="polite" hidden></p>
       <p id="adjustmentMessage" class="dot-message" aria-live="polite"></p>
@@ -116,7 +117,7 @@
       </div>
     </form>
   </dialog>
-  <script src="learning.js?v=20260915-learning"></script>
-  <script src="app.js?v=20260915-learning"></script>
+  <script src="learning.js?v=20260915-recent-confirmed"></script>
+  <script src="app.js?v=20260915-recent-confirmed"></script>
 </body>
 </html>

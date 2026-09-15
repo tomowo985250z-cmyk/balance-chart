@@ -43,6 +43,9 @@ setGuidesVisible(false);
 window.addEventListener('pageshow', () => setGuidesVisible(false));
 const dotForm = document.getElementById('dotForm');
 const adjustmentForm = document.getElementById('adjustmentForm');
+const actualAdjustment = document.getElementById('actualAdjustment');
+actualAdjustment.checked = false;
+window.addEventListener('pageshow', () => { actualAdjustment.checked = false; });
 const redInputs = ['redHourInput', 'redMinuteInput', 'redValueInput'].map((id) => document.getElementById(id));
 const blueInputs = ['blueHourInput', 'blueMinuteInput', 'blueValueInput'].map((id) => document.getElementById(id));
 const addDotButton = document.getElementById('addDotButton');
@@ -150,7 +153,7 @@ function getSingleAdjustment(set, type) {
 }
 
 function getLearnedRotation(type, color) {
-  const action = [...dotSets].reverse().map(set => getSingleAdjustment(set, type)).find(Boolean);
+  const action = learning.latestCondition(type, color);
   return learning.rotation(type, color, action?.blade ?? 1, action?.direction ?? 'UP');
 }
 
@@ -558,6 +561,7 @@ function getLatestTrimSyncAngle() {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!before.blue || !after.blue) continue;
+    if (!learning.isConfirmed(dotSets, after.learningId, 'blue')) continue;
     if (!getSingleAdjustment(before, 'TAB')) continue;
     const adjustment = before.adjustments[0];
     const start = getDotCoordinates(before.blue);
@@ -578,6 +582,7 @@ function getLatestLinkSyncAngle(color) {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!before[color] || !after[color]) continue;
+    if (!learning.isConfirmed(dotSets, after.learningId, color)) continue;
     if (!getSingleAdjustment(before, 'LINK')) continue;
     const adjustment = before.adjustments[0];
     const start = getDotCoordinates(before[color]);
@@ -722,6 +727,7 @@ function getLatestPitchDistanceRatio() {
     const before = dotSets[index];
     const after = dotSets[index + 1];
     if (!getSingleAdjustment(before, 'LINK')) continue;
+    if (!learning.isConfirmed(dotSets, after.learningId, 'red') || !learning.isConfirmed(dotSets, after.learningId, 'blue')) continue;
     if (!before.red || !before.blue || !after.red || !after.blue) continue;
     const distances = ['red', 'blue'].map((color) => {
       const start = getDotCoordinates(before[color]);
@@ -1013,6 +1019,7 @@ function restoreInputs(inputs, values) {
 }
 
 function cancelEditing() {
+  actualAdjustment.checked = false;
   if (resultEdit) restoreInputs([...redInputs, ...blueInputs], resultEdit.draft);
   if (adjustmentEdit) {
     memoValues.splice(0, 4, ...adjustmentEdit.draft);
@@ -1156,7 +1163,7 @@ function renderDots() {
       attachEditAction(adjustmentRow, 'この調整量を編集しますか？', () => startAdjustmentEdit(set, adjustment));
       const adjustmentLabel = document.createElement('span');
       adjustmentLabel.className = 'dot-memo';
-      adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}`;
+      adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}${learning.isArmed(set) ? '（実調整）' : ''}`;
       const deleteAdjustment = document.createElement('button');
       deleteAdjustment.type = 'button';
       deleteAdjustment.textContent = '削除';
@@ -1282,6 +1289,7 @@ dotForm.addEventListener('submit', (event) => {
       return;
     }
     target.blue = blue;
+    learning.acceptMeasurement(dotSets, target.learningId, ['blue']);
     saveDotSets();
     finishCruiseAddition();
     renderDots();
@@ -1305,6 +1313,7 @@ dotForm.addEventListener('submit', (event) => {
   }
 
   dotSets.push({ learningId: newLearningId(), red, blue, adjustments: [] });
+  learning.acceptMeasurement(dotSets, dotSets.at(-1).learningId);
   selectedAdjustmentTarget = null;
   saveDotSets();
   [...redInputs, ...blueInputs].forEach((input) => {
@@ -1328,6 +1337,11 @@ adjustmentForm.addEventListener('submit', (event) => {
     return;
   }
   const targetSet = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  if (actualAdjustment.checked && (targetSet !== dotSets.at(-1)
+    || (targetSet.adjustments?.length ?? 0) - Number(adjustmentEdit?.set === targetSet) !== 0)) {
+    adjustmentMessage.textContent = '実調整の学習指定は、最新の結果に対する単一の調整だけに設定できます。';
+    return;
+  }
   if (adjustmentEdit) {
     const { set, adjustment } = adjustmentEdit;
     const index = set.adjustments?.indexOf(adjustment) ?? -1;
@@ -1338,6 +1352,8 @@ adjustmentForm.addEventListener('submit', (event) => {
       targetSet.adjustments ??= [];
       targetSet.adjustments.push([...memoValues]);
     }
+    if (actualAdjustment.checked) learning.arm(dotSets, targetSet.learningId);
+    else learning.disarm(targetSet.learningId);
     saveDotSets();
     cancelEditing();
     renderDots();
@@ -1345,6 +1361,9 @@ adjustmentForm.addEventListener('submit', (event) => {
   }
   targetSet.adjustments ??= [];
   targetSet.adjustments.push([...memoValues]);
+  if (actualAdjustment.checked) learning.arm(dotSets, targetSet.learningId);
+  else learning.disarm(targetSet.learningId);
+  actualAdjustment.checked = false;
   saveDotSets();
   memoValues.fill('');
   updateMemoButtons();
