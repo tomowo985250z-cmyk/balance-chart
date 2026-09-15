@@ -283,10 +283,40 @@
     await new Promise(resolve => setTimeout(resolve, 50));
     assert(run('rotationLocked && rotationHandles.length >= 2 && rotationHandles.every(handle=>handle.style.pointerEvents === "none")'),
       'automatic rotation remains locked: ' + run('JSON.stringify({locked:rotationLocked,handles:rotationHandles.map(h=>h.style.pointerEvents),svg:chartObject.contentDocument?.documentElement.tagName,auto:pitchAutoMode})'));
-    // 測定編集で学習させず、仮の中心ドットに対する予測を直接評価する。
+    // 補正済み終点だけを固定して、実際のLINK候補選択経路を検証する。
+    run(`
+      window.testCandidateSelection = (pairs, page=0) => {
+        const originalPredict=learning.predict, originalPage=currentChartPage;
+        try {
+          currentChartPage=page;
+          learning.predict=(type,color,blade,direction,amount) => {
+            const pair=pairs[blade-1];
+            if (!pair || direction!=='UP' || amount!==1) return null;
+            return {position:{x:CHART_CENTER_X+pair[color==='red'?0:1]*CHART_RADIUS,y:CHART_CENTER_Y}};
+          };
+          getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
+          return guidePredictionDebug.selected?.blade ?? null;
+        } finally { learning.predict=originalPredict; currentChartPage=originalPage; }
+      };
+    `);
+    const categories = [[0.9,0.9],[0.4,1.4],[1.1,0.2],[1.2,1.2]];
+    for (let high=0;high<categories.length;high++) {
+      assert(run(`testCandidateSelection(${JSON.stringify([categories[high]])})`)===1, `LINK category ${high+1} considered`);
+      for (let low=high+1;low<categories.length;low++) {
+        assert(run(`testCandidateSelection(${JSON.stringify([categories[low],categories[high]])})`)===2,
+          `LINK priority ${high+1} beats ${low+1}`);
+      }
+    }
+    assert(run('testCandidateSelection([[0.4,1.9],[0.42,1.1]])')===1,'HOV closest endpoint wins despite worse cruise');
+    assert(run('testCandidateSelection([[0.4,1.9],[0.405,1.1]])')===2,'similar HOV endpoints prefer better cruise');
+    assert(run('testCandidateSelection([[0.4,1.9],[0.4,1.1]])')===2,'equal HOV endpoints prefer better cruise');
+    assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===2,'TAB still selects by cruise endpoint');
+    assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
+    groups.push('LINK：4分類の全順位・HOV優先・同程度なら巡航優先・TAB維持');
+    // 両方悪化しかないLINK候補も、新仕様の最下位候補として評価する。
     run("window.centerGuides=getLearnedGuideLines({red:testDot(397,520,'red'),blue:testDot(397,520,'blue')});");
-    assert(run('guidePredictionDebug.reason') === 'no-improving-candidate', 'rejects worsening endpoints');
-    assert(run('centerGuides.length') === 0, 'does not replace rejected prediction with worsening fallback');
+    assert(run('guidePredictionDebug.selected.predictions.every(p=>p.improvement<0)'), 'LINK both-worsening is last priority');
+    assert(run('centerGuides.length') === 2, 'LINK selects last-priority candidate when all candidates worsen');
     groups.push('実画面：学習済みTAB・対象色維持・ページ切替・自動回転ロック・悪化候補除外');
 
     run(`

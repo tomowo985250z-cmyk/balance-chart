@@ -831,8 +831,9 @@ function getLearnedGuideLines(finalSet) {
         });
         if (predictions.some(prediction => !prediction)) continue;
         const improvement = predictions.reduce((sum, prediction) => sum + prediction.improvement, 0);
-        // 一方の改善で他方の悪化を相殺しない。線の延長ではなく実際の調整量の終点を評価する。
-        const eligible = predictions.every(prediction => prediction.improvement >= -1e-6) && improvement > 1e-6;
+        // LINKの赤青ペアは悪化側も含めて順位付けする。他の評価対象は従来どおり。
+        const eligible = (type === 'LINK' && colors.length === 2)
+          || (predictions.every(prediction => prediction.improvement >= -1e-6) && improvement > 1e-6);
         candidates.push({ type, blade, direction, amount, amountText, predictions, improvement, eligible,
           withinCenterThreshold: predictions.every(prediction => prediction.predictedDistance <= CENTER_DISTANCE_THRESHOLD),
           maxCenterDistance: Math.max(...predictions.map(prediction => prediction.predictedDistance)),
@@ -840,9 +841,23 @@ function getLearnedGuideLines(finalSet) {
       }
     }
   }
-  const selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
-    Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
-    || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance)[0];
+  let selected;
+  if (type === 'LINK' && colors.length === 2) {
+    // 両方改善 > HOVのみ改善 > 巡航のみ改善 > 両方悪化（改善なし）。
+    const priority = candidate => Number(candidate.predictions[0].improvement > 1e-6) * 2
+      + Number(candidate.predictions[1].improvement > 1e-6);
+    const bestPriority = Math.max(...candidates.map(priority));
+    const preferred = candidates.filter(candidate => priority(candidate) === bestPriority);
+    const closestHov = Math.min(...preferred.map(candidate => candidate.predictions[0].predictedDistance));
+    // HOVが最良値から0.01 IPS以内なら、巡航をより悪化させない候補を採用する。
+    selected = preferred.filter(candidate => candidate.predictions[0].predictedDistance <= closestHov + 0.01)
+      .sort((first, second) => first.predictions[1].predictedDistance - second.predictions[1].predictedDistance
+        || first.predictions[0].predictedDistance - second.predictions[0].predictedDistance)[0];
+  } else {
+    selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
+      Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
+      || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance)[0];
+  }
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
     line: { base: prediction.start, start: prediction.start, end: prediction.position },
