@@ -277,6 +277,60 @@
     assert(run('guidePredictionDebug.selected.predictions.length') === 1, 'TAB still evaluates cruise only');
     assert(run('guidePredictionDebug.selected.predictions[0].model.startsWith("TAB:blue")'), 'trim uses independent TAB/cruise model');
     near(run('cruiseAngle'), run('getLearnedRotation("TAB","blue")'), 'purple hexagon follows learned rotation');
+    // HOV修正前(c3525d6)から不変のTAB角度式を、実登録方向と実測で検証する。
+    run(`
+      window.testTrimRotationRegression = (blade,direction,rotation,count) => {
+        const store=new Map();
+        const engine=BalanceLearning.create({
+          storage:{getItem:key=>store.get(key)??null,setItem:(key,value)=>store.set(key,value)},
+          coordinates:getDotCoordinates,nominalAngle:getNominalAdjustmentAngle,radius:CHART_RADIUS});
+        // SVGの登録辺から独立に求めたUP方向。DOWNはその反対方向。
+        const nominal=[Math.atan2(-175,-303.1)*180/Math.PI,90,Math.atan2(-175,303.1)*180/Math.PI][blade-1]
+          +(direction==='DOWN'?180:0);
+        const radians=(nominal+rotation)*Math.PI/180;
+        const sets=[{learningId:'tab0',blue:testDot(397,520,'blue'),adjustments:[]}];
+        const initial={LINK:{red:137,blue:-121},TAB:{red:73,blue:rotation}};
+        for(let i=1;i<=count;i++) {
+          sets.at(-1).adjustments=[[String(blade),'TAB','1',direction]];
+          engine.arm(sets,sets.at(-1).learningId);
+          engine.sync(sets,initial);
+          sets.push({learningId:'tab'+i,blue:testDot(397+i*30*Math.cos(radians),520+i*30*Math.sin(radians),'blue'),adjustments:[]});
+          engine.acceptMeasurement(sets,sets.at(-1).learningId);
+          engine.sync(sets,initial);
+        }
+        const savedSets=dotSets.slice(), savedAuto=autoTrimCruiseAngle, savedAngle=cruiseAngle, savedReady=trimAutoReady;
+        const original={rotation:learning.rotation,latestCondition:learning.latestCondition,isConfirmed:learning.isConfirmed};
+        try {
+          dotSets.splice(0,dotSets.length,...sets);
+          Object.assign(learning,{rotation:engine.rotation,latestCondition:engine.latestCondition,isConfirmed:engine.isConfirmed});
+          const learned=getLearnedRotation('TAB','blue');
+          syncAutoTrimRotation();
+          const matrix=chartObject.contentDocument.getElementById('cruiseGroup').transform.baseVal.consolidate().matrix;
+          return {angle:cruiseAngle,learned,matrixAngle:Math.atan2(matrix.b,matrix.a)*180/Math.PI,
+            keys:Object.keys(engine.inspect().models),ready:trimAutoReady};
+        } finally {
+          Object.assign(learning,original);
+          dotSets.splice(0,dotSets.length,...savedSets);
+          autoTrimCruiseAngle=savedAuto; trimAutoReady=savedReady;
+          applyCruiseRotation(savedAngle);
+        }
+      };
+    `);
+    const wrapDegrees=angle=>((angle+180)%360+360)%360-180;
+    for (const blade of [1,2,3]) for (const direction of ['UP','DOWN']) for (const angle of [-25,25]) for (const count of [1,3]) {
+      const result=run(`testTrimRotationRegression(${blade},'${direction}',${angle},${count})`);
+      const label=`TAB BLD${blade}/${direction}/${angle}/${count} samples`;
+      near(wrapDegrees(result.angle-angle),0,label+' pre-HOV angle formula');
+      near(wrapDegrees(result.matrixAngle-angle),0,label+' SVG rotation sign',1e-5);
+      assert(result.ready && (count===1?result.learned===null:result.learned!==null),label+' fallback/learned route');
+      assert(result.keys.every(key=>key.startsWith('TAB:blue')),label+' independent learning');
+    }
+    const tabAngleBeforeSwitch=run('cruiseAngle');
+    run('showChartPage(0); showChartPage(1);');
+    near(run('cruiseAngle'),tabAngleBeforeSwitch,'LINK page round trip preserves TAB auto angle');
+    near(run('autoTrimCruiseAngle'),tabAngleBeforeSwitch,'TAB automatic angle remains independent');
+    near(run('pageRotations[1].cruiseAngle'),run('manualTrimCruiseAngle'),'TAB saved manual angle stays separate from automatic angle');
+    groups.push('TAB回転回帰：全BLD/UP/DOWN・正負角・学習/フォールバック・SVG符号・ページ保存分離');
     assert(run("dotOverlay.querySelectorAll('circle').length") === 14, 'all measurement dots remain');
     run('showChartPage(0); pitchModeToggle.click();');
     assert(run('guidePredictionDebug.selected.predictions.every(p=>p.model.startsWith("LINK:"))'), 'page switch restores LINK models');
