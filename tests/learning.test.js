@@ -286,7 +286,7 @@
     // 補正済み終点だけを固定して、実際のLINK候補選択経路を検証する。
     run(`
       window.testCandidateSelection = (pairs, page=0) => {
-        const originalPredict=learning.predict, originalPage=currentChartPage;
+        const originalPredict=learning.predict, originalPage=currentChartPage, originalDirectionLine=getDirectionLine;
         try {
           currentChartPage=page;
           learning.predict=(type,color,blade,direction,amount) => {
@@ -294,9 +294,10 @@
             if (!pair || direction!=='UP' || amount!==1) return null;
             return {position:{x:CHART_CENTER_X+pair[color==='red'?0:1]*CHART_RADIUS,y:CHART_CENTER_Y}};
           };
+          getDirectionLine=(dot,layer,adjustment,blade,direction)=>({arrowTarget:learning.predict('LINK','red',blade,direction,1).position});
           getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
           return guidePredictionDebug.selected?.blade ?? null;
-        } finally { learning.predict=originalPredict; currentChartPage=originalPage; }
+        } finally { learning.predict=originalPredict; currentChartPage=originalPage; getDirectionLine=originalDirectionLine; }
       };
     `);
     assert(run('testCandidateSelection([[0.19,0.30],[0.21,0.05]])')===1,'HOV 0.19 qualifies and beats 0.21 despite cruise');
@@ -315,7 +316,7 @@
     groups.push('LINK：0.19/0.20/0.21境界・HOV上限厳守・上限内は巡航優先・TAB維持');
     run(`
       window.testPathSelection = paths => {
-        const originalPredict=learning.predict;
+        const originalPredict=learning.predict, originalDirectionLine=getDirectionLine;
         try {
           learning.predict=(type,color,blade,direction,amount) => {
             const path=paths[blade-1];
@@ -323,10 +324,11 @@
             const point=color==='red' ? path.end : [path.blue,0];
             return {position:{x:CHART_CENTER_X+point[0]*CHART_RADIUS,y:CHART_CENTER_Y+point[1]*CHART_RADIUS}};
           };
+          getDirectionLine=(dot,layer,adjustment,blade,direction)=>({arrowTarget:learning.predict('LINK','red',blade,direction,1).position});
           getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
           return {blade:guidePredictionDebug.selected?.blade,
             candidates:guidePredictionDebug.candidates.map(c=>({passes:c.hovPathPasses,distance:c.hovPathDistance}))};
-        } finally {learning.predict=originalPredict;}
+        } finally {learning.predict=originalPredict; getDirectionLine=originalDirectionLine;}
       };
     `);
     assert(run('testPathSelection([{end:[0.5,0],blue:1.3},{end:[1,0.5],blue:0.01}]).blade')===1,'forward crossing outranks excellent cruise without crossing');
@@ -348,10 +350,11 @@
     near(run('testPathSelection([{end:[0,0],blue:1.3}]).candidates[0].distance'),0,'direct crossing reports zero');
     run(`
       window.testStableSelection = reverse => {
-        const originalPredict=learning.predict;
+        const originalPredict=learning.predict, originalDirectionLine=getDirectionLine;
         const originalAmounts=[...BalanceLearning.amounts.LINK];
         try {
           learning.predict=(type,color,blade) => ({position:{x:CHART_CENTER_X+(0.1-blade*1e-12)*CHART_RADIUS,y:CHART_CENTER_Y}});
+          getDirectionLine=(dot,layer,adjustment,blade,direction)=>({arrowTarget:learning.predict('LINK','red',blade,direction,1).position});
           let choose=getLearnedGuideLines;
           if(reverse) {
             BalanceLearning.amounts.LINK.reverse();
@@ -360,13 +363,64 @@
           choose({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
           const selected=guidePredictionDebug.selected;
           return [selected.blade,selected.direction,selected.amount].join('/');
-        } finally {learning.predict=originalPredict; BalanceLearning.amounts.LINK.splice(0,Infinity,...originalAmounts);}
+        } finally {learning.predict=originalPredict; getDirectionLine=originalDirectionLine; BalanceLearning.amounts.LINK.splice(0,Infinity,...originalAmounts);}
       };
     `);
     assert(run('testStableSelection(false)')==='1/UP/0.125','practically equal candidates use fixed identity tie-break');
     assert(run('testStableSelection(true)')==='1/UP/0.125','reversed blade/direction/amount order produces same winner');
     assert(run('Array.from({length:10},(_,i)=>testStableSelection(i%2===0)).every(result=>result==="1/UP/0.125")'),'repeated recalculations remain stable');
     groups.push('HOV最小距離順位・中心ゼロ・固定tie-break・生成順独立・反復安定');
+    run(`
+      window.testNo2Arrows = (x,y,rotation=0) => {
+        const previous=hovAngle;
+        try {
+          hovAngle=rotation;
+          const dot=testDot(x,y,'red'), start=getDotCoordinates(dot);
+          return ['UP','DOWN'].map(direction=>{
+            const arrow=getDirectionLine(dot,'red',null,2,direction).arrowTarget;
+            return {arrow,dx:arrow.x-start.x,dy:arrow.y-start.y};
+          });
+        } finally {hovAngle=previous;}
+      };
+      window.testNo2Selection = y => {
+        const originalPredict=learning.predict, previous=hovAngle;
+        try {
+          hovAngle=0;
+          learning.predict=(type,color,blade,direction,amount)=> blade===2 && amount===1
+            ? {position:{x:397,y:direction==='UP'?100:900}} : null;
+          getLearnedGuideLines({red:testDot(1015.324,y,'red'),blue:testDot(637,520,'blue')});
+          return {direction:guidePredictionDebug.selected.direction,
+            up:guidePredictionDebug.candidates.find(c=>c.direction==='UP'),
+            down:guidePredictionDebug.candidates.find(c=>c.direction==='DOWN')};
+        } finally {learning.predict=originalPredict;hovAngle=previous;}
+      };
+    `);
+    for (const [x,targetX] of [[650,706.162],[144,87.838]]) {
+      const arrows=run(`testNo2Arrows(${x},520)`);
+      near(arrows[0].arrow.x,targetX,'No.2 UP scaled X');
+      near(arrows[0].arrow.y,698.5,'No.2 UP registered lower endpoint');
+      near(arrows[1].arrow.y,341.5,'No.2 DOWN registered upper endpoint');
+      near(arrows[0].dx,targetX-x,'No.2 UP uses arrow minus dot X');
+      near(arrows[0].dy,178.5,'No.2 UP uses arrow minus dot Y');
+      near(arrows[1].dy,-178.5,'No.2 DOWN uses arrow minus dot Y');
+    }
+    const rotatedNo2=run('testNo2Arrows(397,773,90)');
+    near(rotatedNo2[0].dx,-178.5,'rotated No.2 UP vector X');
+    near(rotatedNo2[0].dy,56.162,'rotated No.2 UP vector Y');
+    near(rotatedNo2[1].dx,178.5,'rotated No.2 DOWN vector X');
+    const no2Up=run('testNo2Selection(877)'), no2Down=run('testNo2Selection(163)');
+    assert(no2Up.direction==='UP' && no2Up.up.hovPathDistance===0,'outside dot selects actual UP arrow through center');
+    assert(no2Up.up.hovDirectionVector.dy<0 && !no2Up.down.hovPathPasses,'UP can point upward from the actual dot; DOWN does not pass');
+    assert(no2Down.direction==='DOWN' && no2Down.down.hovPathDistance===0,'outside dot selects actual DOWN arrow through center');
+    assert(no2Down.down.hovDirectionVector.dy>0 && !no2Down.up.hovPathPasses,'DOWN direction is computed from actual dot, not label');
+    assert(run(`['a','b'].every(side=>{
+      const svg=chartObject.contentDocument;
+      const body=svg.getElementById(side==='a'?'hovArrowBody01':'hovArrowBody04');
+      return Number(svg.getElementById('hovUpLabel2'+side).getAttribute('y'))===620
+        && Number(svg.getElementById('hovDownLabel2'+side).getAttribute('y'))===420
+        && [Number(body.getAttribute('y1')),Number(body.getAttribute('y2'))].sort((a,b)=>a-b).join(',')==='345,695';
+    })`),'No.2 SVG labels and registered endpoints agree on both sides');
+    groups.push('No.2 UP/DOWN登録照合・実矢印ベクトル・回転・範囲外ドット');
     // 両方悪化しかないLINK候補も、新仕様の最下位候補として評価する。
     run("window.centerGuides=getLearnedGuideLines({red:testDot(397,520,'red'),blue:testDot(397,520,'blue')});");
     assert(run('guidePredictionDebug.selected.predictions.every(p=>p.improvement<0)'), 'LINK both-worsening is last priority');

@@ -710,6 +710,7 @@ function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection)
     : Math.hypot(towardCenterX, towardCenterY)) / CHART_RADIUS;
   return {
     centerDistance,
+    arrowTarget: pointsTowardEnd ? segment.end : segment.start,
     pointsTowardCenter: centerProgress >= 0,
     base: center,
     unit: { x: vector.x / Math.sqrt(vectorLengthSquared), y: vector.y / Math.sqrt(vectorLengthSquared) },
@@ -846,7 +847,10 @@ function getLearnedGuideLines(finalSet) {
     const epsilon = 1e-9; // IPS単位の幾何判定誤差。
     for (const candidate of candidates) {
       const hov = candidate.predictions[0];
-      const dx = hov.position.x - hov.start.x, dy = hov.position.y - hov.start.y;
+      const arrow = getDirectionLine(finalSet.red, 'red', null, candidate.blade, candidate.direction).arrowTarget;
+      candidate.hovArrowTarget = arrow;
+      const dx = arrow.x - hov.start.x, dy = arrow.y - hov.start.y;
+      candidate.hovDirectionVector = { dx, dy };
       const length = Math.hypot(dx, dy);
       const ux = length > 0 ? dx / length : 0, uy = length > 0 ? dy / length : 0;
       const x = hov.start.x - CHART_CENTER_X, y = hov.start.y - CHART_CENTER_Y;
