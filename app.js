@@ -809,10 +809,13 @@ function renderDirectionLines() {
 
   appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);
   selectedLines.forEach(({ line, color, marker }) => {
+    // 範囲外では実際のドットから描画し、選択判定と既存の矢印先端は維持する。
+    const start = Math.hypot(line.base.x - CHART_CENTER_X, line.base.y - CHART_CENTER_Y) > CHART_RADIUS
+      ? line.base : line.start;
     const directionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     directionLine.setAttribute('class', 'guide-direction-line');
-    directionLine.setAttribute('x1', String(line.start.x));
-    directionLine.setAttribute('y1', String(line.start.y));
+    directionLine.setAttribute('x1', String(start.x));
+    directionLine.setAttribute('y1', String(start.y));
     directionLine.setAttribute('x2', String(line.end.x));
     directionLine.setAttribute('y2', String(line.end.y));
     directionLine.setAttribute('stroke', color);

@@ -167,6 +167,8 @@ object {
   z-index: 1;
   width: 100%;
   height: 100%;
+  /* ドットとガイド線はチャート枠外の余白にも表示する。 */
+  overflow: visible;
   pointer-events: none;
 }
 
