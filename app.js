@@ -120,6 +120,7 @@ let activeTimeInputs = null;
 let activeMemoIndex = null;
 let selectedMemoValue = '';
 const memoValues = ['', '', '', ''];
+let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
 let selectedHour = 0;
 let selectedMinute = 0;
 
@@ -213,8 +214,10 @@ function renderMemoWheel(options, selected, index) {
     if (value === selected) requestAnimationFrame(() => option.scrollIntoView({ block: 'center' }));
   });
   memoWheel.onscroll = () => {
+    if (memoPicker.hidden) return;
     cancelAnimationFrame(memoWheel.selectionFrame);
     memoWheel.selectionFrame = requestAnimationFrame(() => {
+      if (memoPicker.hidden) return;
       const center = memoWheel.getBoundingClientRect().top + memoWheel.clientHeight / 2;
       let closest = null;
       let distance = Infinity;
@@ -225,6 +228,7 @@ function renderMemoWheel(options, selected, index) {
       });
       if (!closest) return;
       selectedMemoValue = closest.dataset.value;
+      previewMemoSelection();
       memoWheel.querySelectorAll('.time-wheel-option').forEach((option) => option.setAttribute('aria-selected', String(option === closest)));
     });
   };
@@ -239,18 +243,81 @@ function openMemoPicker(index) {
   memoPickerTitle.textContent = `調整量 ${index + 1} を選択`;
   renderMemoWheel(options, selectedMemoValue, index);
   memoPicker.hidden = false;
+  previewMemoSelection();
+}
+
+function previewMemoSelection() {
+  const values = [...memoValues];
+  values[activeMemoIndex] = selectedMemoValue;
+  if (activeMemoIndex === 1 && values[1] !== memoValues[1]) values[2] = '';
+  updateAdjustmentForecast(values);
+}
+
+function updateAdjustmentForecast(values = memoValues, fixed = false) {
+  const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  const action = BalanceLearning.adjustment(values);
+  if (!target || !action) {
+    adjustmentForecast = null;
+  } else {
+    const key = JSON.stringify([target.learningId, target.red, target.blue, values]);
+    if (!fixed || adjustmentForecast?.phase !== 'preview' || adjustmentForecast.key !== key) {
+      const points = ['red', 'blue'].flatMap(color => {
+        if (!target[color]) return [];
+        const prediction = learning.predict(action.type, color, action.blade, action.direction, action.amount, getDotCoordinates(target[color]));
+        return prediction ? [{ color, ...prediction.position }] : [];
+      });
+      adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points };
+    }
+    if (fixed) adjustmentForecast.phase = 'fixed';
+  }
+  renderAdjustmentForecast();
+}
+
+function compareAdjustmentForecast(result) {
+  if (adjustmentForecast?.phase !== 'fixed') return;
+  const index = dotSets.findIndex(set => set.learningId === adjustmentForecast.targetId);
+  if (index >= 0 && dotSets[index + 1] === result) adjustmentForecast.phase = 'comparison';
+}
+
+function renderAdjustmentForecast() {
+  dotOverlay.querySelector('.adjustment-forecast')?.remove();
+  if (!adjustmentForecast) return;
+  if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
+  if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
+  const ns = 'http://www.w3.org/2000/svg';
+  const layer = document.createElementNS(ns, 'g');
+  layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
+  layer.style.pointerEvents = 'none';
+  adjustmentForecast.points.forEach(({ color, x, y }) => {
+    const group = document.createElementNS(ns, 'g');
+    group.setAttribute('transform', `translate(${x} ${y})`);
+    group.style.color = color === 'red' ? DOT_COLORS.red : adjustmentForecast.type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue;
+    group.dataset.color = color;
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = `${color === 'red' ? 'HOV' : '巡航'}予想位置`;
+    const ring = document.createElementNS(ns, 'circle');
+    ring.setAttribute('r', '12');
+    ring.setAttribute('class', 'forecast-glow');
+    const body = document.createElementNS(ns, 'path');
+    body.setAttribute('d', 'M 0 -7 L 7 0 L 0 7 L -7 0 Z');
+    body.setAttribute('class', 'forecast-body');
+    group.append(title, ring, body);
+    layer.append(group);
+  });
+  dotOverlay.append(layer);
 }
 
 memoButtons.forEach((button, index) => button.addEventListener('click', () => openMemoPicker(index)));
-closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; });
+closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(); });
 confirmMemoPicker.addEventListener('click', () => {
   if (activeMemoIndex === null) return;
   memoValues[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1) memoValues[2] = '';
   updateMemoButtons();
   memoPicker.hidden = true;
+  updateAdjustmentForecast();
 });
-memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) memoPicker.hidden = true; });
+memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { memoPicker.hidden = true; updateAdjustmentForecast(); } });
 updateMemoButtons();
 
 function loadRotation() {
@@ -345,6 +412,7 @@ function showChartPage(page) {
     else button.removeAttribute('aria-current');
   });
   renderDirectionLines();
+  renderAdjustmentForecast();
 }
 
 chartPageButtons.forEach((button, index) => button.addEventListener('click', () => showChartPage(index)));
@@ -1062,6 +1130,7 @@ function updateAdjustmentTarget() {
 
 adjustmentTarget.addEventListener('change', () => {
   selectedAdjustmentTarget = dotSets[Number(adjustmentTarget.value)] ?? null;
+  updateAdjustmentForecast();
 });
 
 const editConfirmation = document.getElementById('editConfirmation');
@@ -1080,6 +1149,7 @@ function restoreInputs(inputs, values) {
 }
 
 function cancelEditing() {
+  if (adjustmentForecast?.phase === 'preview') { adjustmentForecast = null; renderAdjustmentForecast(); }
   actualAdjustment.checked = false;
   if (resultEdit) restoreInputs([...redInputs, ...blueInputs], resultEdit.draft);
   if (adjustmentEdit) {
@@ -1134,6 +1204,7 @@ function startAdjustmentEdit(set, adjustment) {
   memoValues.splice(0, 4, ...Array.from({ length: 4 }, (_, index) => adjustment[index] || ''));
   selectedAdjustmentTarget = set;
   updateMemoButtons();
+  updateAdjustmentForecast();
   updateAdjustmentTarget();
   updateEditingUI();
   adjustmentForm.scrollIntoView({ block: 'start', behavior: 'smooth' });
@@ -1304,7 +1375,7 @@ function renderDots() {
       dotOverlay.append(label);
     });
   });
-
+  renderAdjustmentForecast();
 }
 
 dotForm.addEventListener('submit', (event) => {
@@ -1351,6 +1422,7 @@ dotForm.addEventListener('submit', (event) => {
     }
     target.blue = blue;
     learning.acceptMeasurement(dotSets, target.learningId, ['blue']);
+    compareAdjustmentForecast(target);
     saveDotSets();
     finishCruiseAddition();
     renderDots();
@@ -1375,6 +1447,7 @@ dotForm.addEventListener('submit', (event) => {
 
   dotSets.push({ learningId: newLearningId(), red, blue, adjustments: [] });
   learning.acceptMeasurement(dotSets, dotSets.at(-1).learningId);
+  compareAdjustmentForecast(dotSets.at(-1));
   selectedAdjustmentTarget = null;
   saveDotSets();
   [...redInputs, ...blueInputs].forEach((input) => {
@@ -1407,6 +1480,7 @@ adjustmentForm.addEventListener('submit', (event) => {
     const { set, adjustment } = adjustmentEdit;
     const index = set.adjustments?.indexOf(adjustment) ?? -1;
     if (!dotSets.includes(set) || index < 0) { cancelEditing(); return; }
+    updateAdjustmentForecast(memoValues, true);
     if (set === targetSet) set.adjustments.splice(index, 1, [...memoValues]);
     else {
       set.adjustments.splice(index, 1);
@@ -1420,6 +1494,7 @@ adjustmentForm.addEventListener('submit', (event) => {
     renderDots();
     return;
   }
+  updateAdjustmentForecast(memoValues, true);
   targetSet.adjustments ??= [];
   targetSet.adjustments.push([...memoValues]);
   if (actualAdjustment.checked) learning.arm(dotSets, targetSet.learningId);

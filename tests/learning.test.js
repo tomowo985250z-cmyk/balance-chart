@@ -277,6 +277,9 @@
     assert(run('guidePredictionDebug.selected.predictions.length') === 1, 'TAB still evaluates cruise only');
     assert(run('guidePredictionDebug.selected.predictions[0].model.startsWith("TAB:blue")'), 'trim uses independent TAB/cruise model');
     near(run('cruiseAngle'), run('getLearnedRotation("TAB","blue")'), 'purple hexagon follows learned rotation');
+    run('updateAdjustmentForecast(["1","TAB","2","UP"]);');
+    assert(run('adjustmentForecast.points.every(point=>{const expected=learning.predict("TAB",point.color,1,"UP",2,getDotCoordinates(dotSets.at(-1)[point.color]));return expected && point.x===expected.position.x && point.y===expected.position.y;}) && adjustmentForecast.points.length===2'),'forecast uses real independent learned predictions');
+    run('adjustmentForecast=null; renderAdjustmentForecast();');
     // HOV修正前(c3525d6)から不変のTAB角度式を、実登録方向と実測で検証する。
     run(`
       window.testTrimRotationRegression = (blade,direction,rotation,count) => {
@@ -621,6 +624,50 @@
       assert(run('!pitchAutoReady.red && !pitchAutoReady.blue && !trimAutoReady'),type+' zero movement stays waiting');
     }
     groups.push('未指定履歴：LINK/TAB自動回転・UP/DOWN・入力後再評価・色独立・不足時待ち・学習保存への混入なし');
+    run(`
+      learning.reset([]); dotSets.splice(0);
+      currentChartPage=0; pitchAutoMode=false; trimAutoMode=false; selectedAdjustmentTarget=null;
+      dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
+      window.originalForecastPredict=learning.predict;
+      window.forecastCalls=[];
+      learning.predict=(type,color,blade,direction,amount,start)=>{
+        forecastCalls.push({type,color,blade,direction,amount,start});
+        return {position:{x:start.x+amount*20,y:start.y-amount*10}};
+      };
+      memoValues.splice(0,4,'2','LINK','1','UP');
+      renderDots(); openMemoPicker(2); selectedMemoValue='2'; previewMemoSelection();
+    `);
+    assert(run('adjustmentForecast.phase')==='preview','selection shows preview');
+    near(run('adjustmentForecast.points[0].x'),557,'picker draft amount reaches predict before confirmation');
+    assert(run('forecastCalls.slice(-2).every(call=>call.amount===2 && call.blade===2 && call.direction==="UP" && call.type==="LINK")'),'selected adjustment passed to existing predict');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'HOV and cruise forecast bodies');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-body")).animationName')==='none','body never pulses');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).animationName')===(run('matchMedia("(prefers-reduced-motion: reduce)").matches')?'none':'forecast-pulse'),'only preview glow pulses unless reduced motion');
+    run('confirmMemoPicker.click(); adjustmentForm.requestSubmit();');
+    const fixedForecast=run('JSON.stringify(adjustmentForecast.points)');
+    assert(run('adjustmentForecast.phase')==='fixed','adjustment submission freezes forecast');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).animationName')==='none','confirmed glow stops pulsing');
+    run('learning.predict=()=>({position:{x:999,y:999}}); renderDots(); renderDots();');
+    assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'confirmed positions never recompute');
+    run(`
+      [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.7'];
+      [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.8']; dotForm.requestSubmit();
+    `);
+    assert(run('adjustmentForecast.phase')==='comparison','next measurement transitions to comparison');
+    assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'comparison retains frozen positions');
+    assert(run('dotOverlay.querySelectorAll("circle.chart-dot-red,circle.chart-dot-blue").length')===4,'actual dots coexist with forecast');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast")).opacity')==='0.45','comparison is translucent');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).filter')==='none','comparison removes glow');
+    run('openMemoPicker(0);');
+    assert(!run('dotOverlay.querySelector(".forecast-body")'),'new incomplete adjustment clears previous forecast');
+    run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; updateAdjustmentForecast();`);
+    const forecastPurple=run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color');
+    assert(forecastPurple==='rgb(123, 44, 191)','TAB cruise preview is purple: '+forecastPurple);
+    run('learning.predict=()=>null; updateAdjustmentForecast();');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'null prediction makes no phantom dot');
+    assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().models).length===0'),'preview does not modify learning');
+    run('learning.predict=originalForecastPredict; adjustmentForecast=null; memoValues.fill(""); renderDots();');
+    groups.push('予想ドット：選択値・リング点滅・確定固定・実測比較・次回置換・紫・学習不足・学習不変');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';
