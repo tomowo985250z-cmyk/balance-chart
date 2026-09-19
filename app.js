@@ -1249,6 +1249,41 @@ editConfirmation.addEventListener('close', () => {
 cancelResultEdit.addEventListener('click', cancelEditing);
 cancelAdjustmentEdit.addEventListener('click', cancelEditing);
 
+function renderHistoricalLearning() {
+  const container = document.getElementById('historicalLearningCandidates');
+  container.replaceChildren();
+  const candidates = learning.historicalCandidates(dotSets);
+  if (!candidates.length) {
+    container.textContent = '確認待ちの対象履歴はありません。';
+    return;
+  }
+  candidates.forEach(candidate => {
+    const before = dotSets[candidate.index], after = dotSets[candidate.index + 1];
+    const { type, blade, direction } = candidate.action;
+    const target = type === 'TAB' ? 'TAB紫（巡航）' : candidate.color === 'red' ? 'LINK赤（HOV）' : 'LINK青（巡航）';
+    const measurement = dot => `${dot.clock} ／ ${dot.radius} IPS`;
+    const row = document.createElement('div');
+    row.className = 'historical-learning-row';
+    const description = document.createElement('span');
+    description.textContent = `${target} ／ BLD${blade} ／ ${direction} ／ ${formatMemoValue(before.adjustments[0][2], 2, type)}\n`
+      + `調整前（結果${candidate.index + 1}）：${measurement(before[candidate.color])}\n`
+      + `調整後（結果${candidate.index + 2}）：${measurement(after[candidate.color])}`;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = '実調整として学習';
+    button.setAttribute('aria-label', `${target} 結果${candidate.index + 1}→${candidate.index + 2}を実調整として学習`);
+    button.addEventListener('click', () => {
+      const accepted = learning.confirmHistorical(dotSets, candidate);
+      renderDots();
+      document.getElementById('historicalLearningMessage').textContent = accepted
+        ? learning.inspect().storageError ?? `${target}の実調整を学習に追加しました。`
+        : '履歴が変更されています。内容を確認し直してください。';
+    });
+    row.append(description, button);
+    container.append(row);
+  });
+}
+
 function renderDots() {
   learning.sync(dotSets, {
     LINK: {
@@ -1259,6 +1294,7 @@ function renderDots() {
   });
   syncAutoPitchRotation();
   syncAutoTrimRotation();
+  renderHistoricalLearning();
   if ((resultEdit && !dotSets.includes(resultEdit.set)) ||
       (adjustmentEdit && (!dotSets.includes(adjustmentEdit.set) || !adjustmentEdit.set.adjustments?.includes(adjustmentEdit.adjustment)))) cancelEditing();
   updateEditingUI();

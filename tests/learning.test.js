@@ -178,6 +178,41 @@
     assert(migrated.inspect().samples.length===0 && migrated.inspect().version===2,'unverified version 1 samples are not reused');
     groups.push('実調整指定・練習除外・紫の直近優先・同条件優先・旧版移行');
 
+    for (const type of ['LINK','TAB']) {
+      const store=memory(), history=BalanceLearning.create(options(store));
+      const records=Array.from({length:3},(_,i)=>({learningId:'past'+i,red:{x:i*40,y:i*10},blue:{x:i*60,y:i*20},
+        adjustments:i<2?[['2',type,'1','DOWN']]:[]}));
+      const original=JSON.stringify(records);
+      history.sync(records,rotations);
+      const candidates=history.historicalCandidates(records);
+      assert(candidates.length===(type==='LINK'?4:2),type+' historical candidate colors');
+      assert(history.inspect().samples.length===0,'listing history never learns');
+      for(const candidate of candidates) assert(history.confirmHistorical(records,candidate),'explicit historical confirmation');
+      assert(!history.confirmHistorical(records,candidates[0]),'duplicate confirmation rejected');
+      history.sync(records,rotations);
+      assert(JSON.stringify(records)===original,'historical confirmation preserves source records');
+      for(const color of type==='LINK'?['red','blue']:['blue']) {
+        const prediction=history.predict(type,color,2,'DOWN',2,records.at(-1)[color]);
+        assert(prediction?.model===type+':'+color+':2:DOWN','historical detail model ready');
+        near(prediction.distance,2*Math.hypot(color==='red'?40:60,color==='red'?10:20),'historical distance per amount');
+      }
+      if(type==='TAB') assert(!history.inspect().models['TAB:red'],'purple confirmation excludes TAB red');
+      const loaded=BalanceLearning.create(options(store)); loaded.sync(records,rotations);
+      assert(JSON.stringify(loaded.inspect().models)===JSON.stringify(history.inspect().models),'historical confirmations survive reload and rebuild');
+      loaded.sync(records,rotations);
+      assert(loaded.inspect().samples.length===candidates.length,'repeated sync never duplicates history');
+      const stale=BalanceLearning.create(options(memory())); stale.sync(records,rotations);
+      const candidate=stale.historicalCandidates(records)[0];
+      records[0][candidate.color].x+=1;
+      assert(!stale.confirmHistorical(records,candidate),'stale measurement cannot be confirmed');
+      records[0].adjustments.push(['1',type,'1','UP']);
+      assert(!stale.historicalCandidates(records).some(c=>c.index===0),'multiple adjustments excluded');
+      records[1].blue=null; records[2].blue=null;
+      assert(!stale.historicalCandidates(records).some(c=>c.color==='blue'),'missing measurement excluded');
+      stale.reset(records);
+      assert(stale.historicalCandidates(records).length===0,'reset exclusions retained');
+    }
+    groups.push('過去実調整：明示確定・色別/BLD/方向・距離学習・再読込・二重登録防止・不明確履歴除外');
     const frame = document.createElement('iframe');
     frame.style.cssText = 'width:1000px;height:1600px';
     const loaded = new Promise(resolve => { frame.onload = resolve; });
@@ -676,6 +711,20 @@
     assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().models).length===0'),'preview does not modify learning');
     run('learning.predict=originalForecastPredict; adjustmentForecast=null; memoValues.fill(""); renderDots();');
     groups.push('予想ドット：選択値・リング点滅・確定固定・実測比較・次回置換・紫・学習不足・学習不変');
+    run(`
+      learning.reset([]); dotSets.splice(0); adjustmentForecast=null; currentChartPage=0;
+      for(let i=0;i<3;i++) dotSets.push({learningId:newLearningId(),red:testDot(517-i*20,520,'red'),blue:testDot(397,640-i*30,'blue'),adjustments:i<2?[['1','LINK','1','UP']]:[]});
+      memoValues.splice(0,4,'1','LINK','1','UP'); selectedAdjustmentTarget=null;
+      renderDots(); updateAdjustmentForecast();
+    `);
+    assert(run('document.querySelectorAll(".historical-learning-row button").length')===4,'historical UI lists per-color candidates');
+    assert(run('document.querySelector(".historical-learning-row").textContent.includes("LINK赤（HOV） ／ BLD1 ／ UP ／ 1") && document.querySelector(".historical-learning-row").textContent.includes("調整前（結果1）") && document.querySelector(".historical-learning-row").textContent.includes("調整後（結果2）")'),'historical UI shows review details');
+    const historicalSource=run('JSON.stringify(dotSets)');
+    run('document.querySelector(".historical-learning-row button").click();');
+    assert(run('learning.inspect().models["LINK:red"].sampleCount===1 && !learning.inspect().models["LINK:blue"]'),'UI confirms only clicked color');
+    run('document.querySelectorAll(".historical-learning-row button")[1].click();');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'historical learning immediately enables pending red preview');
+    assert(run('JSON.stringify(dotSets)')===historicalSource,'UI preserves measurement and adjustment history');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

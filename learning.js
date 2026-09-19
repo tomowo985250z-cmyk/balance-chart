@@ -74,6 +74,31 @@ const BalanceLearning = (() => {
         state.confirmed[pair]?.fingerprints?.[color] === fingerprints[color]) };
     }
 
+    function historicalCandidates(sets) {
+      return sets.slice(1).flatMap((after, index) => {
+        const entry = confirmation(sets, after.learningId);
+        if (!entry || state.excluded.includes(entry.pair)) return [];
+        const colors = entry.action.type === 'LINK' ? ['red', 'blue'] : ['blue'];
+        return colors.filter(color => entry.fingerprints[color]
+          && state.confirmed[entry.pair]?.fingerprints?.[color] !== entry.fingerprints[color])
+          .map(color => ({ pair: entry.pair, afterId: after.learningId, index, color,
+            action: entry.action, fingerprint: entry.fingerprints[color] }));
+      });
+    }
+
+    function confirmHistorical(sets, candidate) {
+      // 表示後に測定・調整・組合せが変わっていれば、古い確認内容では確定しない。
+      const current = historicalCandidates(sets).find(item => item.pair === candidate.pair
+        && item.color === candidate.color && item.fingerprint === candidate.fingerprint);
+      if (!current) return false;
+      const fingerprints = { ...state.confirmed[current.pair]?.fingerprints,
+        [current.color]: current.fingerprint };
+      state.confirmed[current.pair] = { fingerprints, confirmedAt: new Date().toISOString() };
+      signature = '';
+      save();
+      return true;
+    }
+
     function arm(sets, beforeId) {
       const before = sets.at(-1);
       if (before?.learningId !== beforeId || !singleAdjustment(before)) return false;
@@ -267,7 +292,7 @@ const BalanceLearning = (() => {
       save();
     }
 
-    return { sync, predict, reset, recordManual, arm, acceptMeasurement,
+    return { sync, predict, reset, recordManual, arm, acceptMeasurement, historicalCandidates, confirmHistorical,
       isArmed(set) { return state.armed[set.learningId]?.stamp === stamp(set); },
       disarm(beforeId) {
         delete state.armed[beforeId];
