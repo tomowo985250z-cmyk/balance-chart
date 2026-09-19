@@ -354,66 +354,76 @@
         } finally { learning.predict=originalPredict; currentChartPage=originalPage; getDirectionLine=originalDirectionLine; }
       };
     `);
-    assert(run('testCandidateSelection([[0.19,0.30],[0.21,0.05]])')===1,'HOV 0.19 qualifies and beats 0.21 despite cruise');
-    assert(run('testCandidateSelection([[0.20,0.30],[0.21,0.05]])')===1,'HOV exact 0.20 qualifies');
-    assert(run('testCandidateSelection([[0.18,0.25],[0.19,0.10]])')===1,'inside HOV limit cruise cannot change HOV choice');
-    assert(run('testCandidateSelection([[0.19,0.30],[0.20,0.05]])')===1,'HOV endpoint tie-break ignores cruise');
-    assert(run('testCandidateSelection([[0.20,0.30],[0.200000001,0.01]])')===1,'even slightly above 0.20 is excluded');
-    assert(run('testCandidateSelection([[0.195,0.30],[0.205,0.01]])')===1,'old 0.01 tolerance cannot cross HOV limit');
-    assert(run('testCandidateSelection([[0.21,0.30],[0.22,0.05]])')===1,'all above limit choose minimum HOV');
-    assert(run('testCandidateSelection([[0.4,1.4],[0.9,0.9]])')===1,'minimum HOV overrides old both-improving priority');
-    assert(run('testCandidateSelection([[0.4,1.9],[0.42,1.1]])')===1,'HOV closest endpoint wins despite worse cruise');
-    assert(run('testCandidateSelection([[0.4,1.9],[0.405,1.1]])')===1,'above limit even small HOV differences take priority');
-    assert(run('testCandidateSelection([[0.4,1.9],[0.4,1.1]])')===1,'equal HOV endpoints use fixed tie-break, not cruise');
-    assert(run('testCandidateSelection([[0.4,0.01],[0.4,9]])')===1,'reversing cruise ranking preserves HOV');
     run(`
-      window.testCruiseIndependence = mode => {
-        const originalPredict=learning.predict, originalRotation=getLearnedRotation;
-        const calls=[];
+      window.testPairSelection = (specs,starts=[1,1],fallback=false) => {
+        const originalPredict=learning.predict, originalDirectionLine=getDirectionLine;
+        const originalLearned=getLearnedGuideLines, originalDistances=getGuideDistances, originalSelect=selectLinkGuideCandidate;
+        const savedSets=dotSets.slice();
         try {
-          getLearnedRotation=(type,color)=>color==='blue' && mode==='untrained' ? null : originalRotation(type,color);
-          learning.predict=(type,color,blade,direction,amount,start)=>{
-            calls.push(color);
-            if (color==='blue') return mode==='missing' || mode==='untrained' ? null
-              : {position:{x:CHART_CENTER_X+mode*CHART_RADIUS,y:CHART_CENTER_Y}};
-            return originalPredict(type,color,blade,direction,amount,start);
+          learning.predict=(type,color,blade,direction,amount)=>{
+            const spec=specs[blade-1];
+            if(!spec || direction!=='UP' || amount!==1) return null;
+            return {position:{x:397+spec.end[color==='red'?0:1]*240,y:520}};
           };
-          const guides=getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
-          const selected=guidePredictionDebug.selected;
-          return {key:[selected.blade,selected.direction,selected.amount],red:guides[0],count:guides.length,calls};
-        } finally { learning.predict=originalPredict; getLearnedRotation=originalRotation; }
-      };
-    `);
-    const cruiseBaseline=run('testCruiseIndependence(0)');
-    for (const mode of [10,-10,'missing','untrained']) {
-      const result=run(`testCruiseIndependence(${JSON.stringify(mode)})`);
-      assert(JSON.stringify(result.key)===JSON.stringify(cruiseBaseline.key) && JSON.stringify(result.red)===JSON.stringify(cruiseBaseline.red),`HOV unchanged with cruise ${mode}`);
-      assert(result.count===2 && result.calls.slice(0,-1).every(color=>color==='red') && result.calls.at(-1)==='blue',`cruise ${mode} evaluated only once after all HOV candidates`);
-    }
-    run(`
-      window.testFallbackIndependence = blueX => {
-        const savedSets=dotSets.slice(), originalLearned=getLearnedGuideLines;
-        try {
-          getLearnedGuideLines=()=>null;
-          dotSets.splice(0,dotSets.length,{red:testDot(637,520,'red'),
-            ...(blueX===null?{}:{blue:testDot(blueX,610,'blue')})});
-          renderDirectionLines();
-          const red=dotOverlay.querySelector('.guide-direction-line');
-          return ['x1','y1','x2','y2'].map(name=>red.getAttribute(name));
+          getDirectionLine=(dot,color,adjustment,blade,direction)=>{
+            if(!specs[blade-1] || direction!=='UP') return null;
+            const point=specs[blade-1][color==='red'?'red':'blue'];
+            const base=getDotCoordinates(dot), end={x:397+specs[blade-1].end[color==='red'?0:1]*240,y:520};
+            return {arrowTarget:{x:397+point[0]*240,y:520+point[1]*240},base,start:base,end,number:blade,direction};
+          };
+          const finalSet={red:testDot(397+starts[0]*240,520,'red'),blue:testDot(397+starts[1]*240,520,'blue')};
+          if(fallback) {
+            dotSets.splice(0,dotSets.length,finalSet);
+            getLearnedGuideLines=()=>null;
+            getGuideDistances=red=>{
+              const [redDistance,blueDistance]=specs[red.number-1].end;
+              return {redDistance,blueDistance,maxCenterDistance:Math.max(redDistance,blueDistance),distance:redDistance+blueDistance};
+            };
+            selectLinkGuideCandidate=candidates=>{
+              const selected=originalSelect(candidates);
+              guidePredictionDebug={selected,candidates};
+              return selected;
+            };
+            renderDirectionLines();
+          } else getLearnedGuideLines(finalSet);
+          return {blade:guidePredictionDebug.selected?.blade,
+            paths:guidePredictionDebug.candidates.map(c=>[c.hovPathDistance,c.cruisePathDistance])};
         } finally {
+          learning.predict=originalPredict;getDirectionLine=originalDirectionLine;
+          getLearnedGuideLines=originalLearned;getGuideDistances=originalDistances;selectLinkGuideCandidate=originalSelect;
           dotSets.splice(0,dotSets.length,...savedSets);
-          getLearnedGuideLines=originalLearned;
-          renderDirectionLines();
         }
       };
     `);
-    const fallbackHov=run('testFallbackIndependence(null)');
-    for (const blueX of [397,637,-100,1200,397]) {
-      assert(JSON.stringify(run(`testFallbackIndependence(${blueX})`))===JSON.stringify(fallbackHov),'fallback HOV unchanged by cruise position or presence');
+    const pickPair=(specs,starts)=>run(`testPairSelection(${JSON.stringify(specs)},${JSON.stringify(starts??[1,1])})`);
+    const pair=(red,blue,end)=>({red,blue,end});
+    const toward=[0,0], away=[2,0], pairTangent=[0.04,Math.sqrt(0.0384)];
+    assert(pickPair([pair(toward,away,[0.01,0.01]),pair(pairTangent,pairTangent,[0.4,0.5])]).blade===2,'both forward paths pass before endpoint score or closer HOV');
+    assert(pickPair([pair(toward,toward,[0.1,0.5]),pair(toward,toward,[0.3,0.3])]).blade===2,'both passing minimize maximum predicted distance');
+    assert(pickPair([pair(toward,toward,[0.2,0.3]),pair(toward,toward,[0.1,0.3])]).blade===2,'equal maximum minimizes sum');
+    assert(pickPair([pair(pairTangent,away,[0.01,0.01]),pair(toward,away,[0.5,0.6])]).blade===2,'no joint passage prioritizes closest HOV over endpoints');
+    assert(pickPair([pair(toward,away,[0.5,0.6]),pair(toward,away,[0.4,0.4])]).blade===2,'equal HOV approach uses predicted maximum');
+    assert(pickPair([pair(toward,away,[0.4,0.6]),pair(toward,away,[0.3,0.6])]).blade===2,'equal HOV approach and maximum uses sum');
+    const exact=pickPair([pair(pairTangent,pairTangent,[0.3,0.3])]);
+    near(exact.paths[0][0],0.2,'HOV exact pairTangent'); near(exact.paths[0][1],0.2,'cruise exact pairTangent');
+    assert(pickPair([pair(toward,away,[0.01,0.01]),pair(toward,pairTangent,[0.6,0.6])]).blade===2,'reverse-only cruise crossing excluded, exact pairTangent accepted');
+    assert(pickPair([pair(away,toward,[0.01,0.01]),pair(pairTangent,toward,[0.6,0.6])]).blade===2,'reverse-only HOV crossing excluded');
+    assert(pickPair([pair(toward,toward,[0.01,0.21]),pair(away,away,[0.15,0.16])],[0.2,0.2]).blade===2,'inside threshold both improvement outranks one-sided improvement');
+    assert(pickPair([pair(away,away,[0.1,0.15]),pair(toward,toward,[0.12,0.12])],[0.2,0.2]).blade===2,'both improving minimize maximum');
+    assert(pickPair([pair(away,away,[0.1,0.15]),pair(toward,toward,[0.08,0.15])],[0.2,0.2]).blade===2,'both improving equal maximum minimize sum');
+    assert(pickPair([pair(away,away,[0.25,0.22]),pair(toward,toward,[0.23,0.23])],[0.2,0.2]).blade===2,'inside without joint improvement uses normal rule; outward ray starting at boundary valid');
+    assert(pickPair([pair(toward,toward,[0.2,0.3]),pair(toward,toward,[0.1,0.3000000001])]).blade===2,'epsilon-equivalent maximum uses sum');
+    assert(pickPair([pair(away,away,[0.21,0.22]),pair(toward,toward,[0.23,0.23])],[0.2,0.2]).blade===1,'outward rays touching at start remain eligible');
+    for (const [specs,starts,expected] of [
+      [[pair(toward,away,[0.01,0.01]),pair(pairTangent,pairTangent,[0.4,0.5])],[1,1],2],
+      [[pair(toward,toward,[0.01,0.21]),pair(away,away,[0.15,0.16])],[0.2,0.2],2],
+      [[pair(pairTangent,away,[0.01,0.01]),pair(toward,away,[0.5,0.6])],[1,1],2]
+    ]) {
+      assert(run(`testPairSelection(${JSON.stringify(specs)},${JSON.stringify(starts)},true).blade`)===expected,'fallback renderer uses the same pair priority');
     }
     assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===2,'TAB still selects by cruise endpoint');
     assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
-    groups.push('LINK：境界・HOV先行確定・巡航予測/学習不足/位置からの独立・TAB維持');
+    groups.push('LINK：両点改善・両有向線通過・最大距離/合計・HOV最接近・境界・TAB維持');
     run(`
       window.testPathSelection = paths => {
         const originalPredict=learning.predict, originalDirectionLine=getDirectionLine;
@@ -424,7 +434,7 @@
             const point=color==='red' ? path.end : [path.blue,0];
             return {position:{x:CHART_CENTER_X+point[0]*CHART_RADIUS,y:CHART_CENTER_Y+point[1]*CHART_RADIUS}};
           };
-          getDirectionLine=(dot,layer,adjustment,blade,direction)=>({arrowTarget:learning.predict('LINK','red',blade,direction,1).position});
+          getDirectionLine=(dot,layer,adjustment,blade,direction)=>({arrowTarget:layer==='red'?learning.predict('LINK','red',blade,direction,1).position:{x:877,y:520}});
           getLearnedGuideLines({red:testDot(637,520,'red'),blue:testDot(637,520,'blue')});
           return {blade:guidePredictionDebug.selected?.blade,
             candidates:guidePredictionDebug.candidates.map(c=>({passes:c.hovPathPasses,distance:c.hovPathDistance}))};

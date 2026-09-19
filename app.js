@@ -808,12 +808,32 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
   target.append(defs);
 }
 
+function selectLinkGuideCandidate(candidates) {
+  const epsilon = 1e-9;
+  const paired = candidates.filter(candidate => candidate.predictions.length === 2);
+  const improving = paired.filter(candidate => candidate.predictions.every(prediction =>
+    prediction.currentDistance <= CENTER_DISTANCE_THRESHOLD + epsilon && prediction.improvement > epsilon));
+  const passing = paired.filter(candidate => candidate.hovPathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon
+    && candidate.cruisePathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon);
+  let pool = improving.length ? improving : passing.length ? passing : candidates;
+  const nearest = field => {
+    const minimum = Math.min(...pool.map(candidate => candidate[field]));
+    pool = pool.filter(candidate => candidate[field] <= minimum + epsilon);
+  };
+  if (!improving.length && !passing.length) nearest('hovPathDistance');
+  nearest('maxCenterDistance');
+  nearest('distance');
+  return pool.sort((first, second) => first.blade - second.blade
+    || Number(first.direction === 'DOWN') - Number(second.direction === 'DOWN')
+    || first.amount - second.amount)[0];
+}
+
 function getLearnedGuideLines(finalSet) {
   const type = currentChartPage === 0 ? 'LINK' : 'TAB';
   const automatic = currentChartPage === 0 ? pitchAutoMode : trimAutoMode;
   guidePredictionDebug = { type, fallback: true, reason: automatic ? 'insufficient-samples' : 'manual-mode' };
   if (!automatic || !finalSet) return null;
-  // LINKはHOVだけで確定し、その後に同じ調整の巡航を求める。
+  // HOV予測を基準に候補を生成し、LINKは対応する巡航予測も評価する。
   const colors = type === 'TAB' ? (finalSet.blue ? ['blue'] : [])
     : finalSet.red ? ['red'] : [];
   if (!colors.length || colors.some(color => getLearnedRotation(type, color) === null)) return null;
@@ -831,6 +851,18 @@ function getLearnedGuideLines(finalSet) {
           return { color, start, ...prediction, currentDistance, predictedDistance, improvement: currentDistance - predictedDistance };
         });
         if (predictions.some(prediction => !prediction)) continue;
+        if (type === 'LINK' && finalSet.blue) {
+          const start = getDotCoordinates(finalSet.blue);
+          const prediction = learning.predict(type, 'blue', blade, direction, amount, start);
+          const fallbackLine = prediction ? null : getDirectionLine(finalSet.blue, 'blue', null, blade, direction);
+          if (prediction || fallbackLine) {
+            const position = prediction?.position ?? fallbackLine.end;
+            const currentDistance = Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS;
+            const predictedDistance = Math.hypot(position.x - CHART_CENTER_X, position.y - CHART_CENTER_Y) / CHART_RADIUS;
+            predictions.push({ color: 'blue', start, ...prediction, position, fallbackLine,
+              currentDistance, predictedDistance, improvement: currentDistance - predictedDistance });
+          }
+        }
         const improvement = predictions.reduce((sum, prediction) => sum + prediction.improvement, 0);
         // LINKは悪化側も含めて順位付けする。TABは従来どおり。
         const eligible = type === 'LINK'
@@ -859,37 +891,22 @@ function getLearnedGuideLines(finalSet) {
       const pathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
       candidate.hovPathDistance = pathDistance <= epsilon ? 0 : pathDistance;
       candidate.hovPathPasses = candidate.hovPathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon;
+      const cruise = candidate.predictions[1];
+      if (cruise) {
+        const target = getDirectionLine(finalSet.blue, 'blue', null, candidate.blade, candidate.direction).arrowTarget;
+        const vx = target.x - cruise.start.x, vy = target.y - cruise.start.y;
+        const size = Math.hypot(vx, vy);
+        const ux = size > 0 ? vx / size : 0, uy = size > 0 ? vy / size : 0;
+        const x = cruise.start.x - CHART_CENTER_X, y = cruise.start.y - CHART_CENTER_Y;
+        const travel = Math.max(0, -(x * ux + y * uy));
+        candidate.cruisePathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
+      }
     }
-    const passing = candidates.filter(candidate => candidate.hovPathPasses);
-    const pool = passing.length ? passing : candidates;
-    const closestPath = Math.min(...pool.map(candidate => candidate.hovPathDistance));
-    const nearest = pool.filter(candidate => candidate.hovPathDistance <= closestPath + epsilon);
-    // 実質同じ経路の場合もHOV予測だけを使い、巡航は参照しない。
-    const withinHovLimit = nearest.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD);
-    let finalists = withinHovLimit.length ? withinHovLimit : nearest;
-    const minimum = Math.min(...finalists.map(candidate => candidate.predictions[0].predictedDistance));
-    finalists = finalists.filter(candidate => candidate.predictions[0].predictedDistance <= minimum + epsilon);
-    // 実質同点だけはBLD番号→UP/DOWN→調整量の固定順。生成順には依存しない。
-    selected = finalists.sort((first, second) => first.blade - second.blade
-      || Number(first.direction === 'DOWN') - Number(second.direction === 'DOWN')
-      || first.amount - second.amount)[0];
+    selected = selectLinkGuideCandidate(candidates);
   } else {
     selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
       Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
       || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance)[0];
-  }
-  // HOV確定後にのみ巡航を計算する。予測不能でもHOVを再選択しない。
-  if (type === 'LINK' && selected && finalSet.blue) {
-    const start = getDotCoordinates(finalSet.blue);
-    const prediction = learning.predict(type, 'blue', selected.blade, selected.direction, selected.amount, start);
-    if (prediction) {
-      const currentDistance = Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS;
-      const predictedDistance = Math.hypot(prediction.position.x - CHART_CENTER_X, prediction.position.y - CHART_CENTER_Y) / CHART_RADIUS;
-      selected.predictions.push({ color: 'blue', start, ...prediction, currentDistance, predictedDistance, improvement: currentDistance - predictedDistance });
-    } else {
-      const line = getDirectionLine(finalSet.blue, 'blue', null, selected.blade, selected.direction);
-      if (line) selected.predictions.push({ color: 'blue', start: line.start, position: line.end, fallbackLine: line });
-    }
   }
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
@@ -937,7 +954,7 @@ function renderDirectionLines() {
     if (!selected) return;
     selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
   } else if (redDots.length) {
-    // 学習不足・手動時もHOVだけで確定し、巡航は対応する番号・方向を使う。
+    // 学習不足・手動時は既存の移動距離予測を使い、同じ順位で選ぶ。
     const centerDistance = (line) => {
       const vx = line.arrowTarget.x - line.base.x;
       const vy = line.arrowTarget.y - line.base.y;
@@ -948,18 +965,25 @@ function renderDirectionLines() {
       const travel = Math.max(0, dx * ux + dy * uy);
       return Math.hypot(dx - travel * ux, dy - travel * uy) / CHART_RADIUS;
     };
-    const candidates = redDots.map(({ line }) => ({ line, distance: centerDistance(line) }));
-    const epsilon = 1e-9;
-    const passing = candidates.filter(candidate => candidate.distance <= CENTER_DISTANCE_THRESHOLD + epsilon);
-    const pool = passing.length ? passing : candidates;
-    const minimum = Math.min(...pool.map(candidate => candidate.distance));
-    const selected = pool.filter(candidate => candidate.distance <= minimum + epsilon)
-      .sort((first, second) => first.line.number - second.line.number
-        || Number(first.line.direction === 'DOWN') - Number(second.line.direction === 'DOWN'))[0];
+    const ratio = getLatestPitchDistanceRatio() ?? { red: 1, blue: 2 };
+    const candidates = redDots.map(({ line }) => {
+      const blue = blueDots.find(candidate => candidate.line.number === line.number
+        && candidate.line.direction === line.direction)?.line;
+      const hovPathDistance = centerDistance(line);
+      const distances = blue ? getGuideDistances(line, blue, ratio)
+        : { redDistance: hovPathDistance, maxCenterDistance: hovPathDistance, distance: hovPathDistance };
+      const predictions = [line, blue].filter(Boolean).map((guide, index) => {
+        const currentDistance = Math.hypot(guide.base.x - CHART_CENTER_X, guide.base.y - CHART_CENTER_Y) / CHART_RADIUS;
+        const predictedDistance = index === 0 ? distances.redDistance : distances.blueDistance;
+        return { currentDistance, predictedDistance, improvement: currentDistance - predictedDistance };
+      });
+      return { line, blue, blade: line.number, direction: line.direction, amount: 0, predictions,
+        hovPathDistance, cruisePathDistance: blue ? centerDistance(blue) : undefined,
+        maxCenterDistance: distances.maxCenterDistance, distance: distances.distance };
+    });
+    const selected = selectLinkGuideCandidate(candidates);
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
-    const blue = blueDots.find(candidate => candidate.line.number === selected.line.number
-      && candidate.line.direction === selected.line.direction);
-    if (blue) selectedLines.push({ line: blue.line, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
+    if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
     return;
   }
