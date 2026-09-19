@@ -261,12 +261,14 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
   } else {
     const key = JSON.stringify([target.learningId, target.red, target.blue, values]);
     if (!fixed || adjustmentForecast?.phase !== 'preview' || adjustmentForecast.key !== key) {
+      const waiting = [];
       const points = ['red', 'blue'].flatMap(color => {
         if (!target[color]) return [];
         const prediction = learning.predict(action.type, color, action.blade, action.direction, action.amount, getDotCoordinates(target[color]));
+        if (!prediction) waiting.push(color);
         return prediction ? [{ color, ...prediction.position }] : [];
       });
-      adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points };
+      adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
     }
     if (fixed) adjustmentForecast.phase = 'fixed';
   }
@@ -281,8 +283,16 @@ function compareAdjustmentForecast(result) {
 
 function renderAdjustmentForecast() {
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
+  const notice = document.getElementById('forecastLearningNotice');
+  notice.hidden = true;
+  notice.textContent = '';
   if (!adjustmentForecast) return;
   if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
+  if (adjustmentForecast.phase !== 'comparison' && adjustmentForecast.waiting?.length) {
+    notice.textContent = adjustmentForecast.waiting.map(color =>
+      `${color === 'red' ? 'HOV（赤）' : adjustmentForecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）'}：予測学習中`).join(' ／ ');
+    notice.hidden = false;
+  }
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
   const ns = 'http://www.w3.org/2000/svg';
   const layer = document.createElementNS(ns, 'g');
@@ -1375,7 +1385,8 @@ function renderDots() {
       dotOverlay.append(label);
     });
   });
-  renderAdjustmentForecast();
+  if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
+  else renderAdjustmentForecast();
 }
 
 dotForm.addEventListener('submit', (event) => {

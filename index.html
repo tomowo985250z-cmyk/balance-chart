@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260920-forecast" />
+    <link rel="stylesheet" href="style.css?v=20260920-forecast-notice" />
   </head>
   <body>
   <main class="app">
@@ -43,6 +43,7 @@
       <button id="cancelAdjustmentEdit" type="button" hidden>編集をキャンセル</button>
       <p id="adjustmentEditMessage" class="edit-message" aria-live="polite" hidden></p>
       <p id="adjustmentMessage" class="dot-message" aria-live="polite"></p>
+      <p id="forecastLearningNotice" class="forecast-learning-notice" aria-live="polite" hidden></p>
     </form>
 
     <h2 id="resultsHeading" class="results-heading">結果</h2>
@@ -118,6 +119,6 @@
     </form>
   </dialog>
   <script src="learning.js?v=20260915-recent-confirmed"></script>
-  <script src="app.js?v=20260920-forecast"></script>
+  <script src="app.js?v=20260920-forecast-notice"></script>
 </body>
 </html>

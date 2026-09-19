@@ -665,6 +665,14 @@
     assert(forecastPurple==='rgb(123, 44, 191)','TAB cruise preview is purple: '+forecastPurple);
     run('learning.predict=()=>null; updateAdjustmentForecast();');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'null prediction makes no phantom dot');
+    assert(run('document.getElementById("forecastLearningNotice").textContent')==='HOV（赤）：予測学習中 ／ 巡航（紫）：予測学習中','missing colors identified in notice');
+    run('learning.predict=(type,color)=>color==="red"?{position:{x:450,y:520}}:null; renderDots();');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'available color keeps its forecast');
+    assert(run('document.getElementById("forecastLearningNotice").textContent')==='巡航（紫）：予測学習中','only missing color shows notice');
+    run('learning.predict=()=>({position:{x:450,y:520}}); renderDots();');
+    assert(run('document.getElementById("forecastLearningNotice").hidden && dotOverlay.querySelectorAll(".forecast-body").length===2'),'ready preview automatically replaces notice');
+    run('currentChartPage=0; memoValues[1]="LINK"; learning.predict=()=>null; updateAdjustmentForecast();');
+    assert(run('document.getElementById("forecastLearningNotice").textContent')==='HOV（赤）：予測学習中 ／ 巡航（青）：予測学習中','LINK identifies missing red and blue');
     assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().models).length===0'),'preview does not modify learning');
     run('learning.predict=originalForecastPredict; adjustmentForecast=null; memoValues.fill(""); renderDots();');
     groups.push('予想ドット：選択値・リング点滅・確定固定・実測比較・次回置換・紫・学習不足・学習不変');
