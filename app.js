@@ -294,6 +294,19 @@ function compareAdjustmentForecast(result) {
   if (index >= 0 && dotSets[index + 1] === result) adjustmentForecast.phase = 'comparison';
 }
 
+function forecastDirectionMatches(dot, color, values, dx, dy) {
+  const action = BalanceLearning.adjustment(values);
+  if (!action) return false;
+  const start = getDotCoordinates(dot);
+  const arrow = getDirectionLine(dot, color, null, action.blade, action.direction)?.arrowTarget;
+  if (!arrow) return false;
+  const ax = arrow.x - start.x, ay = arrow.y - start.y;
+  const lengths = Math.hypot(dx, dy) * Math.hypot(ax, ay);
+  // ドット→選択調整の回転済み矢印への成分が正の場合だけ表示する。
+  // ゼロ移動・直交・逆向き・非有限値は一致とみなさない。
+  return Number.isFinite(lengths) && lengths > 0 && (dx * ax + dy * ay) / lengths > 1e-9;
+}
+
 function renderAdjustmentForecast() {
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
   const notice = document.getElementById('forecastLearningNotice');
@@ -325,6 +338,7 @@ function renderAdjustmentForecast() {
     // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
     const x = start.x + guide.unit.x * distance, y = start.y + guide.unit.y * distance;
     if (![x, y].every(Number.isFinite)) return;
+    if (!forecastDirectionMatches(target[color], color, adjustmentForecast.values, x - start.x, y - start.y)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
     group.style.color = color === 'red' ? DOT_COLORS.red : adjustmentForecast.type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue;
