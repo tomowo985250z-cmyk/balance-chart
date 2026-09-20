@@ -313,7 +313,7 @@
     assert(run('guidePredictionDebug.selected.predictions[0].model.startsWith("TAB:blue")'), 'trim uses independent TAB/cruise model');
     near(run('cruiseAngle'), run('getLearnedRotation("TAB","blue")'), 'purple hexagon follows learned rotation');
     run('updateAdjustmentForecast(["1","TAB","2","UP"]);');
-    assert(run('adjustmentForecast.points.every(point=>{const expected=learning.predict("TAB",point.color,1,"UP",2,getDotCoordinates(dotSets.at(-1)[point.color]));return expected && point.x===expected.position.x && point.y===expected.position.y;}) && adjustmentForecast.points.length===2'),'forecast uses real independent learned predictions');
+    assert(run('adjustmentForecast.points.every(point=>{const start=getDotCoordinates(dotSets.at(-1)[point.color]);const expected=learning.predict("TAB",point.color,1,"UP",2,start);return expected && point.color==="blue" && Math.abs(Math.hypot(point.x-start.x,point.y-start.y)-expected.distance)<1e-8;}) && adjustmentForecast.points.length===1'),'purple forecast uses real independent learned distance; no TAB red guide');
     run('adjustmentForecast=null; renderAdjustmentForecast();');
     // HOV修正前(c3525d6)から不変のTAB角度式を、実登録方向と実測で検証する。
     run(`
@@ -676,13 +676,32 @@
       window.forecastCalls=[];
       learning.predict=(type,color,blade,direction,amount,start)=>{
         forecastCalls.push({type,color,blade,direction,amount,start});
-        return {position:{x:start.x+amount*20,y:start.y-amount*10}};
+        return {distance:amount*(color==='red'?20:30),position:{x:start.x+amount*20,y:start.y-amount*10}};
       };
       memoValues.splice(0,4,'2','LINK','1','UP');
       renderDots(); openMemoPicker(2); selectedMemoValue='2'; previewMemoSelection();
     `);
     assert(run('adjustmentForecast.phase')==='preview','selection shows preview');
-    near(run('adjustmentForecast.points[0].x'),557,'picker draft amount reaches predict before confirmation');
+    near(run('Math.hypot(adjustmentForecast.points[0].x-517,adjustmentForecast.points[0].y-520)'),40,'picker draft amount reaches predict before confirmation');
+    run(`window.forecastGeometry=()=>adjustmentForecast.points.map(point=>{
+      const start=getDotCoordinates(dotSets.at(-1)[point.color]);
+      const line=[...dotOverlay.querySelectorAll('.guide-direction-line')].find(line=>line.getAttribute('marker-end')==='url(#'+point.color+'DirectionLineArrow)');
+      const a={x:Number(line.getAttribute('x1')),y:Number(line.getAttribute('y1'))};
+      const dx=Number(line.getAttribute('x2'))-a.x,dy=Number(line.getAttribute('y2'))-a.y,length=Math.hypot(dx,dy);
+      const vx=point.x-start.x,vy=point.y-start.y;
+      return {color:point.color,cross:((point.x-a.x)*dy-(point.y-a.y)*dx)/length,
+        forward:(vx*dx+vy*dy)/length,distance:Math.hypot(vx,vy)};
+    });`);
+    for(const point of run('forecastGeometry()')) {
+      near(point.cross,0,point.color+' preview is on rendered guide');
+      near(point.forward,point.distance,point.color+' preview follows arrow');
+      near(point.distance,point.color==='red'?40:60,point.color+' independent prediction distance preserved');
+    }
+    run('hovAngle+=35; cruiseAngle-=27; renderDirectionLines();');
+    for(const point of run('forecastGeometry()')) {
+      near(point.cross,0,point.color+' preview follows guide rotation');
+      near(point.forward,point.color==='red'?40:60,point.color+' rotation preserves forward distance');
+    }
     assert(run('forecastCalls.slice(-2).every(call=>call.amount===2 && call.blade===2 && call.direction==="UP" && call.type==="LINK")'),'selected adjustment passed to existing predict');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'HOV and cruise forecast bodies');
     assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-body")).animationName')==='none','body never pulses');
@@ -691,7 +710,7 @@
     const fixedForecast=run('JSON.stringify(adjustmentForecast.points)');
     assert(run('adjustmentForecast.phase')==='fixed','adjustment submission freezes forecast');
     assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).animationName')==='none','confirmed glow stops pulsing');
-    run('learning.predict=()=>({position:{x:999,y:999}}); renderDots(); renderDots();');
+    run('learning.predict=()=>({distance:37,position:{x:999,y:999}}); renderDots(); renderDots();');
     assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'confirmed positions never recompute');
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.7'];
@@ -704,21 +723,39 @@
     assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).filter')==='none','comparison removes glow');
     run('openMemoPicker(0);');
     assert(!run('dotOverlay.querySelector(".forecast-body")'),'new incomplete adjustment clears previous forecast');
-    run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; updateAdjustmentForecast();`);
+    run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; renderDots(); updateAdjustmentForecast();`);
     const forecastPurple=run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color');
     assert(forecastPurple==='rgb(123, 44, 191)','TAB cruise preview is purple: '+forecastPurple);
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'TAB red without selected guide is hidden independently');
+    const purpleGeometry=run('forecastGeometry()[0]');
+    near(purpleGeometry.cross,0,'purple preview on rendered purple guide');
+    near(purpleGeometry.forward,37,'purple follows arrow with unchanged distance');
+    run('cruiseAngle+=19; renderDirectionLines();');
+    near(run('forecastGeometry()[0].cross'),0,'purple rotation updates preview');
     run('learning.predict=()=>null; updateAdjustmentForecast();');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'null prediction makes no phantom dot');
     assert(run('document.getElementById("forecastLearningNotice").textContent')==='HOV（赤）：予測学習中 ／ 巡航（紫）：予測学習中','missing colors identified in notice');
-    run('learning.predict=(type,color)=>color==="red"?{position:{x:450,y:520}}:null; renderDots();');
+    run('learning.predict=(type,color)=>color==="blue"?{distance:24,position:{x:450,y:520}}:null; renderDots();');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'available color keeps its forecast');
-    assert(run('document.getElementById("forecastLearningNotice").textContent')==='巡航（紫）：予測学習中','only missing color shows notice');
-    run('learning.predict=()=>({position:{x:450,y:520}}); renderDots();');
-    assert(run('document.getElementById("forecastLearningNotice").hidden && dotOverlay.querySelectorAll(".forecast-body").length===2'),'ready preview automatically replaces notice');
+    assert(run('document.getElementById("forecastLearningNotice").textContent')==='HOV（赤）：予測学習中','only missing color shows notice');
+    run('learning.predict=()=>({distance:24,position:{x:450,y:520}}); renderDots();');
+    assert(run('document.getElementById("forecastLearningNotice").hidden && dotOverlay.querySelectorAll(".forecast-body").length===1'),'ready preview automatically replaces notice for available guide');
+    run('currentChartPage=0; memoValues[1]="LINK"; renderDots(); updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===2'),'LINK restores independent red and blue guides');
+    run('learning.predict=(type,color)=>color==="red"?null:{distance:24}; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'missing red distance hides only red');
+    run('learning.predict=(type,color)=>color==="blue"?{distance:NaN}:{distance:12}; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'invalid blue distance hides only blue');
+    run('dotSets.at(-1).blue=null; renderDots();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'missing current blue dot hides only blue');
+    run('dotSets.at(-1).blue=testDot(397,640,"blue"); learning.predict=()=>({distance:24}); renderDots(); delete forecastGuides.red; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'missing selected red guide hides only red');
     run('currentChartPage=0; memoValues[1]="LINK"; learning.predict=()=>null; updateAdjustmentForecast();');
     assert(run('document.getElementById("forecastLearningNotice").textContent')==='HOV（赤）：予測学習中 ／ 巡航（青）：予測学習中','LINK identifies missing red and blue');
     assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().models).length===0'),'preview does not modify learning');
     run('learning.predict=originalForecastPredict; adjustmentForecast=null; memoValues.fill(""); renderDots();');
+    run('memoValues.splice(0,4,"1","LINK","1","UP"); updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===0'),'real predict with zero history creates no distance or dot');
     groups.push('予想ドット：選択値・リング点滅・確定固定・実測比較・次回置換・紫・学習不足・学習不変');
     run(`
       learning.reset([]); dotSets.splice(0); adjustmentForecast=null; currentChartPage=0;
@@ -733,6 +770,12 @@
     assert(run('learning.inspect().models["LINK:red"].sampleCount===1 && !learning.inspect().models["LINK:blue"]'),'UI confirms only clicked color');
     run('document.querySelectorAll(".historical-learning-row button")[1].click();');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'historical learning immediately enables pending red preview');
+    const learnedGeometry=run('forecastGeometry()[0]');
+    near(learnedGeometry.cross,0,'real learned forecast lies on selected guide');
+    near(learnedGeometry.forward,run('learning.predict("LINK","red",1,"UP",1,getDotCoordinates(dotSets.at(-1).red)).distance'),'real learned distance unchanged by display');
+    const learningBeforeDisplay=run('JSON.stringify(learning.inspect())');
+    run('hovAngle+=21; renderDirectionLines(); updateAdjustmentForecast();');
+    assert(run('JSON.stringify(learning.inspect())')===learningBeforeDisplay,'constrained display never feeds learning records');
     assert(run('JSON.stringify(dotSets)')===historicalSource,'UI preserves measurement and adjustment history');
     run(`
       adjustmentForecast=null; dotSets.splice(0);

@@ -121,6 +121,7 @@ let activeMemoIndex = null;
 let selectedMemoValue = '';
 const memoValues = ['', '', '', ''];
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
+let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 let selectedHour = 0;
 let selectedMinute = 0;
 
@@ -266,7 +267,15 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
         if (!target[color]) return [];
         const prediction = learning.predict(action.type, color, action.blade, action.direction, action.amount, getDotCoordinates(target[color]));
         if (!prediction) waiting.push(color);
-        return prediction ? [{ color, ...prediction.position }] : [];
+        const guide = forecastGuides[color];
+        const start = getDotCoordinates(target[color]);
+        if (!prediction || !Number.isFinite(prediction.distance) || prediction.distance < 0
+          || !guide || guide.type !== action.type || guide.targetId !== target.learningId
+          || ![start.x, start.y].every(Number.isFinite)) return [];
+        // 距離は既存学習の値を維持。表示位置だけを描画済みガイドの矢印方向へ拘束する。
+        const x = start.x + guide.unit.x * prediction.distance;
+        const y = start.y + guide.unit.y * prediction.distance;
+        return [x, y].every(Number.isFinite) ? [{ color, x, y }] : [];
       });
       adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
     }
@@ -1000,6 +1009,7 @@ function getLearnedGuideLines(finalSet) {
 }
 
 function renderDirectionLines() {
+  forecastGuides = {};
   let guideLayer = dotOverlay.querySelector('.direction-lines');
   if (!guideLayer) {
     guideLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1034,7 +1044,10 @@ function renderDirectionLines() {
     const selected = blueDots.sort((first, second) =>
       Number(second.line.centerDistance <= CENTER_DISTANCE_THRESHOLD) - Number(first.line.centerDistance <= CENTER_DISTANCE_THRESHOLD)
       || first.line.centerDistance - second.line.centerDistance)[0];
-    if (!selected) return;
+    if (!selected) {
+      if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
+      return;
+    }
     selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
   } else if (redDots.length) {
     // 学習不足・手動時は既存の移動距離予測を使い、同じ順位で選ぶ。
@@ -1068,6 +1081,7 @@ function renderDirectionLines() {
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
     if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
+    if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
     return;
   }
 
@@ -1090,7 +1104,16 @@ function renderDirectionLines() {
     directionLine.setAttribute('marker-end', `url(#${marker})`);
     directionLine.style.pointerEvents = 'none';
     guideLayer.append(directionLine);
+    const dx = line.end.x - start.x, dy = line.end.y - start.y;
+    const length = Math.hypot(dx, dy);
+    if (Number.isFinite(length) && length > 0) {
+      forecastGuides[marker === 'redDirectionLineArrow' ? 'red' : 'blue'] = {
+        targetId: finalSet.learningId, type: currentChartPage === 0 ? 'LINK' : 'TAB',
+        unit: { x: dx / length, y: dy / length }
+      };
+    }
   });
+  if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
 }
 
 const deleteConfirmation = document.getElementById('deleteConfirmation');
