@@ -266,15 +266,17 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
       const points = ['red', 'blue'].flatMap(color => {
         if (!target[color]) return [];
         const prediction = learning.predict(action.type, color, action.blade, action.direction, action.amount, getDotCoordinates(target[color]));
-        if (!prediction) waiting.push(color);
+        const estimate = BalanceDistancePrior.resolve(action, color, prediction,
+          prediction ? [] : learning.inspect().samples, CHART_RADIUS);
+        if (!estimate) waiting.push(color);
         const guide = forecastGuides[color];
         const start = getDotCoordinates(target[color]);
-        if (!prediction || !Number.isFinite(prediction.distance) || prediction.distance < 0
+        if (!estimate || !Number.isFinite(estimate.distance) || estimate.distance < 0
           || !guide || guide.type !== action.type || guide.targetId !== target.learningId
           || ![start.x, start.y].every(Number.isFinite)) return [];
-        // 距離は既存学習の値を維持。表示位置だけを描画済みガイドの矢印方向へ拘束する。
-        const x = start.x + guide.unit.x * prediction.distance;
-        const y = start.y + guide.unit.y * prediction.distance;
+        // 既存学習距離を優先し、未成立時だけ完全一致の表示用priorを使う。
+        const x = start.x + guide.unit.x * estimate.distance;
+        const y = start.y + guide.unit.y * estimate.distance;
         return [x, y].every(Number.isFinite) ? [{ color, x, y }] : [];
       });
       adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };

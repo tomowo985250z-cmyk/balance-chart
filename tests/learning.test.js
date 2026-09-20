@@ -35,6 +35,51 @@
     }
     near(BalanceLearning.wrap(1 - 359), 2, '359→1');
     near(BalanceLearning.wrap(359 - 1), -2, '1→359');
+    const priorAction = {type:'LINK',blade:1,direction:'UP',amount:0.5};
+    const prior = BalanceDistancePrior.lookup(priorAction,'red');
+    assert(BalanceDistancePrior.samples.length===29,'29 supplied distances only');
+    assert(BalanceDistancePrior.samples.filter(s=>s.color==='blue').length===11,'missing cruise is never invented');
+    near(prior.distance,(0.34561342317516075+0.2501912778027389)/2,'even-count median prior');
+    assert(prior.sampleCount===2 && prior.confidence==='low','small prior remains low confidence');
+    const scattered = BalanceDistancePrior.lookup({type:'TAB',blade:3,direction:'DOWN',amount:1},'red');
+    near(scattered.distance,0.0204094035228159,'three-sample prior uses median, not outlier mean');
+    assert(scattered.max/scattered.min>9 && scattered.confidence==='low','extreme spread retained with low confidence');
+    assert(BalanceDistancePrior.lookup({...priorAction,amount:2},'red').sampleCount===1,'single sample retained independently');
+    for(const [action,color] of [
+      [{...priorAction,amount:1},'red'],[{...priorAction,blade:2},'red'],
+      [priorAction,'blue'],[{...priorAction,type:'TAB'},'red'],
+      [{type:'LINK',blade:3,direction:'DOWN',amount:0.25},'red']]) {
+      assert(BalanceDistancePrior.resolve(action,color,null)===null,'no amount/No./color/type/direction extrapolation');
+    }
+    const priorStorage=memory(), priorEngine=BalanceLearning.create(options(priorStorage)), priorSets=startSets();
+    const priorDistance=()=>BalanceDistancePrior.resolve(priorAction,'red',
+      priorEngine.predict('LINK','red',1,'UP',0.5,{x:0,y:0}),priorEngine.inspect().samples);
+    near(priorDistance().distance,prior.distance*240,'zero-history prior converts IPS to chart units');
+    const stateBeforePrior=JSON.stringify(priorEngine.inspect());
+    priorDistance(); priorDistance();
+    assert(JSON.stringify(priorEngine.inspect())===stateBeforePrior,'prior resolution never writes learning');
+    addSample(priorEngine,priorSets,'LINK',vector(0.32*240,0),vector(12,0),'1/2');
+    const once=priorDistance();
+    assert(once.source==='prior-adjusted' && once.actualCount===1,'first confirmed real adjustment corrects prior');
+    near(once.distance,(prior.distance+0.6*(0.32-prior.distance))*240,'existing recent update rate reused');
+    addSample(priorEngine,priorSets,'LINK',vector(0.32*240,0),vector(12,0),'1/2');
+    const twice=priorDistance();
+    assert(twice.source==='learned','ready existing model takes precedence');
+    near(twice.distance,priorEngine.predict('LINK','red',1,'UP',0.5,{x:0,y:0}).distance,'learned distance used without extra smoothing');
+    assert(twice.distance/once.distance>=0.85 && twice.distance/once.distance<=1.3,'consistent measurements switch without abnormal jump');
+    const realSamples=priorEngine.inspect().samples.filter(s=>s.color==='red');
+    const sampleAt=distance=>({...realSamples[0],actualVector:{distance:distance*240}});
+    const recentLow=BalanceDistancePrior.resolve(priorAction,'red',null,[sampleAt(0.35),sampleAt(0.25)]).distance;
+    const recentHigh=BalanceDistancePrior.resolve(priorAction,'red',null,[sampleAt(0.25),sampleAt(0.35)]).distance;
+    assert(recentHigh>recentLow,'latest confirmed distance has stronger influence');
+    near(BalanceDistancePrior.resolve(priorAction,'red',null,[sampleAt(100)]).distance,prior.distance*240*1.3,'prior outlier increase capped');
+    near(BalanceDistancePrior.resolve(priorAction,'red',null,[sampleAt(0)]).distance,prior.distance*240*0.85,'prior outlier decrease capped');
+    near(BalanceDistancePrior.resolve(priorAction,'red',null,[{...sampleAt(100),amount:2}]).distance,prior.distance*240,'actual correction also requires exact amount');
+    near(BalanceDistancePrior.resolve(priorAction,'red',{distance:1000},realSamples).distance,1000,'even a large learned/prior difference never overrides existing distance');
+    const reloadedPriorEngine=BalanceLearning.create(options(priorStorage));
+    reloadedPriorEngine.sync(priorSets,rotations);
+    near(reloadedPriorEngine.predict('LINK','red',1,'UP',0.5,{x:0,y:0}).distance,twice.distance,'existing restore unchanged');
+    groups.push('distance prior：29実測・完全一致・中央値/ばらつき・低信頼・実測補正・既存距離優先・切替・混入なし');
     assert(BalanceLearning.adjustment(['1', 'LINK', '1/8', 'UP']).amount === 0.125, 'fraction amount');
     assert(BalanceLearning.adjustment(['1', 'TAB', '1/8', 'UP']) === null, 'separate units');
     assert(BalanceLearning.adjustment(['1', 'constructor', '1', 'UP']) === null, 'malformed adjustment type rejected');
@@ -732,7 +777,7 @@
     near(purpleGeometry.forward,37,'purple follows arrow with unchanged distance');
     run('cruiseAngle+=19; renderDirectionLines();');
     near(run('forecastGeometry()[0].cross'),0,'purple rotation updates preview');
-    run('learning.predict=()=>null; updateAdjustmentForecast();');
+    run('memoValues[2]="3"; learning.predict=()=>null; updateAdjustmentForecast();');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'null prediction makes no phantom dot');
     assert(run('document.getElementById("forecastLearningNotice").textContent')==='HOV（赤）：予測学習中 ／ 巡航（紫）：予測学習中','missing colors identified in notice');
     run('learning.predict=(type,color)=>color==="blue"?{distance:24,position:{x:450,y:520}}:null; renderDots();');
@@ -824,6 +869,42 @@
       numberRadii.push(rings[0].radius);
     }
     assert(numberRadii[0]<14 && numberRadii[0]<numberRadii[1] && numberRadii[1]<numberRadii[2],'ring shrinks for one digit and grows with digit count');
+    // 実際の選択UIと描画済みガイドを通す。予測関数のモックなし、学習履歴0件。
+    run(`
+      learning.reset([]); dotSets.splice(0); adjustmentForecast=null; selectedAdjustmentTarget=null;
+      dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
+      currentChartPage=0; pitchAutoMode=false; trimAutoMode=false; memoValues.fill(''); renderDots();
+      window.priorLearningBefore=JSON.stringify(learning.inspect());
+      window.priorGuideBefore=dotOverlay.querySelector('.direction-lines').outerHTML;
+      memoValues.splice(0,4,'2','LINK','1/4',''); openMemoPicker(3); selectedMemoValue='DOWN'; confirmMemoPicker.click();
+    `);
+    assert(run('adjustmentForecast.points.length===2'),'real UI zero-history exact prior shows red and blue');
+    for(const point of run('forecastGeometry()')) {
+      near(point.cross,0,point.color+' prior on selected guide');
+      near(point.forward,point.distance,point.color+' prior follows arrow');
+      near(point.distance,(point.color==='red'?0.16150416138089613:0.26078038535240095)*240,point.color+' exact prior distance maintained');
+    }
+    assert(run('dotOverlay.querySelector(".direction-lines").outerHTML===priorGuideBefore'),'prior preview never changes guide selection');
+    assert(run('JSON.stringify(learning.inspect())===priorLearningBefore'),'UI prior never changes learning state');
+    run('memoValues[2]="1/2"; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===0'),'UI unrecorded amount hides both without proportional scaling');
+    run('memoValues.splice(0,4,"1","LINK","1/2","UP"); updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'LINK red prior never supplies missing blue');
+    run('showChartPage(1); memoValues.splice(0,4,"3","TAB","1","DOWN"); updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'purple prior appears; TAB red prior has no guide and stays hidden');
+    near(run('forecastGeometry()[0].cross'),0,'purple prior lies on purple guide');
+    near(run('forecastGeometry()[0].forward'),0.25083464888497375*240,'purple median distance follows arrow');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color')==='rgb(123, 44, 191)','prior keeps purple display');
+    run('delete forecastGuides.blue; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===0'),'prior without corresponding guide is hidden');
+    run(`
+      currentChartPage=0; dotSets[0].adjustments=[['2','LINK','1/4','DOWN']];
+      dotSets.push({learningId:newLearningId(),red:testDot(540,520,'red'),blue:testDot(397,660,'blue'),adjustments:[]});
+      memoValues.splice(0,4,'2','LINK','1/4','DOWN'); renderDots(); updateAdjustmentForecast();
+    `);
+    assert(run('learning.inspect().samples.length===0'),'unmarked practice measurements stay excluded');
+    near(run('forecastGeometry()[0].distance'),0.16150416138089613*240,'practice cannot correct prior distance');
+    assert(run('JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),'prior and practice never persist as real samples');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

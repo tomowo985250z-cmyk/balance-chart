@@ -1,0 +1,66 @@
+/* 表示専用の初期実測距離（IPS）。方向・時計角・回転角はモデルへ渡さない。
+ * ユーザー提示A〜Dの単一調整18区間、HOV18件＋Cruise11件。
+ * 欠測Cruiseはnull。Dの複数調整区間および前後ペアなしの参考値は含めない。
+ * 行: ID, 種別, No., 方向, 調整量, HOV移動IPS, Cruise移動IPS。
+ */
+const BalanceDistancePrior = (() => {
+  const rows = [
+    ['A1', 'LINK', 1, 'UP', 0.5, 0.34561342317516075, null],
+    ['A2', 'LINK', 1, 'UP', 2, 1.0951602030712921, null],
+    ['A3', 'LINK', 1, 'DOWN', 0.5, 0.27568841840706326, null],
+    ['A4', 'TAB', 2, 'DOWN', 1, 0.06676843386951678, 0.15177001696073375],
+    ['A5', 'TAB', 2, 'DOWN', 2, 0.08604405839656547, 0.36000948835938007],
+    ['B1', 'TAB', 1, 'DOWN', 1, 0.08058884601441074, 0.22722382565438554],
+    ['B2', 'LINK', 2, 'DOWN', 0.25, 0.16150416138089613, 0.26078038535240095],
+    ['B3', 'TAB', 3, 'DOWN', 1, 0.12234562347359308, 0.25083464888497375],
+    ['B4', 'TAB', 3, 'DOWN', 1, 0.0204094035228159, 0.16443059545713223],
+    ['B5', 'TAB', 2, 'UP', 1, 0.06560478917717313, 0.17902211413636812],
+    ['C1', 'LINK', 3, 'UP', 0.25, 0.11281717958428707, null],
+    ['C2', 'LINK', 3, 'UP', 0.25, 0.22625309674212263, null],
+    ['C3', 'LINK', 2, 'UP', 0.25, 0.07809855326641321, null],
+    ['C4', 'TAB', 2, 'UP', 2, 0.13098836890207852, 0.45599741007704253],
+    ['C5', 'TAB', 1, 'UP', 2, 0.03128689300804617, 0.17027432495976993],
+    ['C6', 'TAB', 3, 'DOWN', 1, 0.013080625846028638, 0.3251084496729846],
+    ['D1', 'LINK', 1, 'UP', 0.5, 0.2501912778027389, null],
+    ['D2', 'TAB', 1, 'UP', 1, 0.08379588496740036, 0.26481583744022225]
+  ];
+  const samples = Object.freeze(rows.flatMap(([id, type, blade, direction, amount, red, blue]) =>
+    [['red', red], ['blue', blue]].filter(([, distance]) => distance !== null)
+      .map(([color, distance]) => Object.freeze({ id, type, blade, direction, amount, color, distance }))));
+  const keyFor = ({ type, blade, direction, amount }, color) => JSON.stringify([type, color, blade, direction, amount]);
+  const grouped = new Map();
+  for (const sample of samples) {
+    const key = keyFor(sample, sample.color);
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(sample.distance);
+  }
+  const models = new Map([...grouped].map(([key, values]) => {
+    const sorted = [...values].sort((a, b) => a - b), count = sorted.length;
+    const middle = Math.floor(count / 2);
+    const distance = count % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+    // 少数サンプルなので全条件を低信頼扱い。ばらつきは隠さず保持する。
+    return [key, Object.freeze({ distance, sampleCount: count, min: sorted[0], max: sorted.at(-1),
+      range: sorted.at(-1) - sorted[0], confidence: 'low' })];
+  }));
+  function lookup(action, color) {
+    return models.get(keyFor(action, color)) ?? null;
+  }
+  function resolve(action, color, prediction, confirmedSamples = [], radius = 240) {
+    if (Number.isFinite(prediction?.distance) && prediction.distance >= 0) {
+      return { distance: prediction.distance, source: 'learned' };
+    }
+    const prior = lookup(action, color);
+    if (!prior) return null; // 未収録条件の補間・比例換算・他No./色への流用はしない。
+    let distance = prior.distance * radius, actualCount = 0;
+    // learning.sync()で実調整確認済みとなった実測だけ。履歴順に直近を強く反映。
+    for (const sample of confirmedSamples) {
+      if (keyFor(sample, sample.color) !== keyFor(action, color)) continue;
+      const actual = sample.actualVector?.distance;
+      if (!Number.isFinite(actual) || actual < 0) continue;
+      distance *= BalanceLearning.distanceCorrection(distance, actual);
+      actualCount += 1;
+    }
+    return { distance, source: actualCount ? 'prior-adjusted' : 'prior', actualCount, prior };
+  }
+  return Object.freeze({ samples, lookup, resolve });
+})();

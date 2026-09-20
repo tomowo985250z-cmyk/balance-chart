@@ -10,6 +10,8 @@ const BalanceLearning = (() => {
   const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
   const wrap = angle => ((angle + 180) % 360 + 360) % 360 - 180;
   const copy = value => JSON.parse(JSON.stringify(value));
+  // 実測学習と表示専用distance priorで同じ更新率・補正上限を使用する。
+  const distanceCorrection = (predicted, actual) => clamp(1 + RATE * (clamp(actual / predicted, 0.5, 2) - 1), 0.85, 1.3);
 
   function adjustment(values) {
     if (!Array.isArray(values)) return null;
@@ -179,10 +181,9 @@ const BalanceLearning = (() => {
         model.angleCorrection = wrap(model.angleCorrection + clamp(error * angleRate, -13.5, 13.5));
       }
       const predictedDistance = model.baseDistance * amount * model.distanceCorrection;
-      const ratio = clamp(actual.distance / predictedDistance, 0.5, 2);
       // 古い初回距離の倍率上限に張り付かないよう、前回予測を次回の基準にする。
       model.baseDistance = predictedDistance / amount;
-      model.distanceCorrection = clamp(1 + RATE * (ratio - 1), 0.85, 1.3);
+      model.distanceCorrection = distanceCorrection(predictedDistance, actual.distance);
       model.sampleCount += 1;
       if (actual.distance >= shortMovement) model.angleSampleCount += 1;
       model.lastUpdated = sample.lastUpdated;
@@ -310,5 +311,5 @@ const BalanceLearning = (() => {
     };
   }
 
-  return { create, adjustment, wrap, amounts: AMOUNTS, storageKey: STORAGE_KEY };
+  return { create, adjustment, wrap, distanceCorrection, amounts: AMOUNTS, storageKey: STORAGE_KEY };
 })();
