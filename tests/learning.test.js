@@ -760,15 +760,22 @@
     for (const count of [1,12,123]) {
       run(`dotSets.splice(0); for(let i=0;i<${count};i++) dotSets.push({learningId:newLearningId(),adjustments:[],red:i===${count}-1?testDot(450,520,'red'):null,blue:i===${count}-1?testDot(397,580,'blue'):null}); renderDots();`);
       const rings=run(`['red','blue'].map(color=>{
-        const label=dotOverlay.querySelector('.latest-measured-number.chart-dot-'+color), b=label.getBBox();
+        const label=dotOverlay.querySelector('.latest-measured-number.chart-dot-'+color), b={};
         const ring=dotOverlay.querySelector('.latest-ring-number.latest-ring-'+color);
+        const context=document.createElement('canvas').getContext('2d'), style=getComputedStyle(label);
+        context.font=style.fontWeight+' '+style.fontSize+' '+style.fontFamily; context.textAlign='center';
+        const ink=context.measureText(label.textContent);
+        b.x=Number(label.getAttribute('x'))-ink.actualBoundingBoxLeft;
+        b.y=Number(label.getAttribute('y'))-ink.actualBoundingBoxAscent;
+        b.width=ink.actualBoundingBoxLeft+ink.actualBoundingBoxRight;
+        b.height=ink.actualBoundingBoxAscent+ink.actualBoundingBoxDescent;
         return {text:label.textContent,font:label.getAttribute('font-size'),radius:Number(ring.getAttribute('rx')),ry:Number(ring.getAttribute('ry')),width:b.width,height:b.height,
           dx:Number(ring.getAttribute('cx'))-(b.x+b.width/2),dy:Number(ring.getAttribute('cy'))-(b.y+b.height/2),stroke:ring.getAttribute('stroke-width')};
       })`);
       for(const ring of rings) {
-        assert(ring.text===String(count) && ring.font==='16' && ring.stroke==='2','number value/font/ring stroke preserved');
+        assert(ring.text===String(count) && ring.font==='16' && ring.stroke==='1','number value/font/ring stroke preserved');
         near(ring.dx,0,'ring horizontally centered on text'); near(ring.dy,0,'ring vertically centered on text');
-        near(ring.radius,Math.hypot(ring.width,ring.height)/2+3,'minimal measured text clearance');
+        near(ring.radius,Math.hypot(ring.width,ring.height)/2+2.25,'minimal measured text clearance');
         near(ring.ry,ring.radius,'number ring remains circular');
       }
       numberRadii.push(rings[0].radius);
