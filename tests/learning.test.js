@@ -734,6 +734,21 @@
     run('document.querySelectorAll(".historical-learning-row button")[1].click();');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'historical learning immediately enables pending red preview');
     assert(run('JSON.stringify(dotSets)')===historicalSource,'UI preserves measurement and adjustment history');
+    run(`
+      adjustmentForecast=null; dotSets.splice(0);
+      for(let i=0;i<3;i++) dotSets.push({learningId:newLearningId(),red:testDot(450+i*20,520,'red'),blue:i<2?testDot(397,560+i*20,'blue'):null,adjustments:[]});
+      currentChartPage=0; renderDots();
+    `);
+    assert(run('dotOverlay.querySelectorAll(".latest-measured-dot").length')===2,'only latest measurement of each color pulses');
+    near(run('Number(dotOverlay.querySelector(".latest-measured-dot.chart-dot-red").getAttribute("cx"))'),490,'latest red selected');
+    near(run('Number(dotOverlay.querySelector(".latest-measured-dot.chart-dot-blue").getAttribute("cy"))'),580,'latest available blue selected when final result lacks blue');
+    assert(run('[...dotOverlay.querySelectorAll("circle.chart-dot-red:not(.latest-measured-dot),circle.chart-dot-blue:not(.latest-measured-dot)")].every(n=>getComputedStyle(n).animationName==="none")'),'past dots do not pulse');
+    run('dotSets.push({learningId:newLearningId(),red:testDot(510,520,"red"),blue:testDot(397,610,"blue"),adjustments:[]}); renderDots();');
+    assert(run('dotOverlay.querySelectorAll(".latest-measured-dot").length===2 && Number(dotOverlay.querySelector(".latest-measured-dot.chart-dot-red").getAttribute("cx"))===510 && Number(dotOverlay.querySelector(".latest-measured-dot.chart-dot-blue").getAttribute("cy"))===610'),'new measurements replace both pulse targets');
+    assert(run('[...dotOverlay.querySelectorAll(".latest-measured-dot")].every(n=>n.getAttribute("r")==="4" && getComputedStyle(n).animationName===(matchMedia("(prefers-reduced-motion: reduce)").matches?"none":"latest-dot-pulse"))'),'dot size unchanged and reduced motion respected');
+    run('showChartPage(1);');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".latest-measured-dot.chart-dot-blue")).fill')==='rgb(123, 44, 191)','latest cruise remains purple on TAB');
+    groups.push('最新実測ドット：色別最新・過去非点滅・追加時移行・サイズ維持・紫・動き抑制');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

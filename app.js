@@ -1394,6 +1394,10 @@ function renderDots() {
     return { x, y };
   }
 
+  const latestDotIndex = {
+    red: dotSets.findLastIndex(set => Boolean(set.red)),
+    blue: dotSets.findLastIndex(set => Boolean(set.blue))
+  };
   dotSets.forEach((set, index) => {
     [set.red, set.blue].filter(Boolean).forEach((dot) => {
       const { x, y } = getDotCoordinates(dot);
@@ -1403,6 +1407,7 @@ function renderDots() {
       circle.setAttribute('r', '4');
       circle.setAttribute('fill', DOT_COLORS[dot.color]);
       circle.classList.add(`chart-dot-${dot.color}`);
+      if (index === latestDotIndex[dot.color]) circle.classList.add('latest-measured-dot');
       circle.setAttribute('stroke', '#ffffff');
       circle.setAttribute('stroke-width', '2');
       circle.style.pointerEvents = 'none';
