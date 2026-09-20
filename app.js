@@ -1369,11 +1369,11 @@ function renderDots() {
   renderDirectionLines();
   const labelBoxes = [];
 
-  function getLabelPosition(dotX, dotY) {
-    const labelWidth = 18;
-    const labelHeight = 20;
+  function getLabelPosition(dotX, dotY, latest = false) {
+    const labelWidth = latest ? 30 : 18;
+    const labelHeight = latest ? 30 : 20;
     const angles = [-45, 0, 45, 90, 135, 180, 225, 270];
-    for (let distance = 17; distance <= 101; distance += 14) {
+    for (let distance = latest ? 31 : 17; distance <= 101; distance += 14) {
       for (const degrees of angles) {
         const radians = degrees * Math.PI / 180;
         const x = dotX + Math.cos(radians) * distance;
@@ -1398,23 +1398,44 @@ function renderDots() {
     red: dotSets.findLastIndex(set => Boolean(set.red)),
     blue: dotSets.findLastIndex(set => Boolean(set.blue))
   };
+  const addLatestRing = (x, y, radius, color, kind) => {
+    const ring = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+    ring.setAttribute('cx', String(x));
+    ring.setAttribute('cy', String(y));
+    ring.setAttribute('rx', String(radius));
+    ring.setAttribute('ry', String(radius));
+    ring.setAttribute('class', `latest-ring latest-ring-${kind} latest-ring-${color}`);
+    ring.setAttribute('fill', 'none');
+    ring.setAttribute('stroke', color === 'white' ? '#ffffff' : DOT_COLORS[color]);
+    ring.setAttribute('stroke-width', '2');
+    dotOverlay.append(ring);
+  };
   dotSets.forEach((set, index) => {
     [set.red, set.blue].filter(Boolean).forEach((dot) => {
       const { x, y } = getDotCoordinates(dot);
+      const latest = index === latestDotIndex[dot.color];
+      if (latest) {
+        addLatestRing(x, y, 6, 'white', 'inner');
+        addLatestRing(x, y, 8, dot.color, 'outer');
+      }
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', String(x));
       circle.setAttribute('cy', String(y));
       circle.setAttribute('r', '4');
       circle.setAttribute('fill', DOT_COLORS[dot.color]);
       circle.classList.add(`chart-dot-${dot.color}`);
-      if (index === latestDotIndex[dot.color]) circle.classList.add('latest-measured-dot');
+      if (latest) circle.classList.add('latest-measured-dot');
       circle.setAttribute('stroke', '#ffffff');
       circle.setAttribute('stroke-width', '2');
       circle.style.pointerEvents = 'none';
       dotOverlay.append(circle);
 
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      const labelPosition = getLabelPosition(x, y);
+      const labelPosition = getLabelPosition(x, y, latest);
+      if (latest) {
+        addLatestRing(labelPosition.x, labelPosition.y - 5, 14, dot.color, 'number');
+        label.classList.add('latest-measured-number');
+      }
       label.setAttribute('x', String(labelPosition.x));
       label.setAttribute('y', String(labelPosition.y));
       label.setAttribute('text-anchor', 'middle');
