@@ -357,7 +357,7 @@ function renderAdjustmentForecast() {
     ring.setAttribute('r', '12');
     ring.setAttribute('class', 'forecast-glow');
     const body = document.createElementNS(ns, 'path');
-    body.setAttribute('d', 'M 0 -7 L 7 0 L 0 7 L -7 0 Z');
+    body.setAttribute('d', 'M -7 -7 L 7 7 M 7 -7 L -7 7');
     body.setAttribute('class', 'forecast-body');
     group.append(title, ring, body);
     layer.append(group);
