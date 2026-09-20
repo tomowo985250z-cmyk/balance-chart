@@ -58,8 +58,8 @@ function setGuidesVisible(visible) {
 guideToggle.addEventListener('click', () => {
   setGuidesVisible(guideToggle.getAttribute('aria-pressed') !== 'true');
 });
-setGuidesVisible(false);
-window.addEventListener('pageshow', () => setGuidesVisible(false));
+setGuidesVisible(true);
+window.addEventListener('pageshow', () => setGuidesVisible(true));
 const dotForm = document.getElementById('dotForm');
 const adjustmentForm = document.getElementById('adjustmentForm');
 const actualAdjustment = document.getElementById('actualAdjustment');
