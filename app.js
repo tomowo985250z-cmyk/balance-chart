@@ -349,7 +349,7 @@ function renderAdjustmentForecast() {
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
-    group.style.color = '#ffd400';
+    group.style.color = color === 'red' ? DOT_COLORS.red : adjustmentForecast.type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue;
     group.dataset.color = color;
     const title = document.createElementNS(ns, 'title');
     title.textContent = `${color === 'red' ? 'HOV' : '巡航'}予想位置`;
