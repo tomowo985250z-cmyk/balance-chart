@@ -62,12 +62,12 @@ const BalanceDistancePrior = (() => {
   function lookup(action, color) {
     return models.get(keyFor(action, color)) ?? null;
   }
-  function resolve(action, color, prediction, confirmedSamples = [], radius = 240) {
-    if (Number.isFinite(prediction?.distance) && prediction.distance >= 0) {
-      return { distance: prediction.distance, source: 'learned' };
-    }
+  function resolveExact(action, color, confirmedSamples, radius) {
     const prior = lookup(action, color);
     if (!prior) {
+      const measured = confirmedSamples.findLast(sample => keyFor(sample, sample.color) === keyFor(action, color)
+        && Number.isFinite(sample.actualVector?.distance) && sample.actualVector.distance >= 0);
+      if (measured) return { distance: measured.actualVector.distance, source: 'measured', sampleCount: 1 };
       // 参考値だけNo./方向を緩和。同色・同種別・同量の元実測のみを集計する。
       if (action.type === 'TAB' && color !== 'blue') return null;
       const values = samples.filter(sample => sample.type === action.type && sample.color === color
@@ -91,6 +91,29 @@ const BalanceDistancePrior = (() => {
       actualCount += 1;
     }
     return { distance, source: actualCount ? 'prior-adjusted' : 'prior', actualCount, prior };
+  }
+  function resolve(action, color, prediction, confirmedSamples = [], radius = 240) {
+    if (Number.isFinite(prediction?.distance) && prediction.distance >= 0) {
+      return { distance: prediction.distance, source: 'learned' };
+    }
+    const exact = resolveExact(action, color, confirmedSamples, radius);
+    if (exact) return exact;
+    const amounts = new Set(samples.filter(sample => sample.type === action.type && sample.color === color)
+      .map(sample => sample.amount));
+    for (const sample of confirmedSamples) {
+      if (sample.type === action.type && sample.color === color && Number.isFinite(sample.amount) && sample.amount > 0) {
+        amounts.add(sample.amount);
+      }
+    }
+    const nearest = [...amounts].filter(amount => amount !== action.amount)
+      .map(amount => ({ amount, estimate: resolveExact({ ...action, amount }, color, confirmedSamples, radius) }))
+      .filter(candidate => candidate.estimate)
+      .sort((first, second) => Math.abs(first.amount - action.amount) - Math.abs(second.amount - action.amount)
+        || first.amount - second.amount)[0];
+    if (!nearest) return null;
+    return { ...nearest.estimate, distance: nearest.estimate.distance * action.amount / nearest.amount,
+      source: 'proportional-estimate', baseSource: nearest.estimate.source,
+      baseAmount: nearest.amount, ratio: action.amount / nearest.amount };
   }
   return Object.freeze({ samples, lookup, resolve });
 })();

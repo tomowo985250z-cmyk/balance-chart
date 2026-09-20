@@ -98,13 +98,31 @@
       near(BalanceDistancePrior.resolve(action,color,{distance:17}).distance,17,'learned overrides reference');
     }
     assert(BalanceDistancePrior.resolve(priorAction,'red',null).source==='prior','exact prior overrides pooled reference');
+    const scaledHalf=BalanceDistancePrior.resolve({...priorAction,amount:1},'red',null);
+    assert(scaledHalf.source==='proportional-estimate' && scaledHalf.baseAmount===0.5 && scaledHalf.ratio===2,'nearest lower amount scales upward');
+    near(scaledHalf.distance,prior.distance*240*2,'lower amount distance scales by target/base');
+    const amountTwo=BalanceDistancePrior.lookup({...priorAction,amount:2},'red');
+    const scaledAbove=BalanceDistancePrior.resolve({...priorAction,amount:3},'red',null);
+    assert(scaledAbove.source==='proportional-estimate' && scaledAbove.baseAmount===2 && scaledAbove.ratio===1.5,'nearest upper amount scales upward');
+    near(scaledAbove.distance,amountTwo.distance*240*1.5,'nearest amount wins over farther amount');
+    const scaledBlue=BalanceDistancePrior.resolve({type:'LINK',blade:2,direction:'DOWN',amount:0.5},'blue',null);
+    near(scaledBlue.distance,0.26078038535240095*240*2,'blue scales only from blue Cruise measurement');
+    const scaledPurple=BalanceDistancePrior.resolve({type:'TAB',blade:2,direction:'DOWN',amount:3},'blue',null);
+    near(scaledPurple.distance,0.36000948835938007*240*1.5,'purple scales only from TAB Cruise measurement');
+    const confirmedBase={type:'TAB',color:'blue',blade:3,direction:'UP',amount:2,actualVector:{distance:80}};
+    const confirmedState=JSON.stringify([confirmedBase]);
+    const scaledConfirmed=BalanceDistancePrior.resolve({type:'TAB',blade:3,direction:'UP',amount:3},'blue',null,[confirmedBase]);
+    assert(scaledConfirmed.source==='proportional-estimate' && scaledConfirmed.baseSource==='measured','confirmed measurement can be proportional display base');
+    near(scaledConfirmed.distance,120,'confirmed amount scales without saving or training');
+    const exactConfirmed=BalanceDistancePrior.resolve({type:'TAB',blade:3,direction:'UP',amount:3},'blue',null,
+      [confirmedBase,{...confirmedBase,amount:3,actualVector:{distance:90}}]);
+    assert(exactConfirmed.source==='measured','new same-amount measurement replaces proportional estimate');
+    near(exactConfirmed.distance,90,'same-amount measurement has priority');
+    assert(JSON.stringify([confirmedBase])===confirmedState,'proportional resolution never mutates confirmed learning data');
     for(const [action,color] of [
-      [{type:'LINK',blade:3,direction:'DOWN',amount:2},'red'],
       [{type:'LINK',blade:1,direction:'DOWN',amount:0.25},'blue'],
-      [{type:'LINK',blade:3,direction:'DOWN',amount:1},'red'],
-      [{type:'TAB',blade:3,direction:'UP',amount:0.25},'blue'],
       [{type:'TAB',blade:3,direction:'UP',amount:1},'red']]) {
-      assert(BalanceDistancePrior.resolve(action,color,null)===null,'singleton/missing amount/TAB HOV cannot supply reference');
+      assert(BalanceDistancePrior.resolve(action,color,null)===null,'different direction or TAB HOV cannot supply proportional reference');
     }
     const referenceEngine=BalanceLearning.create(options(memory())), referenceSets=startSets();
     const referenceAction=referenceCases[0][0];
@@ -1072,7 +1090,7 @@
       run('setGuidesVisible(false);');
       assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' fixed forecasts also obey OFF');
       run('setGuidesVisible(true); learning.predict=visibilityPredict; memoValues[2]="3"; updateAdjustmentForecast();');
-      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' ON without learned distance or exact prior stays hidden');
+      assert(run('adjustmentForecast.points.length>0 && adjustmentForecast.points.every(point=>point.source==="proportional-estimate")'),type+' ON uses nearest amount only as proportional display');
       assert(run('JSON.stringify(learning.inspect())===visibilityLearning'),type+' visibility and projection never change learning');
       run('memoValues[2]=currentChartPage===0?"1/4":"1"; updateAdjustmentForecast();');
       run('dotSets.push({learningId:newLearningId(),red:testDot(480,530,"red"),blue:testDot(410,610,"blue"),adjustments:[]}); selectedAdjustmentTarget=dotSets[0]; renderDots(); updateAdjustmentForecast();');
@@ -1122,8 +1140,9 @@
     assert(run('Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]"))'),'Cruise LINK ON restores valid distance');
     run('memoValues[0]="3"; updateAdjustmentForecast();');
     assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]") && adjustmentForecast.points[0].source==="reference-estimate" && adjustmentForecast.points[0].color==="red"'),'Cruise n=1 stays hidden while independent HOV reference remains');
-    run('memoValues[2]="1/2"; updateAdjustmentForecast();');
-    assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'),'Cruise never scales quarter-flat prior to half-flat');
+    run('memoValues[0]="2"; memoValues[2]="1/2"; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.find(p=>p.color==="blue").source')==='proportional-estimate','Cruise scales nearest quarter-flat prior to half-flat');
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),cruiseLinkPrior.distance*2,'Cruise proportional distance doubles with amount',1e-4);
     run(`
       adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
       currentChartPage=0; pitchAutoMode=false; trimAutoMode=false;
