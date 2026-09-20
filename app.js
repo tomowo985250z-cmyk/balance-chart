@@ -7,7 +7,7 @@ let rotationHandles = [];
 const CHART_CENTER_X = 397;
 const CHART_CENTER_Y = 520;
 const CHART_RADIUS = 240;
-const CENTER_DISTANCE_THRESHOLD = 0.2;
+const CENTER_DISTANCE_THRESHOLD = 0.15;
 const chartObject = document.querySelector('object[type="image/svg+xml"]');
 const chartWrap = document.querySelector('.chart-wrap');
 const chartTitle = document.getElementById('chartTitle');
@@ -942,7 +942,7 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
 
 function selectLinkGuideCandidate(candidates) {
   const epsilon = 1e-9;
-  // 予測HOVを0.20以内に保てる候補があれば、その制約を後段で覆さない。
+  // 予測HOVを0.15以内に保てる候補があれば、その制約を後段で覆さない。
   const hovSafe = candidates.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD + epsilon);
   let pool = hovSafe.length ? hovSafe : candidates;
   const paired = pool.filter(candidate => candidate.predictions.length === 2);

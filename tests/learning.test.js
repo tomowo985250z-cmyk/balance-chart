@@ -622,35 +622,35 @@
     `);
     const pickPair=(specs,starts)=>run(`testPairSelection(${JSON.stringify(specs)},${JSON.stringify(starts??[1,1])})`);
     const pair=(red,blue,end)=>({red,blue,end});
-    const toward=[0,0], away=[2,0], pairTangent=[0.04,Math.sqrt(0.0384)];
-    assert(pickPair([pair(toward,toward,[0.01,0.21]),pair(toward,toward,[0.19,0.19])]).blade===2,'both endpoints inside beats HOV-only convergence');
-    assert(pickPair([pair(toward,toward,[0.1,0.19]),pair(toward,toward,[0.15,0.15])]).blade===2,'both inside minimize maximum');
-    assert(pickPair([pair(toward,toward,[0.15,0.19]),pair(toward,toward,[0.1,0.19])]).blade===2,'both inside equal maximum minimizes sum');
-    assert(pickPair([pair(toward,toward,[0.19,0.4]),pair(toward,toward,[0.21,0.01])],[0.19,0.5]).blade===1,'never sacrifice HOV constraint to improve cruise');
-    assert(pickPair([pair(toward,toward,[0.2,0.2]),pair(toward,toward,[0.21,0.01])]).blade===1,'exact 0.20 endpoint is eligible');
+    const toward=[0,0], away=[2,0], pairTangent=[0.04,0.15*0.96/Math.sqrt(1-0.15**2)];
+    assert(pickPair([pair(toward,toward,[0.01,0.16]),pair(toward,toward,[0.14,0.14])]).blade===2,'both endpoints inside beats HOV-only convergence');
+    assert(pickPair([pair(toward,toward,[0.1,0.14]),pair(toward,toward,[0.12,0.12])]).blade===2,'both inside minimize maximum');
+    assert(pickPair([pair(toward,toward,[0.12,0.14]),pair(toward,toward,[0.1,0.14])]).blade===2,'both inside equal maximum minimizes sum');
+    assert(pickPair([pair(toward,toward,[0.14,0.4]),pair(toward,toward,[0.16,0.01])],[0.14,0.5]).blade===1,'never sacrifice HOV constraint to improve cruise');
+    assert(pickPair([pair(toward,toward,[0.15,0.15]),pair(toward,toward,[0.16,0.01])]).blade===1,'exact 0.15 endpoint is eligible');
     assert(run(`selectLinkGuideCandidate([
       {blade:2,direction:'DOWN',amount:1,hovPathDistance:0,cruisePathDistance:0.3,predictions:[{predictedDistance:0.1},{predictedDistance:0.15}],maxCenterDistance:0.15,distance:0.25},
-      {blade:3,direction:'UP',amount:1,hovPathDistance:0.15,cruisePathDistance:0.2,predictions:[{predictedDistance:0.15},{predictedDistance:0.18}],maxCenterDistance:0.18,distance:0.33}
+      {blade:3,direction:'UP',amount:1,hovPathDistance:0.15,cruisePathDistance:0.15,predictions:[{predictedDistance:0.15},{predictedDistance:0.18}],maxCenterDistance:0.18,distance:0.33}
     ]).blade`)===3,'No.3 UP joint passage beats No.2 DOWN single passage within HOV constraint');
-    assert(pickPair([pair(toward,away,[0.01,0.01]),pair(pairTangent,pairTangent,[0.15,0.5])]).blade===2,'both forward paths pass before endpoint score or closer HOV');
+    assert(pickPair([pair(toward,away,[0.01,0.01]),pair(pairTangent,pairTangent,[0.12,0.5])]).blade===2,'both forward paths pass before endpoint score or closer HOV');
     assert(pickPair([pair(toward,toward,[0.1,0.5]),pair(toward,toward,[0.3,0.3])]).blade===1,'HOV inside limit beats smaller maximum with HOV outside');
-    assert(pickPair([pair(toward,toward,[0.2,0.3]),pair(toward,toward,[0.1,0.3])]).blade===2,'equal maximum minimizes sum');
+    assert(pickPair([pair(toward,toward,[0.15,0.3]),pair(toward,toward,[0.1,0.3])]).blade===2,'equal maximum minimizes sum');
     assert(pickPair([pair(pairTangent,away,[0.3,0.3]),pair(toward,away,[0.5,0.6])]).blade===2,'no joint passage prioritizes closest HOV over endpoints');
     assert(pickPair([pair(toward,away,[0.5,0.6]),pair(toward,away,[0.4,0.4])]).blade===2,'equal HOV approach uses predicted maximum');
     assert(pickPair([pair(toward,away,[0.4,0.6]),pair(toward,away,[0.3,0.6])]).blade===2,'equal HOV approach and maximum uses sum');
     const exact=pickPair([pair(pairTangent,pairTangent,[0.3,0.3])]);
-    near(exact.paths[0][0],0.2,'HOV exact pairTangent'); near(exact.paths[0][1],0.2,'cruise exact pairTangent');
-    assert(pickPair([pair(toward,away,[0.01,0.01]),pair(toward,pairTangent,[0.15,0.6])]).blade===2,'reverse-only cruise crossing excluded, exact pairTangent accepted');
-    assert(pickPair([pair(away,toward,[0.01,0.01]),pair(pairTangent,toward,[0.15,0.6])]).blade===2,'reverse-only HOV crossing excluded');
-    assert(pickPair([pair(toward,toward,[0.01,0.21]),pair(away,away,[0.15,0.16])],[0.2,0.2]).blade===2,'inside threshold both improvement outranks one-sided improvement');
-    assert(pickPair([pair(away,away,[0.1,0.15]),pair(toward,toward,[0.12,0.12])],[0.2,0.2]).blade===2,'both improving minimize maximum');
-    assert(pickPair([pair(away,away,[0.1,0.15]),pair(toward,toward,[0.08,0.15])],[0.2,0.2]).blade===2,'both improving equal maximum minimize sum');
-    assert(pickPair([pair(away,away,[0.25,0.22]),pair(toward,toward,[0.23,0.23])],[0.2,0.2]).blade===2,'inside without joint improvement uses normal rule; outward ray starting at boundary valid');
-    assert(pickPair([pair(toward,toward,[0.2,0.3]),pair(toward,toward,[0.1,0.3000000001])]).blade===2,'epsilon-equivalent maximum uses sum');
-    assert(pickPair([pair(away,away,[0.21,0.22]),pair(toward,toward,[0.23,0.23])],[0.2,0.2]).blade===1,'outward rays touching at start remain eligible');
+    near(exact.paths[0][0],0.15,'HOV exact pairTangent'); near(exact.paths[0][1],0.15,'cruise exact pairTangent');
+    assert(pickPair([pair(toward,away,[0.01,0.01]),pair(toward,pairTangent,[0.12,0.6])]).blade===2,'reverse-only cruise crossing excluded, exact pairTangent accepted');
+    assert(pickPair([pair(away,toward,[0.01,0.01]),pair(pairTangent,toward,[0.12,0.6])]).blade===2,'reverse-only HOV crossing excluded');
+    assert(pickPair([pair(toward,toward,[0.01,0.16]),pair(away,away,[0.12,0.13])],[0.15,0.15]).blade===2,'inside threshold both improvement outranks one-sided improvement');
+    assert(pickPair([pair(away,away,[0.08,0.12]),pair(toward,toward,[0.1,0.1])],[0.15,0.15]).blade===2,'both improving minimize maximum');
+    assert(pickPair([pair(away,away,[0.08,0.12]),pair(toward,toward,[0.06,0.12])],[0.15,0.15]).blade===2,'both improving equal maximum minimize sum');
+    assert(pickPair([pair(away,away,[0.2,0.17]),pair(toward,toward,[0.18,0.18])],[0.15,0.15]).blade===2,'inside without joint improvement uses normal rule; outward ray starting at boundary valid');
+    assert(pickPair([pair(toward,toward,[0.15,0.3]),pair(toward,toward,[0.1,0.3000000001])]).blade===2,'epsilon-equivalent maximum uses sum');
+    assert(pickPair([pair(away,away,[0.16,0.17]),pair(toward,toward,[0.18,0.18])],[0.15,0.15]).blade===1,'outward rays touching at start remain eligible');
     for (const [specs,starts,expected] of [
-      [[pair(toward,away,[0.01,0.01]),pair(pairTangent,pairTangent,[0.15,0.5])],[1,1],2],
-      [[pair(toward,toward,[0.01,0.21]),pair(away,away,[0.15,0.16])],[0.2,0.2],2],
+      [[pair(toward,away,[0.01,0.01]),pair(pairTangent,pairTangent,[0.12,0.5])],[1,1],2],
+      [[pair(toward,toward,[0.01,0.16]),pair(away,away,[0.12,0.13])],[0.15,0.15],2],
       [[pair(pairTangent,away,[0.3,0.3]),pair(toward,away,[0.5,0.6])],[1,1],2]
     ]) {
       assert(run(`testPairSelection(${JSON.stringify(specs)},${JSON.stringify(starts)},true).blade`)===expected,'fallback renderer uses the same pair priority');
@@ -680,15 +680,15 @@
     assert(run('testPathSelection([{end:[0.5,0],blue:1.3}]).candidates[0].passes'),'ray crossing beyond predicted arrow endpoint counts');
     assert(run('testPathSelection([{end:[0.5,0.05],blue:0.01},{end:[0.5,0],blue:1.3}]).blade')===2,'closest HOV path wins among crossing candidates');
     assert(run('testPathSelection([{end:[0.5,0.4],blue:1.3},{end:[1,0.5],blue:0.01}]).blade')===1,'no crossing chooses closest forward path');
-    const tangent=run('testPathSelection([{end:[0.04,Math.sqrt(0.0384)],blue:0.5}])');
-    near(tangent.candidates[0].distance,0.20,'exact tangent distance');
-    assert(tangent.candidates[0].passes,'exact 0.20 tangent counts as crossing');
-    assert(!run('testPathSelection([{end:[0.04,0.21],blue:0.5}]).candidates[0].passes'),'path outside 0.20 is rejected');
-    assert(run('testPathSelection([{end:[0.19,0],blue:0.3},{end:[0.18,0],blue:0.1}]).blade')===2,'equal paths use HOV predicted endpoint tie-break');
+    const tangent=run('testPathSelection([{end:[0.04,0.15*0.96/Math.sqrt(1-0.15**2)],blue:0.5}])');
+    near(tangent.candidates[0].distance,0.15,'exact tangent distance');
+    assert(tangent.candidates[0].passes,'exact 0.15 tangent counts as crossing');
+    assert(!run('testPathSelection([{end:[0.04,0.16],blue:0.5}]).candidates[0].passes'),'path outside 0.15 is rejected');
+    assert(run('testPathSelection([{end:[0.14,0],blue:0.3},{end:[0.13,0],blue:0.1}]).blade')===2,'equal paths use HOV predicted endpoint tie-break');
     assert(!run('testPathSelection([{end:[1,0],blue:0.1}]).candidates[0].passes'),'zero-length direction stays at starting point');
     groups.push('HOV有向経路：通過優先・逆方向除外・接近性能・非通過時・接線境界');
     const pathAt = (distance, blue) => ({end:[distance*distance, distance*Math.sqrt(1-distance*distance)],blue});
-    assert(run(`testPathSelection(${JSON.stringify([pathAt(0.18,0.01),pathAt(0.05,1.3)])}).blade`)===1,'HOV 0.18 within limit preserves both endpoints inside');
+    assert(run(`testPathSelection(${JSON.stringify([pathAt(0.14,0.01),pathAt(0.05,1.3)])}).blade`)===1,'HOV 0.14 within limit preserves both endpoints inside');
     assert(run(`testPathSelection(${JSON.stringify([pathAt(0.05,0.01),pathAt(0.01,1.3)])}).blade`)===1,'HOV 0.05 within limit prefers cruise convergence');
     assert(run(`testPathSelection(${JSON.stringify([pathAt(0.01,0.01),pathAt(0,1.3)])}).blade`)===1,'HOV zero alone cannot override joint endpoint convergence');
     near(run('testPathSelection([{end:[0,0],blue:1.3}]).candidates[0].distance'),0,'direct crossing reports zero');
