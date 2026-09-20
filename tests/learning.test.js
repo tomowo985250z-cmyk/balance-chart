@@ -362,6 +362,20 @@
     await loaded;
     const run = code => frame.contentWindow.eval(code);
     assert(run('typeof renderDots') === 'function', 'app script loads');
+    assert(run('pitchAutoMode && trimAutoMode && pitchModeToggle.getAttribute("aria-pressed")==="true" && trimModeToggle.getAttribute("aria-pressed")==="true"'),'all hexagons start in AUTO');
+    near(run('hovAngle'),0,'no-history HOV starts at existing default');
+    near(run('cruiseAngle'),0,'no-history Cruise starts at existing default');
+    run('showChartPage(1);');
+    near(run('cruiseAngle'),0,'no-history TAB starts at existing default');
+    run('localStorage.setItem(ROTATION_STORAGE_KEY,JSON.stringify({pages:[{hovAngle:23,cruiseAngle:-41},{hovAngle:0,cruiseAngle:67}]}));');
+    const noHistoryReload=new Promise(resolve=>{frame.onload=resolve;});
+    frame.contentWindow.location.reload(); await noHistoryReload;
+    assert(run('pitchAutoMode && trimAutoMode && !pitchAutoReady.red && !pitchAutoReady.blue && !trimAutoReady'),'no learning retains AUTO waiting state');
+    near(run('hovAngle'),23,'no-learning HOV preserves existing saved initial rotation');
+    near(run('cruiseAngle'),-41,'no-learning Cruise preserves saved initial rotation');
+    run('showChartPage(1);');
+    near(run('cruiseAngle'),67,'no-learning TAB preserves saved initial rotation rather than zero');
+    run('showChartPage(0); pitchModeToggle.click(); trimModeToggle.click();');
     run(`
       window.testErrors = [];
       window.addEventListener('error', event => testErrors.push(event.message));
@@ -412,8 +426,10 @@
     await reloaded;
     assert(run('JSON.stringify(learning.inspect().models)') === savedModel, 'real localStorage reload');
     assert(run('getDotCount()') === 8, 'measurements survive reload');
-    run('pitchModeToggle.click();');
-    assert(run('guidePredictionDebug.fallback') === false, 'learned guides after reload');
+    assert(run('pitchAutoMode && trimAutoMode'),'reload starts AUTO without clicking');
+    near(run('hovAngle'),run('getLearnedRotation("LINK","red")'),'startup HOV uses latest corrected learned rotation');
+    near(run('cruiseAngle'),run('getLearnedRotation("LINK","blue")'),'startup Cruise uses independent corrected learned rotation');
+    assert(run('guidePredictionDebug.fallback') === false, 'learned guides after reload: '+run('JSON.stringify(guidePredictionDebug)'));
     run(`
       pitchModeToggle.click();
       window.dispatchEvent(new MessageEvent('message', {source:chartObject.contentWindow,
@@ -446,7 +462,7 @@
           adjustments:i<6 ? [['1',i<3?'LINK':'TAB','1','UP']] : []});
         learning.acceptMeasurement(dotSets,dotSets.at(-1).learningId);
       }
-      saveDotSets(); renderDots(); showChartPage(1); trimModeToggle.click();
+      saveDotSets(); renderDots(); showChartPage(1);
     `);
     assert(run('guidePredictionDebug.fallback') === false, 'learned trim candidates');
     assert(run('guidePredictionDebug.candidates.length') === 18, 'TAB amount candidates');
@@ -454,6 +470,17 @@
     assert(run('guidePredictionDebug.selected.predictions[0].model.startsWith("TAB:blue")'), 'trim uses independent TAB/cruise model');
     assert(run('getLearnedGuideLines(dotSets.at(-1)).every(g=>g.blade===guidePredictionDebug.selected.blade && g.direction===guidePredictionDebug.selected.direction)'),'learned guides retain selected No. and UP/DOWN');
     near(run('cruiseAngle'), run('getLearnedRotation("TAB","blue")'), 'purple hexagon follows learned rotation');
+    const startupFrame=document.createElement('iframe');
+    const startupLoaded=new Promise(resolve=>{startupFrame.onload=resolve;});
+    startupFrame.src='../index.html'; document.body.append(startupFrame); await startupLoaded;
+    const startup=code=>startupFrame.contentWindow.eval(code);
+    assert(startup('pitchAutoMode && trimAutoMode && pitchAutoReady.red && pitchAutoReady.blue && trimAutoReady'),'all three learned channels initialize in AUTO');
+    near(startup('hovAngle'),startup('getLearnedRotation("LINK","red")'),'fresh startup restores corrected red model');
+    near(startup('cruiseAngle'),startup('getLearnedRotation("LINK","blue")'),'fresh startup restores corrected blue model');
+    near(startup('autoTrimCruiseAngle'),startup('getLearnedRotation("TAB","blue")'),'purple learned rotation prepared before page selection');
+    startup('showChartPage(1);');
+    near(startup('cruiseAngle'),startup('getLearnedRotation("TAB","blue")'),'TAB page uses its independent corrected startup rotation');
+    startupFrame.remove();
     run('updateAdjustmentForecast(["1","TAB","2","UP"]);');
     assert(run('adjustmentForecast.points.every(point=>{const start=getDotCoordinates(dotSets.at(-1)[point.color]);const expected=learning.predict("TAB",point.color,1,"UP",2,start);return expected && point.color==="blue" && Math.abs(Math.hypot(point.x-start.x,point.y-start.y)-expected.distance)<1e-8;}) && adjustmentForecast.points.length===1'),'purple forecast uses real independent learned distance; no TAB red guide');
     run('adjustmentForecast=null; renderAdjustmentForecast();');

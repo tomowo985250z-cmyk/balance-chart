@@ -19,11 +19,11 @@ const dotOverlay = document.getElementById('dotOverlay');
 const rotationLock = document.getElementById('rotationLock');
 const trimModeToggle = document.getElementById('trimModeToggle');
 const pitchModeToggle = document.getElementById('pitchModeToggle');
-let pitchAutoMode = false;
+let pitchAutoMode = true;
 const pitchAutoReady = { red: false, blue: false };
 const manualPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
 const autoPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
-let trimAutoMode = false;
+let trimAutoMode = true;
 let trimAutoReady = false;
 let manualTrimCruiseAngle = 0;
 let autoTrimCruiseAngle = 0;
@@ -391,6 +391,8 @@ function saveRotation() {
 loadRotation();
 Object.assign(manualPitchAngles, pageRotations[0]);
 manualTrimCruiseAngle = pageRotations[1].cruiseAngle;
+Object.assign(autoPitchAngles, manualPitchAngles);
+autoTrimCruiseAngle = manualTrimCruiseAngle;
 
 function updatePitchModeUI() {
   pitchModeToggle.hidden = currentChartPage !== 0;
@@ -589,6 +591,7 @@ rotationLock.addEventListener('input', updateRotationLock);
 rotationLock.checked = true;
 updateRotationLock();
 updatePitchModeUI();
+updateTrimModeUI();
 
 function getStoredDot(dot, color) {
   if (!dot || dot.color !== color || !Number.isFinite(dot.angle) || !Number.isFinite(dot.radius)
@@ -713,8 +716,10 @@ function applyChartRotation(redAngle, blueAngle) {
   cruiseAngle = blueAngle;
   const svgDocument = chartObject.contentDocument;
   if (svgDocument) {
-    setGroupRotation(svgDocument.getElementById('hovGroup'), redAngle);
-    setGroupRotation(svgDocument.getElementById('cruiseGroup'), blueAngle);
+    const hovGroup = svgDocument.getElementById('hovGroup');
+    const cruiseGroup = svgDocument.getElementById('cruiseGroup');
+    if (hovGroup) setGroupRotation(hovGroup, redAngle);
+    if (cruiseGroup) setGroupRotation(cruiseGroup, blueAngle);
   }
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page: currentChartPage }, '*');
 }
