@@ -37,8 +37,8 @@
     near(BalanceLearning.wrap(359 - 1), -2, '1→359');
     const priorAction = {type:'LINK',blade:1,direction:'UP',amount:0.5};
     const prior = BalanceDistancePrior.lookup(priorAction,'red');
-    assert(BalanceDistancePrior.samples.length===29,'29 supplied distances only');
-    assert(BalanceDistancePrior.samples.filter(s=>s.color==='blue').length===11,'missing cruise is never invented');
+    assert(BalanceDistancePrior.samples.filter(s=>s.source!=='verified-chart').length===29,'original 29 distances preserved');
+    assert(BalanceDistancePrior.samples.filter(s=>s.color==='blue').length===13,'11 original plus 2 verified Cruise measurements');
     near(prior.distance,(0.34561342317516075+0.2501912778027389)/2,'even-count median prior');
     assert(prior.sampleCount===2 && prior.confidence==='low','small prior remains low confidence');
     const scattered = BalanceDistancePrior.lookup({type:'TAB',blade:3,direction:'DOWN',amount:1},'red');
@@ -100,7 +100,7 @@
     assert(BalanceDistancePrior.resolve(priorAction,'red',null).source==='prior','exact prior overrides pooled reference');
     for(const [action,color] of [
       [{type:'LINK',blade:3,direction:'DOWN',amount:2},'red'],
-      [{type:'LINK',blade:3,direction:'UP',amount:0.25},'blue'],
+      [{type:'LINK',blade:1,direction:'DOWN',amount:0.25},'blue'],
       [{type:'LINK',blade:3,direction:'DOWN',amount:1},'red'],
       [{type:'TAB',blade:3,direction:'UP',amount:0.25},'blue'],
       [{type:'TAB',blade:3,direction:'UP',amount:1},'red']]) {
@@ -118,7 +118,7 @@
     groups.push('参考距離：No./方向のみ緩和・n>=2・中央値・単位・色/種別/量分離・上位優先');
     // blueはCruise。TABでは紫表示になるが、red（HOV）へ読み替えない。
     const cruisePopulation=BalanceDistancePrior.samples.filter(s=>s.color==='blue');
-    assert(cruisePopulation.length===11 && cruisePopulation.filter(s=>s.type==='LINK').length===1,'Cruise population contains 1 LINK and 10 TAB real distances');
+    assert(cruisePopulation.length===13 && cruisePopulation.filter(s=>s.type==='LINK').length===3,'Cruise population contains 3 LINK and unchanged 10 TAB real distances');
     for(const amount of [1,2]) {
       const values=cruisePopulation.filter(s=>s.type==='TAB' && s.amount===amount).map(s=>s.distance).sort((a,b)=>a-b);
       const expected=values[Math.floor(values.length/2)];
@@ -136,7 +136,29 @@
     assert(cruiseLinkPrior.source==='prior','singleton Cruise LINK still supports exact prior');
     near(cruiseLinkPrior.distance,cruisePopulation.find(s=>s.type==='LINK').distance*240,'Cruise LINK does not use same-condition HOV distance');
     assert(BalanceDistancePrior.resolve({...cruiseLinkAction,blade:3},'blue',null)===null,'Cruise LINK singleton cannot become a No.-relaxed reference');
-    assert(BalanceDistancePrior.resolve({...cruiseLinkAction,direction:'UP'},'blue',null)===null,'Cruise LINK singleton cannot become a direction-relaxed reference');
+    const newCruiseReference=BalanceDistancePrior.resolve({...cruiseLinkAction,direction:'UP'},'blue',null);
+    assert(newCruiseReference.source==='reference-estimate' && newCruiseReference.sampleCount===2,'Cruise LINK UP reference uses only two UP samples');
+    const verified=BalanceDistancePrior.samples.filter(s=>s.source==='verified-chart');
+    assert(verified.length===2 && verified.every(s=>s.type==='LINK' && s.color==='blue' && s.direction==='UP' && s.amount===0.25),'two explicit formal Cruise-only UP samples');
+    const measurementVector=(r1,h1,m1,r2,h2,m2)=>{
+      const angle1=(h1*60+m1)*Math.PI/360,angle2=(h2*60+m2)*Math.PI/360;
+      return {dx:r2*Math.sin(angle2)-r1*Math.sin(angle1),dy:-r2*Math.cos(angle2)+r1*Math.cos(angle1)};
+    };
+    for(const [index,args,blade] of [[0,[.33,5,30,.35,6,31],1],[1,[.35,6,31,.19,7,9],3]]) {
+      const expected=measurementVector(...args),sample=verified[index];
+      assert(sample.blade===blade,'sequential adjustment matches correct No.');
+      near(sample.actualVector.dx,expected.dx,'Cruise 2D horizontal movement');
+      near(sample.actualVector.dy,expected.dy,'Cruise 2D vertical movement');
+      near(sample.distance,Math.hypot(expected.dx,expected.dy),'Cruise distance uses vector magnitude, not IPS radius change');
+      assert(Math.abs(sample.distance-Math.abs(args[3]-args[0]))>0.01,'clock angle materially affects Cruise displacement');
+      const action={type:'LINK',blade,direction:'UP',amount:0.25};
+      const estimate=BalanceDistancePrior.resolve(action,'blue',null);
+      assert(estimate.source==='prior','verified sample enables exact Cruise prior');
+      near(estimate.distance,sample.distance*240,'new exact prior prediction distance');
+      near(BalanceDistancePrior.resolve(action,'blue',{distance:39}).distance,39,'existing learned distance still overrides new sample');
+      assert(BalanceDistancePrior.resolve({...action,direction:'DOWN'},'blue',null)===null,'new UP samples never populate missing DOWN predictions');
+    }
+    near(newCruiseReference.distance,(verified[0].distance+verified[1].distance)/2*240,'UP-only reference median excludes old DOWN measurement');
     near(BalanceDistancePrior.resolve(cruiseLinkAction,'blue',{distance:42}).distance,42,'Cruise learned overrides exact and reference');
     const cruiseStore=memory(), cruiseEngine=BalanceLearning.create(options(cruiseStore)), cruiseSets=startSets();
     const cruiseAction={type:'TAB',blade:3,direction:'UP',amount:2};
@@ -1083,6 +1105,23 @@
     assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]") && adjustmentForecast.points[0].source==="reference-estimate" && adjustmentForecast.points[0].color==="red"'),'Cruise n=1 stays hidden while independent HOV reference remains');
     run('memoValues[2]="1/2"; updateAdjustmentForecast();');
     assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'),'Cruise never scales quarter-flat prior to half-flat');
+    run(`
+      adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
+      currentChartPage=0; pitchAutoMode=false; trimAutoMode=false;
+      dotSets.push({learningId:newLearningId(),red:testDot(480,540,'red'),blue:{...parseDotInput('6','31','0.35'),color:'blue'},adjustments:[]});
+      memoValues.splice(0,4,'1','LINK','1/4','UP'); renderDots(); setGuidesVisible(true); updateAdjustmentForecast();
+    `);
+    assert(run('adjustmentForecast.points.find(p=>p.color==="blue").source')==='prior','new formal Cruise sample reaches actual forecast display');
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").cross'),0,'new Cruise forecast remains on displayed guide',1e-4);
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),verified[0].distance*240,'new Cruise forecast preserves full XY displacement magnitude',1e-4);
+    assert(run('BalanceDistancePrior.samples.filter(s=>s.source==="verified-chart").every(s=>{const a=getDotCoordinates({...parseDotInput(...s.before.clock.split(":"),s.before.radius)}),b=getDotCoordinates({...parseDotInput(...s.after.clock.split(":"),s.after.radius)});return Math.abs((b.x-a.x)/CHART_RADIUS-s.actualVector.dx)<1e-10 && Math.abs((b.y-a.y)/CHART_RADIUS-s.actualVector.dy)<1e-10;})'),'formal sample vectors exactly match existing chart coordinates');
+    run('memoValues[0]="3"; updateAdjustmentForecast();');
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),verified[1].distance*240,'No.3 selects second interval, not first',1e-4);
+    run('memoValues[0]="2"; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.find(p=>p.color==="blue").sampleCount')===2,'No.2 UP reference uses two verified UP samples');
+    run('memoValues[3]="DOWN"; updateAdjustmentForecast();');
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),cruiseLinkPrior.distance,'original No.2 DOWN prior unchanged',1e-4);
+    assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().confirmed).length===0 && JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),'formal chart samples do not mark ordinary UI history as real or write predictions into learning');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

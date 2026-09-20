@@ -1,5 +1,5 @@
 /* 表示専用の初期実測距離（IPS）。方向・時計角・回転角はモデルへ渡さない。
- * ユーザー提示A〜Dの単一調整18区間、HOV18件＋Cruise11件。
+ * A〜Dの単一調整18区間（HOV18件＋Cruise11件）に、正式Cruise実測E1/E2を追加。
  * 欠測Cruiseはnull。Dの複数調整区間および前後ペアなしの参考値は含めない。
  * 行: ID, 種別, No., 方向, 調整量, HOV移動IPS, Cruise移動IPS。
  */
@@ -24,9 +24,26 @@ const BalanceDistancePrior = (() => {
     ['D1', 'LINK', 1, 'UP', 0.5, 0.2501912778027389, null],
     ['D2', 'TAB', 1, 'UP', 1, 0.08379588496740036, 0.26481583744022225]
   ];
-  const samples = Object.freeze(rows.flatMap(([id, type, blade, direction, amount, red, blue]) =>
+  // ユーザーが正式実測と指定した連続2区間。時計12時=上、時計回り、Y下向き。
+  // getDotCoordinatesと同じ座標系をIPS単位で保持（中心平行移動は差分から消える）。
+  const verifiedCruise = [
+    { id: 'E1', blade: 1, before: { clock: '5:30', radius: 0.33 }, after: { clock: '6:31', radius: 0.35 } },
+    { id: 'E2', blade: 3, before: { clock: '6:31', radius: 0.35 }, after: { clock: '7:09', radius: 0.19 } }
+  ].map(({ id, blade, before, after }) => {
+    const point = ({ clock, radius }) => {
+      const [hour, minute] = clock.split(':').map(Number);
+      const angle = ((hour % 12) * 30 + minute * 0.5) * Math.PI / 180;
+      return Object.freeze({ x: radius * Math.sin(angle), y: -radius * Math.cos(angle) });
+    };
+    const start = point(before), end = point(after);
+    const dx = end.x - start.x, dy = end.y - start.y, distance = Math.hypot(dx, dy);
+    return Object.freeze({ id, type: 'LINK', color: 'blue', blade, direction: 'UP', amount: 0.25,
+      source: 'verified-chart', before: Object.freeze(before), after: Object.freeze(after),
+      start, end, actualVector: Object.freeze({ dx, dy, distance, angle: Math.atan2(dy, dx) * 180 / Math.PI }), distance });
+  });
+  const samples = Object.freeze([...rows.flatMap(([id, type, blade, direction, amount, red, blue]) =>
     [['red', red], ['blue', blue]].filter(([, distance]) => distance !== null)
-      .map(([color, distance]) => Object.freeze({ id, type, blade, direction, amount, color, distance }))));
+      .map(([color, distance]) => Object.freeze({ id, type, blade, direction, amount, color, distance }))), ...verifiedCruise]);
   const keyFor = ({ type, blade, direction, amount }, color) => JSON.stringify([type, color, blade, direction, amount]);
   const grouped = new Map();
   for (const sample of samples) {
@@ -54,6 +71,8 @@ const BalanceDistancePrior = (() => {
       // 参考値だけNo./方向を緩和。同色・同種別・同量の元実測のみを集計する。
       if (action.type === 'TAB' && color !== 'blue') return null;
       const values = samples.filter(sample => sample.type === action.type && sample.color === color
+        // 新規Cruise LINKのUP実測はDOWNへ流用しない。他系統の既存集計は維持。
+        && (!(action.type === 'LINK' && color === 'blue') || sample.direction === action.direction)
         && sample.amount === action.amount && Number.isFinite(sample.distance) && sample.distance > 0)
         .map(sample => sample.distance).sort((a, b) => a - b);
       if (values.length < 2) return null;
