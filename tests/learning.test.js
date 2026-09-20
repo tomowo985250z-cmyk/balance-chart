@@ -452,6 +452,7 @@
     assert(run('guidePredictionDebug.candidates.length') === 18, 'TAB amount candidates');
     assert(run('guidePredictionDebug.selected.predictions.length') === 1, 'TAB still evaluates cruise only');
     assert(run('guidePredictionDebug.selected.predictions[0].model.startsWith("TAB:blue")'), 'trim uses independent TAB/cruise model');
+    assert(run('getLearnedGuideLines(dotSets.at(-1)).every(g=>g.blade===guidePredictionDebug.selected.blade && g.direction===guidePredictionDebug.selected.direction)'),'learned guides retain selected No. and UP/DOWN');
     near(run('cruiseAngle'), run('getLearnedRotation("TAB","blue")'), 'purple hexagon follows learned rotation');
     run('updateAdjustmentForecast(["1","TAB","2","UP"]);');
     assert(run('adjustmentForecast.points.every(point=>{const start=getDotCoordinates(dotSets.at(-1)[point.color]);const expected=learning.predict("TAB",point.color,1,"UP",2,start);return expected && point.color==="blue" && Math.abs(Math.hypot(point.x-start.x,point.y-start.y)-expected.distance)<1e-8;}) && adjustmentForecast.points.length===1'),'purple forecast uses real independent learned distance; no TAB red guide');
@@ -815,6 +816,10 @@
       setGuidesVisible(true);
       dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
       window.originalForecastPredict=learning.predict;
+      // 距離/表示ライフサイクルの既存試験は一致条件を前提とする。
+      // 末尾で実判定を復元し、実選定ガイドで一致・不一致を検証する。
+      window.originalForecastGuideMatches=forecastGuideMatches;
+      forecastGuideMatches=()=>true;
       window.forecastCalls=[];
       learning.predict=(type,color,blade,direction,amount,start)=>{
         forecastCalls.push({type,color,blade,direction,amount,start});
@@ -1122,6 +1127,40 @@
     run('memoValues[3]="DOWN"; updateAdjustmentForecast();');
     near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),cruiseLinkPrior.distance,'original No.2 DOWN prior unchanged',1e-4);
     assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().confirmed).length===0 && JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),'formal chart samples do not mark ordinary UI history as real or write predictions into learning');
+    run('forecastGuideMatches=originalForecastGuideMatches;');
+    for(const [type,color] of [['LINK','red'],['LINK','blue'],['TAB','blue']]) {
+      run(`
+        adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
+        currentChartPage=${type==='LINK'?0:1}; pitchAutoMode=false; trimAutoMode=false;
+        dotSets.push({learningId:newLearningId(),red:testDot(517,550,'red'),blue:testDot(430,640,'blue'),adjustments:[]});
+        hovAngle=27; cruiseAngle=-43; renderDots(); setGuidesVisible(true);
+        window.identityGuide=forecastGuides['${color}'];
+        window.identityPredict=learning.predict;
+        learning.predict=()=>({distance:24});
+        memoValues.splice(0,4,String(identityGuide.blade),'${type}','1',identityGuide.direction);
+        updateAdjustmentForecast();
+        window.identityLines=dotOverlay.querySelector('.direction-lines').outerHTML;
+        window.identityLearning=JSON.stringify(learning.inspect());
+      `);
+      assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),type+'/'+color+' selected guide identity displays forecast');
+      near(run(`renderedForecastGeometry().find(p=>p.color==='${color}').forward`),24,type+'/'+color+' same learned distance maintained',1e-4);
+      run('memoValues[3]=identityGuide.direction==="UP"?"DOWN":"UP"; updateAdjustmentForecast();');
+      assert(run(`!dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]')`),type+'/'+color+' opposite UP/DOWN hidden');
+      assert(run(`adjustmentForecast.points.some(p=>p.color==='${color}' && p.distance===24)`),'hidden prediction is retained');
+      run('memoValues[3]=identityGuide.direction; memoValues[0]=String(identityGuide.blade%3+1); updateAdjustmentForecast();');
+      assert(run(`!dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]')`),type+'/'+color+' different No. hidden');
+      run('memoValues[0]=String(identityGuide.blade); updateAdjustmentForecast(); setGuidesVisible(false);');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),'guide OFF remains hidden');
+      run('setGuidesVisible(true);');
+      assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),'matching forecast restored');
+      if(type==='LINK') {
+        run(`forecastGuides['${color}']={...forecastGuides['${color}'],direction:identityGuide.direction==='UP'?'DOWN':'UP'}; renderAdjustmentForecast();`);
+        assert(run(`!dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]') && Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color==='red'?'blue':'red'}]'))`),'per-color guide identity is independent');
+      }
+      assert(run('JSON.stringify(learning.inspect())===identityLearning && dotOverlay.querySelector(".direction-lines").outerHTML===identityLines'),'display gate leaves learning and rendered guides unchanged');
+      run('learning.predict=identityPredict;');
+    }
+    assert(run('!forecastGuideMatches({},["1","LINK","1","UP"]) && !forecastGuideMatches({blade:1,direction:"UP"},[])'),'missing guide identity or adjustment hides forecast');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

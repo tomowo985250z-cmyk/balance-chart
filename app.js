@@ -294,6 +294,11 @@ function compareAdjustmentForecast(result) {
   if (index >= 0 && dotSets[index + 1] === result) adjustmentForecast.phase = 'comparison';
 }
 
+function forecastGuideMatches(guide, values) {
+  const action = BalanceLearning.adjustment(values);
+  return Boolean(action && guide && guide.blade === action.blade && guide.direction === action.direction);
+}
+
 function renderAdjustmentForecast() {
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
   const notice = document.getElementById('forecastLearningNotice');
@@ -317,6 +322,7 @@ function renderAdjustmentForecast() {
     const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
     if (!guide || guide.targetId !== target?.learningId || guide.type !== adjustmentForecast.type
       || !target[color] || !Number.isFinite(distance) || distance < 0) return;
+    if (!forecastGuideMatches(guide, adjustmentForecast.values)) return;
     const visibleLine = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
     if (!visibleLine) return;
     const style = getComputedStyle(visibleLine);
@@ -1019,6 +1025,7 @@ function getLearnedGuideLines(finalSet) {
   }
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
+    blade: selected.blade, direction: selected.direction,
     line: prediction.fallbackLine ?? { base: prediction.start, start: prediction.start, end: prediction.position },
     color: prediction.color === 'red' ? DOT_COLORS.red : type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue,
     marker: `${prediction.color}DirectionLineArrow`
@@ -1105,7 +1112,7 @@ function renderDirectionLines() {
   }
 
   appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);
-  selectedLines.forEach(({ line, color, marker }) => {
+  selectedLines.forEach(({ line, color, marker, blade = line.number, direction = line.direction }) => {
     // 範囲外では実際のドットから描画し、選択判定と既存の矢印先端は維持する。
     const start = Math.hypot(line.base.x - CHART_CENTER_X, line.base.y - CHART_CENTER_Y) > CHART_RADIUS
       ? line.base : line.start;
@@ -1128,6 +1135,7 @@ function renderDirectionLines() {
     if (Number.isFinite(length) && length > 0) {
       forecastGuides[marker === 'redDirectionLineArrow' ? 'red' : 'blue'] = {
         targetId: finalSet.learningId, type: currentChartPage === 0 ? 'LINK' : 'TAB',
+        blade, direction,
         unit: { x: dx / length, y: dy / length }
       };
     }
