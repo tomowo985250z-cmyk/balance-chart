@@ -938,7 +938,7 @@
     assert(run('[...dotOverlay.querySelectorAll(".latest-measured-dot")].every(n=>n.getAttribute("r")==="4" && getComputedStyle(n).animationName==="none")'),'dot size unchanged and blinking removed');
     run('showChartPage(1);');
     assert(run('getComputedStyle(dotOverlay.querySelector(".latest-measured-dot.chart-dot-blue")).fill')==='rgb(123, 44, 191)','latest cruise remains purple on TAB');
-    assert(run('dotOverlay.querySelectorAll(".latest-ring-inner").length===2 && dotOverlay.querySelectorAll(".latest-ring-outer").length===2 && dotOverlay.querySelectorAll(".latest-ring-number").length===2'),'only two latest dots and numbers receive rings');
+    assert(run('dotOverlay.querySelectorAll(".latest-ring-inner").length===2 && dotOverlay.querySelectorAll(".latest-ring-outer").length===2 && dotOverlay.querySelectorAll(".latest-ring-number").length===0'),'only latest dots receive rings; number rings removed');
     assert(run('[...dotOverlay.querySelectorAll(".latest-ring-outer")].every(r=>{const color=r.classList.contains("latest-ring-red")?"red":"blue";const d=dotOverlay.querySelector(".latest-measured-dot.chart-dot-"+color);return r.getAttribute("cx")===d.getAttribute("cx") && r.getAttribute("cy")===d.getAttribute("cy") && r.getAttribute("rx")===r.getAttribute("ry");})'),'dot rings preserve exact centers');
     assert(run('[...dotOverlay.querySelectorAll(".latest-measured-number")].every(n=>n.textContent==="4")'),'latest existing result number unchanged');
     assert(run('getComputedStyle(dotOverlay.querySelector(".latest-ring-inner")).stroke')==='rgb(255, 255, 255)','inner ring stays white');
@@ -946,31 +946,16 @@
     run('showChartPage(0);');
     assert(run('[...dotOverlay.querySelectorAll(".latest-ring-blue")].every(n=>getComputedStyle(n).stroke==="rgb(0, 102, 255)")'),'LINK outer and number rings are blue');
     groups.push('最新実測ドット：色別最新・過去非点滅・追加時移行・サイズ維持・紫・動き抑制');
-    const numberRadii=[];
     for (const count of [1,12,123]) {
       run(`dotSets.splice(0); for(let i=0;i<${count};i++) dotSets.push({learningId:newLearningId(),adjustments:[],red:i===${count}-1?testDot(450,520,'red'):null,blue:i===${count}-1?testDot(397,580,'blue'):null}); renderDots();`);
-      const rings=run(`['red','blue'].map(color=>{
-        const label=dotOverlay.querySelector('.latest-measured-number.chart-dot-'+color), b={};
-        const ring=dotOverlay.querySelector('.latest-ring-number.latest-ring-'+color);
-        const context=document.createElement('canvas').getContext('2d'), style=getComputedStyle(label);
-        context.font=style.fontWeight+' '+style.fontSize+' '+style.fontFamily; context.textAlign='center';
-        const ink=context.measureText(label.textContent);
-        b.x=Number(label.getAttribute('x'))-ink.actualBoundingBoxLeft;
-        b.y=Number(label.getAttribute('y'))-ink.actualBoundingBoxAscent;
-        b.width=ink.actualBoundingBoxLeft+ink.actualBoundingBoxRight;
-        b.height=ink.actualBoundingBoxAscent+ink.actualBoundingBoxDescent;
-        return {text:label.textContent,font:label.getAttribute('font-size'),radius:Number(ring.getAttribute('rx')),ry:Number(ring.getAttribute('ry')),width:b.width,height:b.height,
-          dx:Number(ring.getAttribute('cx'))-(b.x+b.width/2),dy:Number(ring.getAttribute('cy'))-(b.y+b.height/2),stroke:ring.getAttribute('stroke-width')};
-      })`);
-      for(const ring of rings) {
-        assert(ring.text===String(count) && ring.font==='16' && ring.stroke==='1','number value/font/ring stroke preserved');
-        near(ring.dx,0,'ring horizontally centered on text'); near(ring.dy,0,'ring vertically centered on text');
-        near(ring.radius,Math.hypot(ring.width,ring.height)/2+2.25,'minimal measured text clearance');
-        near(ring.ry,ring.radius,'number ring remains circular');
+      for(const page of [0,1]) {
+        run(`showChartPage(${page});`);
+        assert(run('dotOverlay.querySelectorAll(".latest-ring-number").length')===0,'all digit counts and colors have no number ring');
+        assert(run(`[...dotOverlay.querySelectorAll('.latest-measured-number')].every(n=>n.textContent==='${count}' && n.getAttribute('font-size')==='16')`),'number text and font unchanged');
+        assert(run('[...dotOverlay.querySelectorAll(".latest-ring-outer")].every(r=>r.getAttribute("rx")==="7" && r.getAttribute("ry")==="7" && r.getAttribute("stroke-width")==="2")'),'red/blue/purple outer ring diameter reduced from 18 to 16 including stroke');
+        assert(run('[...dotOverlay.querySelectorAll(".latest-ring-inner")].every(r=>r.getAttribute("rx")==="6") && [...dotOverlay.querySelectorAll(".latest-measured-dot")].every(d=>d.getAttribute("r")==="4")'),'white ring and dot body sizes unchanged');
       }
-      numberRadii.push(rings[0].radius);
     }
-    assert(numberRadii[0]<14 && numberRadii[0]<numberRadii[1] && numberRadii[1]<numberRadii[2],'ring shrinks for one digit and grows with digit count');
     // 実際の選択UIと描画済みガイドを通す。予測関数のモックなし、学習履歴0件。
     run(`
       learning.reset([]); dotSets.splice(0); adjustmentForecast=null; selectedAdjustmentTarget=null;

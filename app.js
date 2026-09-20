@@ -1449,7 +1449,6 @@ function renderDots() {
     red: dotSets.findLastIndex(set => Boolean(set.red)),
     blue: dotSets.findLastIndex(set => Boolean(set.blue))
   };
-  const numberMeasure = document.createElement('canvas').getContext('2d');
   const addLatestRing = (x, y, radius, color, kind) => {
     const ring = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
     ring.setAttribute('cx', String(x));
@@ -1459,7 +1458,7 @@ function renderDots() {
     ring.setAttribute('class', `latest-ring latest-ring-${kind} latest-ring-${color}`);
     ring.setAttribute('fill', 'none');
     ring.setAttribute('stroke', color === 'white' ? '#ffffff' : DOT_COLORS[color]);
-    ring.setAttribute('stroke-width', kind === 'number' ? '1' : '2');
+    ring.setAttribute('stroke-width', '2');
     dotOverlay.append(ring);
   };
   dotSets.forEach((set, index) => {
@@ -1468,7 +1467,7 @@ function renderDots() {
       const latest = index === latestDotIndex[dot.color];
       if (latest) {
         addLatestRing(x, y, 6, 'white', 'inner');
-        addLatestRing(x, y, 8, dot.color, 'outer');
+        addLatestRing(x, y, 7, dot.color, 'outer');
       }
       const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
       circle.setAttribute('cx', String(x));
@@ -1501,18 +1500,6 @@ function renderDots() {
       label.style.pointerEvents = 'none';
       label.textContent = String(index + 1);
       dotOverlay.append(label);
-      if (latest) {
-        const style = getComputedStyle(label);
-        numberMeasure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-        numberMeasure.textAlign = 'center';
-        const ink = numberMeasure.measureText(label.textContent);
-        const width = ink.actualBoundingBoxLeft + ink.actualBoundingBoxRight;
-        const height = ink.actualBoundingBoxAscent + ink.actualBoundingBoxDescent;
-        // 字形の外接円＋文字縁1.5＋円の半幅0.5＋余白0.25。文字枠の上下余白は含めない。
-        const radius = Math.hypot(width, height) / 2 + 2.25;
-        addLatestRing(labelPosition.x + (ink.actualBoundingBoxRight - ink.actualBoundingBoxLeft) / 2,
-          labelPosition.y + (ink.actualBoundingBoxDescent - ink.actualBoundingBoxAscent) / 2, radius, dot.color, 'number');
-      }
     });
   });
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
