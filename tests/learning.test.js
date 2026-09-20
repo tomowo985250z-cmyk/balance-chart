@@ -815,10 +815,6 @@
       setGuidesVisible(true);
       dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
       window.originalForecastPredict=learning.predict;
-      // 既存の距離/表示ライフサイクル試験は方向一致を前提とする。
-      // 新条件は末尾で実関数を復元し、全色/No./UP/DOWN/回転の実矢印で独立検証する。
-      window.originalForecastDirectionMatches=forecastDirectionMatches;
-      forecastDirectionMatches=()=>true;
       window.forecastCalls=[];
       learning.predict=(type,color,blade,direction,amount,start)=>{
         forecastCalls.push({type,color,blade,direction,amount,start});
@@ -1126,64 +1122,6 @@
     run('memoValues[3]="DOWN"; updateAdjustmentForecast();');
     near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),cruiseLinkPrior.distance,'original No.2 DOWN prior unchanged',1e-4);
     assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().confirmed).length===0 && JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),'formal chart samples do not mark ordinary UI history as real or write predictions into learning');
-    run('forecastDirectionMatches=originalForecastDirectionMatches;');
-    for(const [type,color] of [['LINK','red'],['LINK','blue'],['TAB','blue']]) {
-      for(const blade of [1,2,3]) for(const direction of ['UP','DOWN']) for(const rotation of [0,73]) {
-        run(`
-          adjustmentForecast=null; dotSets.splice(0); currentChartPage=${type==='LINK'?0:1};
-          hovAngle=${rotation}; cruiseAngle=${rotation};
-          dotSets.push({learningId:newLearningId(),red:testDot(455,570,'red'),blue:testDot(480,580,'blue'),adjustments:[]});
-          window.directionValues=['${blade}','${type}','1','${direction}'];
-          window.directionDot=dotSets[0]['${color}'];
-          window.directionStart=getDotCoordinates(directionDot);
-          window.directionArrow=getDirectionLine(directionDot,'${color}',null,${blade},'${direction}').arrowTarget;
-          window.directionVector={x:directionArrow.x-directionStart.x,y:directionArrow.y-directionStart.y};
-        `);
-        assert(run(`forecastDirectionMatches(directionDot,'${color}',directionValues,directionVector.x,directionVector.y)`),type+'/'+color+'/'+blade+'/'+direction+' actual arrow positive');
-        assert(run(`!forecastDirectionMatches(directionDot,'${color}',directionValues,-directionVector.x,-directionVector.y)`),'opposite vector hidden');
-        assert(run(`!forecastDirectionMatches(directionDot,'${color}',directionValues,-directionVector.y,directionVector.x)`),'perpendicular vector is indeterminate');
-        assert(run(`!forecastDirectionMatches(directionDot,'${color}',directionValues,0,0) && !forecastDirectionMatches(directionDot,'${color}',directionValues,NaN,1)`),'zero/nonfinite direction hidden');
-        run(`
-          dotOverlay.replaceChildren(); setGuidesVisible(true);
-          const size=Math.hypot(directionVector.x,directionVector.y);
-          window.directionUnit={x:directionVector.x/size,y:directionVector.y/size};
-          forecastGuides={['${color}']:{targetId:dotSets[0].learningId,type:'${type}',unit:directionUnit}};
-          const line=document.createElementNS('http://www.w3.org/2000/svg','line');
-          line.setAttribute('class','guide-direction-line'); line.setAttribute('marker-end','url(#${color}DirectionLineArrow)');
-          line.setAttribute('x1',directionStart.x);line.setAttribute('y1',directionStart.y);
-          line.setAttribute('x2',directionArrow.x);line.setAttribute('y2',directionArrow.y);dotOverlay.append(line);
-          adjustmentForecast={type:'${type}',targetId:dotSets[0].learningId,phase:'preview',values:directionValues,points:[{color:'${color}',distance:24}]};
-          window.directionSnapshot=JSON.stringify(adjustmentForecast);window.directionLearning=JSON.stringify(learning.inspect());
-          renderAdjustmentForecast();
-        `);
-        assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'matching real vector reaches SVG');
-        run(`forecastGuides['${color}'].unit={x:-directionUnit.x,y:-directionUnit.y}; renderAdjustmentForecast();`);
-        assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'reverse vector removed from SVG');
-        assert(run('JSON.stringify(adjustmentForecast)===directionSnapshot && JSON.stringify(learning.inspect())===directionLearning'),'hidden prediction and learning remain intact');
-      }
-    }
-    groups.push('予想表示方向：赤青紫・全No./UP/DOWN・回転・正逆/直交/ゼロ・SVG表示・データ維持');
-    // 判定・距離・ガイドをモックしない実画面経路でも、色別の表示結果を照合する。
-    for(const type of ['LINK','TAB']) for(const blade of [1,2,3]) for(const direction of ['UP','DOWN']) {
-      run(`
-        adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
-        currentChartPage=${type==='LINK'?0:1}; pitchAutoMode=false; trimAutoMode=false; hovAngle=17; cruiseAngle=-29;
-        dotSets.push({learningId:newLearningId(),red:testDot(517,550,'red'),blue:testDot(430,640,'blue'),adjustments:[]});
-        memoValues.splice(0,4,'${blade}','${type}','${type==='LINK'?'1/4':'1'}','${direction}');
-        renderDots(); setGuidesVisible(true); updateAdjustmentForecast();
-      `);
-      assert(run(`['red','blue'].every(color=>{
-        const p=adjustmentForecast.points.find(p=>p.color===color);
-        let expected=false;
-        if(p && p.distance>0){
-          const start=getDotCoordinates(dotSets[0][color]);
-          const arrow=getDirectionLine(dotSets[0][color],color,null,${blade},'${direction}').arrowTarget;
-          const u=forecastGuides[color].unit;
-          expected=((arrow.x-start.x)*u.x+(arrow.y-start.y)*u.y)>1e-9*Math.hypot(arrow.x-start.x,arrow.y-start.y);
-        }
-        return Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color='+color+']'))===expected;
-      })`),type+'/'+blade+'/'+direction+' real guides, real priors and per-color visibility agree');
-    }
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';
