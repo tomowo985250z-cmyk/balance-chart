@@ -756,6 +756,24 @@
     run('showChartPage(0);');
     assert(run('[...dotOverlay.querySelectorAll(".latest-ring-blue")].every(n=>getComputedStyle(n).stroke==="rgb(0, 102, 255)")'),'LINK outer and number rings are blue');
     groups.push('最新実測ドット：色別最新・過去非点滅・追加時移行・サイズ維持・紫・動き抑制');
+    const numberRadii=[];
+    for (const count of [1,12,123]) {
+      run(`dotSets.splice(0); for(let i=0;i<${count};i++) dotSets.push({learningId:newLearningId(),adjustments:[],red:i===${count}-1?testDot(450,520,'red'):null,blue:i===${count}-1?testDot(397,580,'blue'):null}); renderDots();`);
+      const rings=run(`['red','blue'].map(color=>{
+        const label=dotOverlay.querySelector('.latest-measured-number.chart-dot-'+color), b=label.getBBox();
+        const ring=dotOverlay.querySelector('.latest-ring-number.latest-ring-'+color);
+        return {text:label.textContent,font:label.getAttribute('font-size'),radius:Number(ring.getAttribute('rx')),ry:Number(ring.getAttribute('ry')),width:b.width,height:b.height,
+          dx:Number(ring.getAttribute('cx'))-(b.x+b.width/2),dy:Number(ring.getAttribute('cy'))-(b.y+b.height/2),stroke:ring.getAttribute('stroke-width')};
+      })`);
+      for(const ring of rings) {
+        assert(ring.text===String(count) && ring.font==='16' && ring.stroke==='2','number value/font/ring stroke preserved');
+        near(ring.dx,0,'ring horizontally centered on text'); near(ring.dy,0,'ring vertically centered on text');
+        near(ring.radius,Math.hypot(ring.width,ring.height)/2+3,'minimal measured text clearance');
+        near(ring.ry,ring.radius,'number ring remains circular');
+      }
+      numberRadii.push(rings[0].radius);
+    }
+    assert(numberRadii[0]<14 && numberRadii[0]<numberRadii[1] && numberRadii[1]<numberRadii[2],'ring shrinks for one digit and grows with digit count');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

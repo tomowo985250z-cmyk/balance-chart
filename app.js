@@ -1433,7 +1433,6 @@ function renderDots() {
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
       const labelPosition = getLabelPosition(x, y, latest);
       if (latest) {
-        addLatestRing(labelPosition.x, labelPosition.y - 5, 14, dot.color, 'number');
         label.classList.add('latest-measured-number');
       }
       label.setAttribute('x', String(labelPosition.x));
@@ -1450,6 +1449,12 @@ function renderDots() {
       label.style.pointerEvents = 'none';
       label.textContent = String(index + 1);
       dotOverlay.append(label);
+      if (latest) {
+        const bounds = label.getBBox();
+        // 文字の外接円＋文字縁1.5＋リング半幅1＋余白0.5（SVG座標）。
+        const radius = Math.hypot(bounds.width, bounds.height) / 2 + 3;
+        addLatestRing(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2, radius, dot.color, 'number');
+      }
     });
   });
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
