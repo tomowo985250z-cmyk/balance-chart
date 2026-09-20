@@ -29,11 +29,14 @@ let manualTrimCruiseAngle = 0;
 let autoTrimCruiseAngle = 0;
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
+let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
+let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 
 function setGuidesVisible(visible) {
   dotOverlay.classList.toggle('guides-visible', visible);
   guideToggle.setAttribute('aria-pressed', String(visible));
   guideToggleText.textContent = visible ? 'ガイド ON' : 'ガイド OFF';
+  renderAdjustmentForecast();
 }
 
 guideToggle.addEventListener('click', () => {
@@ -120,8 +123,6 @@ let activeTimeInputs = null;
 let activeMemoIndex = null;
 let selectedMemoValue = '';
 const memoValues = ['', '', '', ''];
-let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
-let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 let selectedHour = 0;
 let selectedMinute = 0;
 
@@ -277,7 +278,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
         // 既存学習距離を優先し、未成立時だけ完全一致の表示用priorを使う。
         const x = start.x + guide.unit.x * estimate.distance;
         const y = start.y + guide.unit.y * estimate.distance;
-        return [x, y].every(Number.isFinite) ? [{ color, x, y }] : [];
+        return [x, y].every(Number.isFinite) ? [{ color, x, y, distance: estimate.distance }] : [];
       });
       adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
     }
@@ -305,11 +306,24 @@ function renderAdjustmentForecast() {
     notice.hidden = false;
   }
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
+  if (!dotOverlay.classList.contains('guides-visible')) return;
   const ns = 'http://www.w3.org/2000/svg';
   const layer = document.createElementNS(ns, 'g');
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
   layer.style.pointerEvents = 'none';
-  adjustmentForecast.points.forEach(({ color, x, y }) => {
+  adjustmentForecast.points.forEach(({ color, distance }) => {
+    const guide = forecastGuides[color];
+    const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
+    if (!guide || guide.targetId !== target?.learningId || guide.type !== adjustmentForecast.type
+      || !target[color] || !Number.isFinite(distance) || distance < 0) return;
+    const visibleLine = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
+    if (!visibleLine) return;
+    const style = getComputedStyle(visibleLine);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || Number(style.opacity) === 0) return;
+    const start = getDotCoordinates(target[color]);
+    // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
+    const x = start.x + guide.unit.x * distance, y = start.y + guide.unit.y * distance;
+    if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
     group.style.color = color === 'red' ? DOT_COLORS.red : adjustmentForecast.type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue;
@@ -1048,6 +1062,7 @@ function renderDirectionLines() {
       || first.line.centerDistance - second.line.centerDistance)[0];
     if (!selected) {
       if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
+      else renderAdjustmentForecast();
       return;
     }
     selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
@@ -1084,6 +1099,7 @@ function renderDirectionLines() {
     if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
     if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
+    else renderAdjustmentForecast();
     return;
   }
 
@@ -1116,6 +1132,7 @@ function renderDirectionLines() {
     }
   });
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
+  else renderAdjustmentForecast();
 }
 
 const deleteConfirmation = document.getElementById('deleteConfirmation');

@@ -220,6 +220,7 @@ object {
 .trim-mode-toggle[aria-pressed='true'] { background: #f0e7fa; border-color: #7b2cbf; color: #5d208f; }
 .pitch-mode-toggle[aria-pressed='true'] { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
 #dotOverlay:not(.guides-visible) .guide-direction-line { display: none; }
+#dotOverlay:not(.guides-visible) .adjustment-forecast { display: none; }
 .guide-toggle[aria-pressed='true'] .rotation-lock-track { background: #1f5faa; }
 .guide-toggle[aria-pressed='true'] .rotation-lock-track::after { transform: translateX(12px); }
 .guide-toggle:focus-visible { outline: 2px solid #111; outline-offset: 2px; }

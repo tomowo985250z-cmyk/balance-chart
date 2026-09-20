@@ -716,6 +716,7 @@
     run(`
       learning.reset([]); dotSets.splice(0);
       currentChartPage=0; pitchAutoMode=false; trimAutoMode=false; selectedAdjustmentTarget=null;
+      setGuidesVisible(true);
       dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
       window.originalForecastPredict=learning.predict;
       window.forecastCalls=[];
@@ -765,7 +766,7 @@
     assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'comparison retains frozen positions');
     assert(run('dotOverlay.querySelectorAll("circle.chart-dot-red,circle.chart-dot-blue").length')===4,'actual dots coexist with forecast');
     assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast")).opacity')==='0.45','comparison is translucent');
-    assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).filter')==='none','comparison removes glow');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'old comparison target without current matching guide is hidden');
     run('openMemoPicker(0);');
     assert(!run('dotOverlay.querySelector(".forecast-body")'),'new incomplete adjustment clears previous forecast');
     run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; renderDots(); updateAdjustmentForecast();`);
@@ -905,6 +906,65 @@
     assert(run('learning.inspect().samples.length===0'),'unmarked practice measurements stay excluded');
     near(run('forecastGeometry()[0].distance'),0.16150416138089613*240,'practice cannot correct prior distance');
     assert(run('JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),'prior and practice never persist as real samples');
+    // 描画済みSVGを確認する（内部予測座標だけで合否を判定しない）。
+    for(const type of ['LINK','TAB']) {
+      run(`
+        adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
+        currentChartPage=${type==='LINK'?0:1}; pitchAutoMode=false; trimAutoMode=false;
+        dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
+        memoValues.splice(0,4,'2','${type}','${type==='LINK'?'1/4':'1'}','DOWN');
+        renderDots(); updateAdjustmentForecast(); setGuidesVisible(true);
+        window.visibilityLearning=JSON.stringify(learning.inspect());
+      `);
+      const colors=type==='LINK'?['red','blue']:['blue'];
+      for(const color of colors) {
+        assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),type+'/'+color+' guide ON with prior shows forecast');
+      }
+      run('guideToggle.click();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' OFF immediately removes all forecast bodies');
+      run('guideToggle.click();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===colors.length,type+' ON restores prior forecasts');
+      run(`
+        window.visibilityPredict=learning.predict;
+        learning.predict=(type,color)=>({distance:color==='red'?23:41});
+        updateAdjustmentForecast();
+        window.renderedForecastGeometry=()=>[...dotOverlay.querySelectorAll('.adjustment-forecast [data-color]')].map(node=>{
+          const color=node.dataset.color, pos=node.transform.baseVal.getItem(0).matrix;
+          const line=dotOverlay.querySelector('.guide-direction-line[marker-end="url(#'+color+'DirectionLineArrow)"]');
+          const a={x:+line.getAttribute('x1'),y:+line.getAttribute('y1')};
+          const dx=+line.getAttribute('x2')-a.x,dy=+line.getAttribute('y2')-a.y,size=Math.hypot(dx,dy);
+          const start=getDotCoordinates(dotSets.at(-1)[color]);
+          return {color,cross:((pos.e-a.x)*dy-(pos.f-a.y)*dx)/size,
+            forward:((pos.e-start.x)*dx+(pos.f-start.y)*dy)/size};
+        });
+      `);
+      for(const point of run('renderedForecastGeometry()')) {
+        near(point.cross,0,type+'/'+point.color+' rendered learned point on guide',1e-4);
+        near(point.forward,point.color==='red'?23:41,type+'/'+point.color+' rendered forward distance preserved',1e-4);
+      }
+      run('setGuidesVisible(false); setGuidesVisible(true);');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===colors.length,type+' learned forecasts restore after toggle');
+      if(type==='LINK') {
+        run('dotOverlay.querySelector(".guide-direction-line[marker-end=\'url(#redDirectionLineArrow)\']").style.display="none"; renderAdjustmentForecast();');
+        assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=red]") && Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]"))'),'individual red guide hidden leaves blue forecast visible');
+        run('renderDirectionLines();');
+      }
+      run('updateAdjustmentForecast(memoValues,true); hovAngle+=30; cruiseAngle-=20; renderDirectionLines();');
+      for(const point of run('renderedForecastGeometry()')) {
+        near(point.cross,0,type+' fixed distance follows currently displayed line',1e-4);
+        near(point.forward,point.color==='red'?23:41,type+' fixed distance preserved on rotation',1e-4);
+      }
+      run('setGuidesVisible(false);');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' fixed forecasts also obey OFF');
+      run('setGuidesVisible(true); learning.predict=visibilityPredict; memoValues[2]="3"; updateAdjustmentForecast();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' ON without learned distance or exact prior stays hidden');
+      assert(run('JSON.stringify(learning.inspect())===visibilityLearning'),type+' visibility and projection never change learning');
+      run('memoValues[2]=currentChartPage===0?"1/4":"1"; updateAdjustmentForecast();');
+      run('dotSets.push({learningId:newLearningId(),red:testDot(480,530,"red"),blue:testDot(410,610,"blue"),adjustments:[]}); selectedAdjustmentTarget=dotSets[0]; renderDots(); updateAdjustmentForecast();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' old selected result never uses current result guide');
+      run('selectedAdjustmentTarget=null; updateAdjustmentForecast();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===colors.length,type+' selecting current result restores matching forecast');
+    }
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';
