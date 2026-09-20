@@ -116,6 +116,44 @@
     near(referenceTransition.distance,referenceLearned.distance,'transition preserves learned distance');
     near(BalanceDistancePrior.resolve(referenceAction,'red',null,[sampleAt(99999)]).distance,originalReference.distance,'reference statistics ignore runtime inputs and outliers');
     groups.push('参考距離：No./方向のみ緩和・n>=2・中央値・単位・色/種別/量分離・上位優先');
+    // blueはCruise。TABでは紫表示になるが、red（HOV）へ読み替えない。
+    const cruisePopulation=BalanceDistancePrior.samples.filter(s=>s.color==='blue');
+    assert(cruisePopulation.length===11 && cruisePopulation.filter(s=>s.type==='LINK').length===1,'Cruise population contains 1 LINK and 10 TAB real distances');
+    for(const amount of [1,2]) {
+      const values=cruisePopulation.filter(s=>s.type==='TAB' && s.amount===amount).map(s=>s.distance).sort((a,b)=>a-b);
+      const expected=values[Math.floor(values.length/2)];
+      assert(values.length===(amount===1?7:3),'Cruise TAB population excludes TAB HOV');
+      for(const blade of [1,2,3]) for(const direction of ['UP','DOWN']) {
+        const action={type:'TAB',blade,direction,amount};
+        const exact=BalanceDistancePrior.lookup(action,'blue');
+        const result=BalanceDistancePrior.resolve(action,'blue',null);
+        assert(result.source===(exact?'prior':'reference-estimate'),'Cruise No./direction relaxation applies only after exact lookup');
+        near(result.distance,(exact?.distance??expected)*240,'Cruise exact or pooled median uses only its own data');
+      }
+    }
+    const cruiseLinkAction={type:'LINK',blade:2,direction:'DOWN',amount:0.25};
+    const cruiseLinkPrior=BalanceDistancePrior.resolve(cruiseLinkAction,'blue',null);
+    assert(cruiseLinkPrior.source==='prior','singleton Cruise LINK still supports exact prior');
+    near(cruiseLinkPrior.distance,cruisePopulation.find(s=>s.type==='LINK').distance*240,'Cruise LINK does not use same-condition HOV distance');
+    assert(BalanceDistancePrior.resolve({...cruiseLinkAction,blade:3},'blue',null)===null,'Cruise LINK singleton cannot become a No.-relaxed reference');
+    assert(BalanceDistancePrior.resolve({...cruiseLinkAction,direction:'UP'},'blue',null)===null,'Cruise LINK singleton cannot become a direction-relaxed reference');
+    near(BalanceDistancePrior.resolve(cruiseLinkAction,'blue',{distance:42}).distance,42,'Cruise learned overrides exact and reference');
+    const cruiseStore=memory(), cruiseEngine=BalanceLearning.create(options(cruiseStore)), cruiseSets=startSets();
+    const cruiseAction={type:'TAB',blade:3,direction:'UP',amount:2};
+    const cruiseReference=BalanceDistancePrior.resolve(cruiseAction,'blue',null);
+    addSample(cruiseEngine,cruiseSets,'TAB',vector(300,0),vector(55,0),'2','3','UP');
+    const afterOne=BalanceDistancePrior.resolve(cruiseAction,'blue',cruiseEngine.predict('TAB','blue',3,'UP',2,{x:0,y:0}),cruiseEngine.inspect().samples);
+    near(afterOne.distance,cruiseReference.distance,'reference statistics stay fixed and exclude runtime HOV/measurement values');
+    addSample(cruiseEngine,cruiseSets,'TAB',vector(300,0),vector(55,0),'2','3','UP');
+    const cruisePrediction=cruiseEngine.predict('TAB','blue',3,'UP',2,{x:0,y:0});
+    const cruiseSwitched=BalanceDistancePrior.resolve(cruiseAction,'blue',cruisePrediction,cruiseEngine.inspect().samples);
+    assert(cruiseSwitched.source==='learned','confirmed Cruise measurements replace reference with learned distance');
+    near(cruiseSwitched.distance,55,'Cruise learns its 55-unit movement, not HOV 300');
+    const cruiseStateBefore=JSON.stringify(cruiseEngine.inspect()), cruiseDataBefore=JSON.stringify(BalanceDistancePrior.samples);
+    BalanceDistancePrior.resolve(cruiseAction,'blue',null,cruiseEngine.inspect().samples);
+    assert(JSON.stringify(cruiseEngine.inspect())===cruiseStateBefore && JSON.stringify(BalanceDistancePrior.samples)===cruiseDataBefore,'Cruise reference never writes learning, correction, or prior data');
+    assert(JSON.parse(cruiseStore.getItem(BalanceLearning.storageKey)).samples.every(s=>s.actualVector.distance===(s.color==='blue'?55:300)),'only actual HOV/Cruise movements are persisted');
+    groups.push('Cruise専用：母集団11件・TAB/HOV分離・No./方向緩和・n不足・上位優先・確定実測への切替');
     assert(BalanceLearning.adjustment(['1', 'LINK', '1/8', 'UP']).amount === 0.125, 'fraction amount');
     assert(BalanceLearning.adjustment(['1', 'TAB', '1/8', 'UP']) === null, 'separate units');
     assert(BalanceLearning.adjustment(['1', 'constructor', '1', 'UP']) === null, 'malformed adjustment type rejected');
@@ -1028,6 +1066,23 @@
     }
     run('memoValues.splice(0,4,"2","TAB","2","UP"); updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points[0].source')==='prior','switch to exact condition replaces reference with prior');
+    run(`
+      adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
+      currentChartPage=0; pitchAutoMode=false; trimAutoMode=false;
+      dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
+      memoValues.splice(0,4,'2','LINK','1/4','DOWN'); renderDots(); setGuidesVisible(true); updateAdjustmentForecast();
+    `);
+    assert(run('adjustmentForecast.points.find(p=>p.color==="blue").source')==='prior','Cruise LINK UI displays exact singleton prior');
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").cross'),0,'Cruise LINK actual rendered guide alignment',1e-4);
+    near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),cruiseLinkPrior.distance,'Cruise LINK forward distance',1e-4);
+    run('guideToggle.click();');
+    assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'),'Cruise LINK OFF hides dot');
+    run('guideToggle.click();');
+    assert(run('Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]"))'),'Cruise LINK ON restores valid distance');
+    run('memoValues[0]="3"; updateAdjustmentForecast();');
+    assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]") && adjustmentForecast.points[0].source==="reference-estimate" && adjustmentForecast.points[0].color==="red"'),'Cruise n=1 stays hidden while independent HOV reference remains');
+    run('memoValues[2]="1/2"; updateAdjustmentForecast();');
+    assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'),'Cruise never scales quarter-flat prior to half-flat');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';
