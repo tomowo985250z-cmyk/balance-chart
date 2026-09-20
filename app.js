@@ -275,10 +275,11 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
         if (!estimate || !Number.isFinite(estimate.distance) || estimate.distance < 0
           || !guide || guide.type !== action.type || guide.targetId !== target.learningId
           || ![start.x, start.y].every(Number.isFinite)) return [];
-        // 既存学習距離を優先し、未成立時だけ完全一致の表示用priorを使う。
+        // 学習距離、完全一致prior、表示専用参考距離の順で採用する。
         const x = start.x + guide.unit.x * estimate.distance;
         const y = start.y + guide.unit.y * estimate.distance;
-        return [x, y].every(Number.isFinite) ? [{ color, x, y, distance: estimate.distance }] : [];
+        return [x, y].every(Number.isFinite) ? [{ color, x, y, distance: estimate.distance,
+          source: estimate.source, sampleCount: estimate.sampleCount, medianDistance: estimate.medianDistance }] : [];
       });
       adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
     }

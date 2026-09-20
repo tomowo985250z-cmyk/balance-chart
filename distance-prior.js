@@ -50,7 +50,18 @@ const BalanceDistancePrior = (() => {
       return { distance: prediction.distance, source: 'learned' };
     }
     const prior = lookup(action, color);
-    if (!prior) return null; // 未収録条件の補間・比例換算・他No./色への流用はしない。
+    if (!prior) {
+      // 参考値だけNo./方向を緩和。同色・同種別・同量の元実測のみを集計する。
+      if (action.type === 'TAB' && color !== 'blue') return null;
+      const values = samples.filter(sample => sample.type === action.type && sample.color === color
+        && sample.amount === action.amount && Number.isFinite(sample.distance) && sample.distance > 0)
+        .map(sample => sample.distance).sort((a, b) => a - b);
+      if (values.length < 2) return null;
+      const middle = Math.floor(values.length / 2);
+      const medianDistance = values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2;
+      return { distance: medianDistance * radius, source: 'reference-estimate',
+        sampleCount: values.length, medianDistance, confidence: 'low' };
+    }
     let distance = prior.distance * radius, actualCount = 0;
     // learning.sync()で実調整確認済みとなった実測だけ。履歴順に直近を強く反映。
     for (const sample of confirmedSamples) {

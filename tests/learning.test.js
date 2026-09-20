@@ -49,7 +49,7 @@
       [{...priorAction,amount:1},'red'],[{...priorAction,blade:2},'red'],
       [priorAction,'blue'],[{...priorAction,type:'TAB'},'red'],
       [{type:'LINK',blade:3,direction:'DOWN',amount:0.25},'red']]) {
-      assert(BalanceDistancePrior.resolve(action,color,null)===null,'no amount/No./color/type/direction extrapolation');
+      assert(BalanceDistancePrior.lookup(action,color)===null,'exact prior never extrapolates amount/No./color/type/direction');
     }
     const priorStorage=memory(), priorEngine=BalanceLearning.create(options(priorStorage)), priorSets=startSets();
     const priorDistance=()=>BalanceDistancePrior.resolve(priorAction,'red',
@@ -80,6 +80,42 @@
     reloadedPriorEngine.sync(priorSets,rotations);
     near(reloadedPriorEngine.predict('LINK','red',1,'UP',0.5,{x:0,y:0}).distance,twice.distance,'existing restore unchanged');
     groups.push('distance prior：29実測・完全一致・中央値/ばらつき・低信頼・実測補正・既存距離優先・切替・混入なし');
+    const referenceCases=[
+      [{type:'LINK',blade:3,direction:'DOWN',amount:0.25},'red',4],
+      [{type:'LINK',blade:2,direction:'UP',amount:0.5},'red',3],
+      [{type:'TAB',blade:3,direction:'UP',amount:1},'blue',7],
+      [{type:'TAB',blade:3,direction:'UP',amount:2},'blue',3]
+    ];
+    for(const [action,color,count] of referenceCases) {
+      const values=BalanceDistancePrior.samples.filter(s=>s.type===action.type && s.color===color && s.amount===action.amount)
+        .map(s=>s.distance).sort((a,b)=>a-b);
+      const median=(values[Math.floor((values.length-1)/2)]+values[Math.floor(values.length/2)])/2;
+      const reference=BalanceDistancePrior.resolve(action,color,null);
+      assert(reference.source==='reference-estimate' && reference.sampleCount===count,'reference pools only same color/type/amount');
+      near(reference.medianDistance,median,'reference median computed from source samples');
+      near(reference.distance,median*240,'reference uses existing IPS scale');
+      assert(reference.distance>0 && reference.confidence==='low','reference positive and low confidence');
+      near(BalanceDistancePrior.resolve(action,color,{distance:17}).distance,17,'learned overrides reference');
+    }
+    assert(BalanceDistancePrior.resolve(priorAction,'red',null).source==='prior','exact prior overrides pooled reference');
+    for(const [action,color] of [
+      [{type:'LINK',blade:3,direction:'DOWN',amount:2},'red'],
+      [{type:'LINK',blade:3,direction:'UP',amount:0.25},'blue'],
+      [{type:'LINK',blade:3,direction:'DOWN',amount:1},'red'],
+      [{type:'TAB',blade:3,direction:'UP',amount:0.25},'blue'],
+      [{type:'TAB',blade:3,direction:'UP',amount:1},'red']]) {
+      assert(BalanceDistancePrior.resolve(action,color,null)===null,'singleton/missing amount/TAB HOV cannot supply reference');
+    }
+    const referenceEngine=BalanceLearning.create(options(memory())), referenceSets=startSets();
+    const referenceAction=referenceCases[0][0];
+    const originalReference=BalanceDistancePrior.resolve(referenceAction,'red',null);
+    for(let i=0;i<2;i++) addSample(referenceEngine,referenceSets,'LINK',vector(35,0),vector(20,0),'1/4','3','DOWN');
+    const referenceLearned=referenceEngine.predict('LINK','red',3,'DOWN',0.25,{x:0,y:0});
+    const referenceTransition=BalanceDistancePrior.resolve(referenceAction,'red',referenceLearned,referenceEngine.inspect().samples);
+    assert(referenceTransition.source==='learned','reference automatically yields to real learned model');
+    near(referenceTransition.distance,referenceLearned.distance,'transition preserves learned distance');
+    near(BalanceDistancePrior.resolve(referenceAction,'red',null,[sampleAt(99999)]).distance,originalReference.distance,'reference statistics ignore runtime inputs and outliers');
+    groups.push('参考距離：No./方向のみ緩和・n>=2・中央値・単位・色/種別/量分離・上位優先');
     assert(BalanceLearning.adjustment(['1', 'LINK', '1/8', 'UP']).amount === 0.125, 'fraction amount');
     assert(BalanceLearning.adjustment(['1', 'TAB', '1/8', 'UP']) === null, 'separate units');
     assert(BalanceLearning.adjustment(['1', 'constructor', '1', 'UP']) === null, 'malformed adjustment type rejected');
@@ -887,7 +923,7 @@
     }
     assert(run('dotOverlay.querySelector(".direction-lines").outerHTML===priorGuideBefore'),'prior preview never changes guide selection');
     assert(run('JSON.stringify(learning.inspect())===priorLearningBefore'),'UI prior never changes learning state');
-    run('memoValues[2]="1/2"; updateAdjustmentForecast();');
+    run('memoValues[2]="1"; updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.length===0'),'UI unrecorded amount hides both without proportional scaling');
     run('memoValues.splice(0,4,"1","LINK","1/2","UP"); updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'LINK red prior never supplies missing blue');
@@ -965,6 +1001,33 @@
       run('selectedAdjustmentTarget=null; updateAdjustmentForecast();');
       assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===colors.length,type+' selecting current result restores matching forecast');
     }
+    for(const [type,amount] of [['LINK','1/4'],['LINK','1/2'],['TAB','1'],['TAB','2']]) {
+      run(`
+        adjustmentForecast=null; selectedAdjustmentTarget=null; learning.reset([]); dotSets.splice(0);
+        currentChartPage=${type==='LINK'?0:1}; pitchAutoMode=false; trimAutoMode=false;
+        dotSets.push({learningId:newLearningId(),red:testDot(517,520,'red'),blue:testDot(397,640,'blue'),adjustments:[]});
+        memoValues.splice(0,4,'${amount==='1/2'?'2':'3'}','${type}','${amount}','${type==='LINK'&&amount==='1/4'?'DOWN':'UP'}');
+        renderDots(); setGuidesVisible(true); updateAdjustmentForecast();
+        window.referenceState=JSON.stringify(learning.inspect());
+      `);
+      const color=type==='LINK'?'red':'blue';
+      assert(run(`adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==='${color}' && adjustmentForecast.points[0].source==='reference-estimate'`),type+'/'+amount+' real UI reference only for eligible color');
+      const displayed=run('renderedForecastGeometry()[0]');
+      near(displayed.cross,0,'reference follows actual rendered guide',1e-4);
+      near(displayed.forward,run('adjustmentForecast.points[0].distance'),'reference forward distance preserved',1e-4);
+      run('guideToggle.click();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),'reference OFF immediately hidden');
+      run('guideToggle.click();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===1'),'reference ON restored');
+      assert(run('JSON.stringify(learning.inspect())===referenceState'),'reference display never changes learning or correction');
+      run('dotSets[0].adjustments=[Array.from(memoValues)]; dotSets.push({learningId:newLearningId(),red:testDot(470,520,"red"),blue:testDot(397,600,"blue"),adjustments:[]}); selectedAdjustmentTarget=dotSets[0]; renderDots(); updateAdjustmentForecast();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),'old reference target is hidden');
+      run('selectedAdjustmentTarget=null; updateAdjustmentForecast();');
+      assert(run('dotOverlay.querySelectorAll(".forecast-body").length===1'),'current target gets new reference');
+      assert(run('learning.inspect().samples.length===0 && Object.keys(learning.inspect().models).length===0 && JSON.parse(localStorage.getItem(BalanceLearning.storageKey)).samples.length===0'),'practice/reference never saved as measured learning');
+    }
+    run('memoValues.splice(0,4,"2","TAB","2","UP"); updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points[0].source')==='prior','switch to exact condition replaces reference with prior');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';
