@@ -898,8 +898,8 @@
     run('openMemoPicker(0);');
     assert(!run('dotOverlay.querySelector(".forecast-body")'),'new incomplete adjustment clears previous forecast');
     run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; renderDots(); updateAdjustmentForecast();`);
-    const forecastPurple=run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color');
-    assert(forecastPurple==='rgb(123, 44, 191)','TAB cruise preview is purple: '+forecastPurple);
+    const forecastYellow=run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color');
+    assert(forecastYellow==='rgb(255, 212, 0)','TAB cruise preview is yellow: '+forecastYellow);
     assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'TAB red without selected guide is hidden independently');
     const purpleGeometry=run('forecastGeometry()[0]');
     near(purpleGeometry.cross,0,'purple preview on rendered purple guide');
@@ -1008,7 +1008,7 @@
     assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'purple prior appears; TAB red prior has no guide and stays hidden');
     near(run('forecastGeometry()[0].cross'),0,'purple prior lies on purple guide');
     near(run('forecastGeometry()[0].forward'),0.25083464888497375*240,'purple median distance follows arrow');
-    assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color')==='rgb(123, 44, 191)','prior keeps purple display');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color')==='rgb(255, 212, 0)','prior keeps yellow display');
     run('delete forecastGuides.blue; updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.length===0'),'prior without corresponding guide is hidden');
     run(`

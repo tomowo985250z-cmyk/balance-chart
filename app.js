@@ -349,7 +349,7 @@ function renderAdjustmentForecast() {
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
-    group.style.color = color === 'red' ? DOT_COLORS.red : adjustmentForecast.type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue;
+    group.style.color = '#ffd400';
     group.dataset.color = color;
     const title = document.createElementNS(ns, 'title');
     title.textContent = `${color === 'red' ? 'HOV' : '巡航'}予想位置`;
@@ -357,7 +357,7 @@ function renderAdjustmentForecast() {
     ring.setAttribute('r', '12');
     ring.setAttribute('class', 'forecast-glow');
     const body = document.createElementNS(ns, 'path');
-    body.setAttribute('d', 'M -7 -7 L 7 7 M 7 -7 L -7 7');
+    body.setAttribute('d', 'M 0 -7 L 7 0 L 0 7 L -7 0 Z');
     body.setAttribute('class', 'forecast-body');
     group.append(title, ring, body);
     layer.append(group);

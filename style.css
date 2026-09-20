@@ -203,7 +203,7 @@ object {
 .chart-note input:focus-visible { outline: 2px solid #1f5faa; outline-offset: 2px; }
 .latest-ring { pointer-events: none; }
 #dotOverlay.trim-tab .latest-ring-blue { stroke: #7b2cbf; }
-.forecast-body { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.forecast-body { fill: currentColor; stroke: white; stroke-width: 2; }
 .forecast-learning-notice { margin: 2px 0; font-size: 12px; color: #596573; flex-basis: 100%; }
 .historical-learning { margin: 10px 0; font-size: 13px; }
 .historical-learning summary { cursor: pointer; }
