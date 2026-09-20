@@ -888,17 +888,22 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
 
 function selectLinkGuideCandidate(candidates) {
   const epsilon = 1e-9;
-  const paired = candidates.filter(candidate => candidate.predictions.length === 2);
-  const improving = paired.filter(candidate => candidate.predictions.every(prediction =>
-    prediction.currentDistance <= CENTER_DISTANCE_THRESHOLD + epsilon && prediction.improvement > epsilon));
+  // 予測HOVを0.20以内に保てる候補があれば、その制約を後段で覆さない。
+  const hovSafe = candidates.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD + epsilon);
+  let pool = hovSafe.length ? hovSafe : candidates;
+  const paired = pool.filter(candidate => candidate.predictions.length === 2);
   const passing = paired.filter(candidate => candidate.hovPathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon
     && candidate.cruisePathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon);
-  let pool = improving.length ? improving : passing.length ? passing : candidates;
+  if (passing.length) pool = passing;
+  const bothSafe = pool.filter(candidate => candidate.predictions.length === 2
+    && candidate.predictions.every(prediction => prediction.predictedDistance <= CENTER_DISTANCE_THRESHOLD + epsilon));
+  if (bothSafe.length) pool = bothSafe;
   const nearest = field => {
     const minimum = Math.min(...pool.map(candidate => candidate[field]));
     pool = pool.filter(candidate => candidate[field] <= minimum + epsilon);
   };
-  if (!improving.length && !passing.length) nearest('hovPathDistance');
+  // HOVを制約内にできない場合だけ、既存の有向線最接近評価へ戻る。
+  if (!hovSafe.length && !passing.length) nearest('hovPathDistance');
   nearest('maxCenterDistance');
   nearest('distance');
   return pool.sort((first, second) => first.blade - second.blade
