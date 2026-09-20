@@ -13,6 +13,8 @@ const chartWrap = document.querySelector('.chart-wrap');
 const chartTitle = document.getElementById('chartTitle');
 const chartPageButtons = [...document.querySelectorAll('.chart-page')];
 const chartNames = ['現在の調整：ピッチリンク', '現在の調整：トリムタブ'];
+const chartNote = document.getElementById('chartNote');
+const CHART_NOTE_STORAGE_KEY = 'balance-chart-note-v1';
 let currentChartPage = 0;
 const pageRotations = [{ hovAngle: 0, cruiseAngle: 0 }, { hovAngle: 0, cruiseAngle: 0 }];
 const dotOverlay = document.getElementById('dotOverlay');
@@ -31,6 +33,20 @@ const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
+
+try {
+  chartNote.value = localStorage.getItem(CHART_NOTE_STORAGE_KEY) || '';
+} catch (error) {
+  console.warn('チャートメモを読み込めませんでした。', error);
+}
+
+chartNote.addEventListener('input', () => {
+  try {
+    localStorage.setItem(CHART_NOTE_STORAGE_KEY, chartNote.value);
+  } catch (error) {
+    console.warn('チャートメモを保存できませんでした。', error);
+  }
+});
 
 function setGuidesVisible(visible) {
   dotOverlay.classList.toggle('guides-visible', visible);

@@ -176,6 +176,31 @@ object {
 }
 
 #dotOverlay.trim-tab .chart-dot-blue { fill: #7b2cbf; }
+.chart-note {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  width: min(150px, calc(100% - 24px));
+  color: #4d5663;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+}
+.chart-note input {
+  min-width: 0;
+  height: 30px;
+  padding: 4px 7px;
+  border: 1px solid #aab2bf;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 90%);
+  color: #252a32;
+  font: inherit;
+  font-size: 14px;
+}
+.chart-note input:focus-visible { outline: 2px solid #1f5faa; outline-offset: 2px; }
 .latest-ring { pointer-events: none; }
 #dotOverlay.trim-tab .latest-ring-blue { stroke: #7b2cbf; }
 .forecast-body { fill: currentColor; stroke: white; stroke-width: 2; }
@@ -423,6 +448,12 @@ object {
     touch-action: pan-y;
   }
 
+  .chart-note {
+    top: 8px;
+    left: 8px;
+    width: min(135px, calc(100% - 16px));
+  }
+
   .rotation-lock {
     right: 10px;
     bottom: 10px;
@@ -496,7 +527,8 @@ object {
   .dot-form,
   .adjustment-form,
   .results-heading,
-  .dot-list { display: none; }
+  .dot-list,
+  .chart-note { display: none; }
 
   .app { width: 210mm; }
 
