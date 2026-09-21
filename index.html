@@ -11,13 +11,13 @@
     <form class="dot-form" id="dotForm">
       <fieldset class="dot-set dot-set-red">
         <legend>HOV</legend>
-        <label>数値<input id="redValueInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="HOVの数値" /></label>
-        <div class="clock-angle"><span>時計角</span><span class="clock-inputs"><span><input id="redHourInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="HOVの時" /><small>時</small></span><span><input id="redMinuteInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="HOVの分" /><small>分</small></span></span></div>
+        <label>数値<input id="redValueInput" type="text" inputmode="numeric" enterkeyhint="next" maxlength="4" autocomplete="off" aria-label="HOVの数値" /></label>
+        <div class="clock-angle"><span>時計角</span><span class="clock-inputs"><span><input id="redHourInput" type="text" inputmode="numeric" enterkeyhint="next" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="HOVの時" /><small>時</small></span><span><input id="redMinuteInput" type="text" inputmode="numeric" enterkeyhint="done" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="HOVの分" /><small>分</small></span></span></div>
       </fieldset>
       <fieldset class="dot-set dot-set-blue">
         <legend>巡航</legend>
-        <label>数値<input id="blueValueInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="巡航の数値" /></label>
-        <div class="clock-angle"><span>時計角</span><span class="clock-inputs"><span><input id="blueHourInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="巡航の時" /><small>時</small></span><span><input id="blueMinuteInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="巡航の分" /><small>分</small></span></span></div>
+        <label>数値<input id="blueValueInput" type="text" inputmode="numeric" enterkeyhint="next" maxlength="4" autocomplete="off" aria-label="巡航の数値" /></label>
+        <div class="clock-angle"><span>時計角</span><span class="clock-inputs"><span><input id="blueHourInput" type="text" inputmode="numeric" enterkeyhint="next" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="巡航の時" /><small>時</small></span><span><input id="blueMinuteInput" type="text" inputmode="numeric" enterkeyhint="done" pattern="[0-9]*" maxlength="2" autocomplete="off" aria-label="巡航の分" /><small>分</small></span></span></div>
       </fieldset>
       <button id="addDotButton" type="submit">ドットを追加</button>
       <button id="cancelResultEdit" type="button" hidden>編集をキャンセル</button>
@@ -132,6 +132,6 @@ LINK</button>
   </dialog>
   <script src="learning.js?v=20260920-distance-prior"></script>
   <script src="distance-prior.js?v=20260921-tab-monotonic-distance"></script>
-  <script src="app.js?v=20260922-fixed-adjustment-type"></script>
+  <script src="app.js?v=20260922-input-focus"></script>
 </body>
 </html>

@@ -848,6 +848,13 @@
       redInputs[1].value='5'; redInputs[1].dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'}));
       redInputs[1].dispatchEvent(new Event('change',{bubbles:true}));
       window.directClockValues=[redInputs[0].value,redInputs[1].value];
+      window.focusMoves=[];
+      redInputs[2].focus(); redInputs[2].value='123'; redInputs[2].dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'}));
+      focusMoves.push(document.activeElement===redInputs[0]);
+      for(const hour of ['2','9']) { redInputs[0].focus(); redInputs[0].value=hour; redInputs[0].dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'})); focusMoves.push(document.activeElement===redInputs[1]); }
+      redInputs[0].focus(); redInputs[0].value='1'; redInputs[0].dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'}));
+      focusMoves.push(document.activeElement===redInputs[0]);
+      for(const hour of ['10','12']) { redInputs[0].focus(); redInputs[0].value=hour; redInputs[0].dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText'})); focusMoves.push(document.activeElement===redInputs[1]); }
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.5'];
       blueInputs.forEach(input=>input.value=''); dotForm.requestSubmit();
     `);
@@ -855,6 +862,7 @@
     assert(run("document.querySelector('.dot-set-red .clock-inputs').textContent.includes('時') && document.querySelector('.dot-set-red .clock-inputs').textContent.includes('分')"), 'clock fields explicitly label hours and minutes');
     assert(run("autoDecimalValue==='1.23' && firstDigitValue==='1.' && fixedDecimalValue==='1.00'"), 'first digit inserts decimal and confirmation fixes two places');
     assert(run("directClockValues.join(':')==='3:05'"), 'direct clock inputs accept digits and normalize minutes');
+    assert(run("focusMoves.every(Boolean) && redInputs[2].enterKeyHint==='next' && redInputs[0].enterKeyHint==='next'"), 'numeric completion and valid hours advance focus while hour 1 waits');
     assert(run('dotSets.length') === 1 && run('getDotCount()') === 1, 'existing measurement form');
     assert(run("dotSets[0].red.clock==='3:00' && dotList.textContent.includes('0.50')"), 'confirmed result keeps clock format and shows two decimals');
     near(run('getDotCoordinates(dotSets[0].red).x'), 517, 'unchanged dot coordinate calculation');

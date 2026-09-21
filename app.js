@@ -627,8 +627,12 @@ function openTimePicker(hourInput, minuteInput) {
   timePicker.hidden = false;
 }
 
-function setupClockInput(input, pad = false) {
-  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 2); });
+function setupClockInput(input, pad = false, nextInput = null) {
+  input.addEventListener('input', (event) => {
+    input.value = input.value.replace(/\D/g, '').slice(0, 2);
+    const advances = /^[2-9]$/.test(input.value) || /^(10|11|12)$/.test(input.value);
+    if (nextInput && advances && !String(event.inputType).startsWith('delete')) nextInput.focus({ preventScroll: true });
+  });
   input.addEventListener('change', () => {
     if (input.value !== '' && pad) input.value = String(Number(input.value)).padStart(2, '0');
   });
@@ -640,25 +644,26 @@ function normalizeMeasurementValue(input) {
   if (Number.isFinite(value) && value >= 0) input.value = value.toFixed(2);
 }
 
-function setupMeasurementValueInput(input) {
+function setupMeasurementValueInput(input, nextInput) {
   input.addEventListener('beforeinput', (event) => {
     if (event.inputType === 'deleteContentBackward' && /^\d\.$/.test(input.value)) {
       event.preventDefault();
       input.value = '';
     }
   });
-  input.addEventListener('input', () => {
+  input.addEventListener('input', (event) => {
     const digits = input.value.replace(/\D/g, '').slice(0, 3);
     input.value = digits ? `${digits[0]}.${digits.slice(1)}` : '';
+    if (digits.length === 3 && !String(event.inputType).startsWith('delete')) nextInput.focus({ preventScroll: true });
   });
   input.addEventListener('change', () => normalizeMeasurementValue(input));
   input.addEventListener('blur', () => normalizeMeasurementValue(input));
 }
 
 [redInputs, blueInputs].forEach((inputs) => {
-  setupClockInput(inputs[0]);
+  setupClockInput(inputs[0], false, inputs[1]);
   setupClockInput(inputs[1], true);
-  setupMeasurementValueInput(inputs[2]);
+  setupMeasurementValueInput(inputs[2], inputs[0]);
 });
 
 closeTimePicker.addEventListener('click', () => { timePicker.hidden = true; });
