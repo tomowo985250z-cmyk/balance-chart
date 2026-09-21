@@ -65,6 +65,7 @@ guideCandidateToggle.addEventListener('click', () => {
   guideCandidateToggle.textContent = `ガイド線${guideCandidateIndex + 1}`;
   guideCandidateToggle.setAttribute('aria-pressed', String(guideCandidateIndex === 1));
   renderDirectionLines();
+  applySelectedGuideAdjustment();
 });
 setGuidesVisible(true);
 window.addEventListener('pageshow', () => setGuidesVisible(true));
@@ -223,6 +224,17 @@ function updateMemoButtons() {
   memoButtons[2].disabled = thirdOptions.length === 0;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
   memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
+}
+
+function applySelectedGuideAdjustment() {
+  const guide = Object.values(forecastGuides)[0];
+  if (!guide) return;
+  [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
+    const index = [0, 1, 3][position];
+    memoValues[index] = value;
+    memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
+  });
+  updateAdjustmentForecast();
 }
 
 function renderMemoWheel(options, selected, index) {
@@ -1815,6 +1827,7 @@ function setupRotationControls() {
 }
 
 renderDots();
+applySelectedGuideAdjustment();
 
 // chart.svg は viewBox を変えるたびに通知する。file:// などで object のDOMに
 // 直接アクセスできない場合も、ドット表示を確実に同期できる。
