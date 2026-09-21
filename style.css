@@ -212,7 +212,7 @@ object {
 .historical-learning-row button { min-height: 36px; cursor: pointer; }
 .forecast-glow { fill: none; stroke: currentColor; stroke-width: 3; opacity: .75; filter: drop-shadow(0 0 4px currentColor); }
 .adjustment-forecast.preview .forecast-glow { stroke-dasharray: 4 3; animation: forecast-pulse 2.4s ease-in-out infinite; }
-.adjustment-forecast.comparison { opacity: .45; }
+.adjustment-forecast.comparison { opacity: .7; }
 .adjustment-forecast.comparison .forecast-glow { filter: none; opacity: .5; stroke-width: 1; }
 @keyframes forecast-pulse { 0%, 100% { opacity: .35; } 50% { opacity: .9; } }
 @media (prefers-reduced-motion: reduce) { .adjustment-forecast.preview .forecast-glow { animation: none; } }

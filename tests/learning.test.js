@@ -925,9 +925,11 @@
     assert(run('adjustmentForecast.phase')==='comparison','next measurement transitions to comparison');
     assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'comparison retains frozen positions');
     assert(run('dotOverlay.querySelectorAll("circle.chart-dot-red,circle.chart-dot-blue").length')===4,'actual dots coexist with forecast');
-    assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast")).opacity')==='0.45','comparison is translucent');
+    assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast")).opacity')==='0.7','comparison remains visible at 0.7 opacity');
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'comparison keeps both forecast dots after actual measurement');
     assert(run('[...dotOverlay.querySelectorAll(".adjustment-forecast [data-color]")].every(node=>{const point=adjustmentForecast.points.find(item=>item.color===node.dataset.color),matrix=node.transform.baseVal.getItem(0).matrix;return matrix.e===point.x&&matrix.f===point.y;})'),'comparison uses frozen forecast coordinates');
+    run('renderDots(); renderDots(); renderDirectionLines();');
+    assert(run('adjustmentForecast.phase==="comparison" && dotOverlay.querySelectorAll(".forecast-body").length===2'),'comparison survives repeated dot and guide redraws');
     run('openMemoPicker(0);');
     assert(run('adjustmentForecast.phase==="comparison" && dotOverlay.querySelectorAll(".forecast-body").length===2'),'incomplete new adjustment keeps previous comparison');
     run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; renderDots(); updateAdjustmentForecast();`);
