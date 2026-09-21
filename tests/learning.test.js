@@ -422,12 +422,12 @@
     assert(run("getComputedStyle(dotOverlay).overflow") === 'visible', 'out of chart overflow preserved');
     assert(run("guideCandidateIndex===0 && guideCandidateToggle.textContent==='ガイド線1' && guideCandidateToggle.getAttribute('aria-pressed')==='false'"), 'guide candidate starts at line 1');
     assert(run(`(()=>{
-      memoValues.splice(0,4,'','','1/2',''); applySelectedGuideAdjustment();
+      memoValues.splice(0,4,'','','1/2',''); renderDirectionLines();
       const guide=Object.values(forecastGuides)[0];
       return memoValues[0]===String(guide.blade) && memoValues[1]===guide.type
         && memoValues[2]==='1/2' && memoValues[3]===guide.direction
         && [0,1,3].every(index=>!memoButtons[index].textContent.includes('選択'));
-    })()`), 'guide line 1 confirms No./type/direction and leaves amount unchanged');
+    })()`), 'pitch guide line 1 synchronously confirms No./type/direction and leaves amount unchanged');
     assert(run(`(()=>{
       const guide=Object.values(forecastGuides)[0], saved=[...memoValues], initial=[];
       memoValues.splice(0,4,'','','',''); updateMemoButtons();

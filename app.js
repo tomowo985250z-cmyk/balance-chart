@@ -69,7 +69,6 @@ guideCandidateToggle.addEventListener('click', () => {
   guideCandidateToggle.setAttribute('aria-pressed', String(guideCandidateIndex === 1));
   restoreAdjustmentSelection();
   renderDirectionLines();
-  applySelectedGuideAdjustment();
 });
 setGuidesVisible(true);
 window.addEventListener('pageshow', () => setGuidesVisible(true));
@@ -1266,7 +1265,7 @@ function renderDirectionLines() {
       };
     }
   });
-  if (currentChartPage === 1) applySelectedGuideAdjustment();
+  applySelectedGuideAdjustment();
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
 }
@@ -1891,7 +1890,6 @@ function setupRotationControls() {
 }
 
 renderDots();
-applySelectedGuideAdjustment();
 
 // chart.svg は viewBox を変えるたびに通知する。file:// などで object のDOMに
 // 直接アクセスできない場合も、ドット表示を確実に同期できる。
