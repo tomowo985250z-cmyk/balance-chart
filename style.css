@@ -389,7 +389,6 @@ object {
 .dot-form .dot-set-red input, .dot-form .dot-set-red .time-wheel-trigger { color: #a61924; }
 .dot-form .dot-set-blue input, .dot-form .dot-set-blue .time-wheel-trigger { color: #1259a8; }
 .memo-wheel-trigger { color: #172b42; border-color: #8b9bb0; font-size: 15px; padding-inline: 4px; }
-#memoFour { font-weight: 800; background: #eaf0f7; border-color: #71849b; }
 .dot-form button, .adjustment-form button, .dot-list button, .time-picker button { touch-action: manipulation; cursor: pointer; }
 .dot-form :disabled, .adjustment-form :disabled, .dot-list button:disabled { color: #667487; background: #e5eaf0; border-color: #bdc7d3; cursor: not-allowed; }
 .dot-form :focus-visible, .adjustment-form :focus-visible, .dot-list button:focus-visible, .time-picker button:focus-visible {

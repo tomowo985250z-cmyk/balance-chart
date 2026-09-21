@@ -1294,6 +1294,11 @@
     ])`), 'LINK/TAB guide lines 1/2 retain four independent adjustment selections');
     run('memoPicker.hidden=true; memoButtons[1].click();');
     assert(run("memoButtons[1].disabled && memoPicker.hidden && memoValues[1]==='TAB' && memoButtons[1].textContent.includes('TAB')"), 'TAB type is fixed and cannot open selection');
+    run("memoValues[3]=''; updateMemoButtons(); memoThree.click();");
+    assert(run("!memoButtons[2].disabled && !memoPicker.hidden && activeMemoIndex===2"), 'amount remains selectable without direction');
+    run('memoPicker.hidden=true;');
+    assert(run(`(()=>{const three=getComputedStyle(memoThree),four=getComputedStyle(memoFour); return three.color===four.color
+      && three.backgroundColor===four.backgroundColor && three.borderColor===four.borderColor;})()`), 'direction uses the same colors as other selection fields');
     run('showChartPage(0); guideCandidateToggle.click();');
     assert(run("memoButtons[1].disabled && memoValues[1]==='LINK' && memoButtons[1].textContent.includes('LINK')"), 'LINK type stays fixed on both guide lines');
     frame.remove();

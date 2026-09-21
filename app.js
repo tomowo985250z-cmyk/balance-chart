@@ -241,7 +241,7 @@ function updateMemoButtons() {
   });
   memoButtons[1].disabled = true;
   const thirdOptions = getThirdMemoOptions();
-  memoButtons[2].disabled = thirdOptions.length === 0;
+  memoButtons[2].disabled = false;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
   memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
   saveAdjustmentSelection();
