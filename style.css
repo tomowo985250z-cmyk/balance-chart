@@ -41,7 +41,7 @@ body {
   box-shadow: 0 3px 12px rgb(0 0 0 / 10%);
 }
 
-.dot-form label {
+.dot-form label, .clock-angle {
   display: grid;
   gap: 4px;
   color: #30343b;
@@ -59,7 +59,7 @@ body {
 }
 
 .dot-set legend { padding: 0 4px; font-weight: 700; }
-.dot-set label { min-width: 54px; }
+.dot-set label, .clock-angle { min-width: 54px; }
 .dot-set input { width: 100%; }
 .dot-set-red { color: #b00000; }
 .dot-set-blue { color: #0057c8; }
@@ -84,12 +84,12 @@ body {
 }
 
 .dot-form input { width: 130px; }
-.dot-form select { width: 100%; }
 .dot-form .dot-set input { width: 100%; }
-.time-select-value { display: none; }
-.time-wheel-trigger { width: 100%; }
 .clock-angle { flex: 1 1 130px; }
-.clock-angle > span { display: block; }
+.clock-angle > span:first-child { display: block; margin-bottom: 4px; }
+.clock-inputs { display: flex; gap: 6px; }
+.clock-inputs > span { display: flex; flex: 1 1 0; align-items: center; gap: 3px; }
+.clock-inputs small { font-size: 14px; font-weight: 700; white-space: nowrap; }
 .dot-form button { background: #1f5faa; color: #fff; border-color: #1f5faa; font-weight: 700; cursor: pointer; }
 .dot-form button:disabled { background: #77808d; border-color: #77808d; cursor: not-allowed; }
 .adjustment-form > button { min-height: 36px; background: #1f5faa; color: #fff; border-color: #1f5faa; font-weight: 700; cursor: pointer; }
@@ -473,7 +473,7 @@ object {
   }
   .adjustment-form { gap: 8px; border-radius: 0; box-shadow: none; }
 
-  .dot-form label {
+  .dot-form label, .clock-angle {
     flex: 1 1 130px;
   }
 
@@ -484,7 +484,7 @@ object {
   .memo-set { flex: 1 1 100%; }
   .memo-wheel-trigger { flex: 1 1 0; min-height: 44px; }
 
-  .dot-set label {
+  .dot-set label, .clock-angle {
     flex: 1 1 0;
   }
 

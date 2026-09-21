@@ -565,11 +565,6 @@ function renderTimeWheel(wheel, minimum, maximum, selected, setSelected) {
   };
 }
 
-populateTimeSelect(redInputs[0], 1, 12);
-populateTimeSelect(redInputs[1], 0, 59);
-populateTimeSelect(blueInputs[0], 1, 12);
-populateTimeSelect(blueInputs[1], 0, 59);
-
 function createTimePickerTrigger(hourInput, minuteInput) {
   const trigger = document.createElement('button');
   trigger.type = 'button';
@@ -597,8 +592,39 @@ function openTimePicker(hourInput, minuteInput) {
   timePicker.hidden = false;
 }
 
-createTimePickerTrigger(redInputs[0], redInputs[1]);
-createTimePickerTrigger(blueInputs[0], blueInputs[1]);
+function setupClockInput(input, pad = false) {
+  input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, 2); });
+  input.addEventListener('change', () => {
+    if (input.value !== '' && pad) input.value = String(Number(input.value)).padStart(2, '0');
+  });
+}
+
+function normalizeMeasurementValue(input) {
+  if (input.value === '') return;
+  const value = Number(input.value);
+  if (Number.isFinite(value) && value >= 0) input.value = value.toFixed(2);
+}
+
+function setupMeasurementValueInput(input) {
+  input.addEventListener('beforeinput', (event) => {
+    if (event.inputType === 'deleteContentBackward' && /^\d\.$/.test(input.value)) {
+      event.preventDefault();
+      input.value = '';
+    }
+  });
+  input.addEventListener('input', () => {
+    const digits = input.value.replace(/\D/g, '').slice(0, 3);
+    input.value = digits ? `${digits[0]}.${digits.slice(1)}` : '';
+  });
+  input.addEventListener('change', () => normalizeMeasurementValue(input));
+  input.addEventListener('blur', () => normalizeMeasurementValue(input));
+}
+
+[redInputs, blueInputs].forEach((inputs) => {
+  setupClockInput(inputs[0]);
+  setupClockInput(inputs[1], true);
+  setupMeasurementValueInput(inputs[2]);
+});
 
 closeTimePicker.addEventListener('click', () => { timePicker.hidden = true; });
 confirmTimePicker.addEventListener('click', () => {
@@ -697,6 +723,7 @@ function parseDotInput(hourValue, minuteValue, value) {
 }
 
 function readDotInput(inputs, color) {
+  normalizeMeasurementValue(inputs[2]);
   const values = inputs.map((input) => input.value);
   if (values.every((value) => value === '')) return null;
   const dot = parseDotInput(...values);
@@ -1312,7 +1339,7 @@ function startResultEdit(set) {
   if (cruiseAdditionTarget) finishCruiseAddition();
   resultEdit = { set, draft: [...redInputs, ...blueInputs].map(input => input.value) };
   [set.red, set.blue].forEach((dot, index) => {
-    const values = dot ? [...dot.clock.split(':'), String(dot.radius)] : ['', '', ''];
+    const values = dot ? [...dot.clock.split(':'), dot.radius.toFixed(2)] : ['', '', ''];
     if (dot) {
       values[0] = String(Number(values[0]) || 12);
       values[1] = String(Number(values[1]));
@@ -1380,7 +1407,7 @@ function renderHistoricalLearning() {
     const before = dotSets[candidate.index], after = dotSets[candidate.index + 1];
     const { type, blade, direction } = candidate.action;
     const target = type === 'TAB' ? 'TAB紫（巡航）' : candidate.color === 'red' ? 'LINK赤（HOV）' : 'LINK青（巡航）';
-    const measurement = dot => `${dot.clock} ／ ${dot.radius} IPS`;
+    const measurement = dot => `${dot.clock} ／ ${dot.radius.toFixed(2)} IPS`;
     const row = document.createElement('div');
     row.className = 'historical-learning-row';
     const description = document.createElement('span');
@@ -1431,7 +1458,7 @@ function renderDots() {
       if (dotIndex) label.append(' ／ ');
       const dotLabel = document.createElement('span');
       dotLabel.className = `dot-label-${dot.color}`;
-      dotLabel.textContent = `${dot.color === 'red' ? 'HOV' : '巡航'} ${dot.radius} ${dot.clock}`;
+      dotLabel.textContent = `${dot.color === 'red' ? 'HOV' : '巡航'} ${dot.radius.toFixed(2)} ${dot.clock}`;
       label.append(dotLabel);
     });
     const remove = document.createElement('button');
