@@ -331,7 +331,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   const action = BalanceLearning.adjustment(values);
   if (!target || !action) {
-    if (adjustmentForecast?.phase !== 'comparison') adjustmentForecast = null;
+    if (!['fixed', 'comparison'].includes(adjustmentForecast?.phase)) adjustmentForecast = null;
   } else {
     const key = JSON.stringify([target.learningId, target.red, target.blue, values]);
     if (!fixed || adjustmentForecast?.phase !== 'preview' || adjustmentForecast.key !== key) {
@@ -354,7 +354,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
           source: estimate.source, sampleCount: estimate.sampleCount, medianDistance: estimate.medianDistance,
           baseAmount: estimate.baseAmount, ratio: estimate.ratio }] : [];
       });
-      if (points.length || adjustmentForecast?.phase !== 'comparison') {
+      if (points.length || !['fixed', 'comparison'].includes(adjustmentForecast?.phase)) {
         adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
       }
     }

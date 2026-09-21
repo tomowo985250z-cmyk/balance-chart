@@ -991,9 +991,10 @@
     run('confirmMemoPicker.click(); adjustmentForm.requestSubmit();');
     const fixedForecast=run('JSON.stringify(adjustmentForecast.points)');
     assert(run('adjustmentForecast.phase')==='fixed','adjustment submission freezes forecast');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'adjustment submission keeps forecast dots after input reset');
     assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).animationName')==='none','confirmed glow stops pulsing');
     run('learning.predict=()=>({distance:37,position:{x:999,y:999}}); renderDots(); renderDots();');
-    assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'confirmed positions never recompute');
+    assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast && run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'confirmed positions never recompute or disappear');
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.7'];
       [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.8']; dotForm.requestSubmit();
