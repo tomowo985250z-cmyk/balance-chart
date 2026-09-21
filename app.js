@@ -275,7 +275,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   const action = BalanceLearning.adjustment(values);
   if (!target || !action) {
-    adjustmentForecast = null;
+    if (adjustmentForecast?.phase !== 'comparison') adjustmentForecast = null;
   } else {
     const key = JSON.stringify([target.learningId, target.red, target.blue, values]);
     if (!fixed || adjustmentForecast?.phase !== 'preview' || adjustmentForecast.key !== key) {
@@ -298,9 +298,11 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
           source: estimate.source, sampleCount: estimate.sampleCount, medianDistance: estimate.medianDistance,
           baseAmount: estimate.baseAmount, ratio: estimate.ratio }] : [];
       });
-      adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
+      if (points.length || adjustmentForecast?.phase !== 'comparison') {
+        adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
+      }
     }
-    if (fixed) adjustmentForecast.phase = 'fixed';
+    if (fixed && adjustmentForecast?.phase === 'preview' && adjustmentForecast.key === key) adjustmentForecast.phase = 'fixed';
   }
   renderAdjustmentForecast();
 }
@@ -334,19 +336,23 @@ function renderAdjustmentForecast() {
   const layer = document.createElementNS(ns, 'g');
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
   layer.style.pointerEvents = 'none';
-  adjustmentForecast.points.forEach(({ color, distance }) => {
-    const guide = forecastGuides[color];
-    const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
-    if (!guide || guide.targetId !== target?.learningId || guide.type !== adjustmentForecast.type
-      || !target[color] || !Number.isFinite(distance) || distance < 0) return;
-    if (!forecastGuideMatches(guide, adjustmentForecast.values)) return;
-    const visibleLine = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
-    if (!visibleLine) return;
-    const style = getComputedStyle(visibleLine);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || Number(style.opacity) === 0) return;
-    const start = getDotCoordinates(target[color]);
-    // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
-    const x = start.x + guide.unit.x * distance, y = start.y + guide.unit.y * distance;
+  adjustmentForecast.points.forEach(({ color, distance, x: storedX, y: storedY }) => {
+    let x = storedX, y = storedY;
+    if (adjustmentForecast.phase !== 'comparison') {
+      const guide = forecastGuides[color];
+      const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
+      if (!guide || guide.targetId !== target?.learningId || guide.type !== adjustmentForecast.type
+        || !target[color] || !Number.isFinite(distance) || distance < 0) return;
+      if (!forecastGuideMatches(guide, adjustmentForecast.values)) return;
+      const visibleLine = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
+      if (!visibleLine) return;
+      const style = getComputedStyle(visibleLine);
+      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || Number(style.opacity) === 0) return;
+      const start = getDotCoordinates(target[color]);
+      // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
+      x = start.x + guide.unit.x * distance;
+      y = start.y + guide.unit.y * distance;
+    }
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);

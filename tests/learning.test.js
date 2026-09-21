@@ -926,10 +926,12 @@
     assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast,'comparison retains frozen positions');
     assert(run('dotOverlay.querySelectorAll("circle.chart-dot-red,circle.chart-dot-blue").length')===4,'actual dots coexist with forecast');
     assert(run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast")).opacity')==='0.45','comparison is translucent');
-    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===0,'old comparison target without current matching guide is hidden');
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'comparison keeps both forecast dots after actual measurement');
+    assert(run('[...dotOverlay.querySelectorAll(".adjustment-forecast [data-color]")].every(node=>{const point=adjustmentForecast.points.find(item=>item.color===node.dataset.color),matrix=node.transform.baseVal.getItem(0).matrix;return matrix.e===point.x&&matrix.f===point.y;})'),'comparison uses frozen forecast coordinates');
     run('openMemoPicker(0);');
-    assert(!run('dotOverlay.querySelector(".forecast-body")'),'new incomplete adjustment clears previous forecast');
+    assert(run('adjustmentForecast.phase==="comparison" && dotOverlay.querySelectorAll(".forecast-body").length===2'),'incomplete new adjustment keeps previous comparison');
     run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; renderDots(); updateAdjustmentForecast();`);
+    assert(run('adjustmentForecast.phase')==='preview','valid new forecast replaces previous comparison');
     const forecastPurple=run('getComputedStyle(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")).color');
     assert(forecastPurple==='rgb(123, 44, 191)','TAB cruise preview is purple: '+forecastPurple);
     assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'TAB red without selected guide is hidden independently');
