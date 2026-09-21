@@ -240,6 +240,8 @@ object {
 }
 
 .guide-toggle { left: 14px; right: auto; font-family: inherit; }
+.guide-candidate-toggle { left: 14px; right: auto; bottom: 66px; font-family: inherit; }
+.guide-candidate-toggle[aria-pressed='true'] { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
 .trim-mode-toggle { bottom: 66px; font-family: inherit; }
 .trim-mode-toggle[hidden] { display: none; }
 .trim-mode-toggle[aria-pressed='true'] { background: #f0e7fa; border-color: #7b2cbf; color: #5d208f; }
@@ -461,6 +463,7 @@ object {
   }
 
   .guide-toggle { left: 10px; right: auto; }
+  .guide-candidate-toggle { left: 10px; right: auto; bottom: 64px; }
   .trim-mode-toggle { bottom: 64px; }
 
   .dot-form {

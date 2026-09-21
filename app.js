@@ -31,6 +31,8 @@ let manualTrimCruiseAngle = 0;
 let autoTrimCruiseAngle = 0;
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
+const guideCandidateToggle = document.getElementById('guideCandidateToggle');
+let guideCandidateIndex = 0;
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 
@@ -57,6 +59,12 @@ function setGuidesVisible(visible) {
 
 guideToggle.addEventListener('click', () => {
   setGuidesVisible(guideToggle.getAttribute('aria-pressed') !== 'true');
+});
+guideCandidateToggle.addEventListener('click', () => {
+  guideCandidateIndex = guideCandidateIndex === 0 ? 1 : 0;
+  guideCandidateToggle.textContent = `ガイド線${guideCandidateIndex + 1}`;
+  guideCandidateToggle.setAttribute('aria-pressed', String(guideCandidateIndex === 1));
+  renderDirectionLines();
 });
 setGuidesVisible(true);
 window.addEventListener('pageshow', () => setGuidesVisible(true));
@@ -971,6 +979,16 @@ function selectLinkGuideCandidate(candidates) {
     || first.amount - second.amount)[0];
 }
 
+function selectRankedLinkGuideCandidate(candidates, rank = guideCandidateIndex) {
+  let pool = [...candidates];
+  let selected;
+  for (let index = 0; index <= rank && pool.length; index += 1) {
+    selected = selectLinkGuideCandidate(pool);
+    if (index < rank) pool = pool.filter(candidate => candidate !== selected);
+  }
+  return selected;
+}
+
 function getLearnedGuideLines(finalSet) {
   const type = currentChartPage === 0 ? 'LINK' : 'TAB';
   const automatic = currentChartPage === 0 ? pitchAutoMode : trimAutoMode;
@@ -1045,11 +1063,12 @@ function getLearnedGuideLines(finalSet) {
         candidate.cruisePathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
       }
     }
-    selected = selectLinkGuideCandidate(candidates);
+    selected = selectRankedLinkGuideCandidate(candidates);
   } else {
-    selected = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
+    const ranked = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
       Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
-      || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance)[0];
+      || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance);
+    selected = ranked[guideCandidateIndex] || ranked[0];
   }
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
@@ -1093,9 +1112,10 @@ function renderDirectionLines() {
     // 学習済み候補が全て悪化する場合は、旧候補で上書きしない。
   } else if (currentChartPage === 1) {
     // トリムタブは巡航線だけを、矢印方向で到達できる中心距離で選ぶ。
-    const selected = blueDots.sort((first, second) =>
+    const ranked = blueDots.sort((first, second) =>
       Number(second.line.centerDistance <= CENTER_DISTANCE_THRESHOLD) - Number(first.line.centerDistance <= CENTER_DISTANCE_THRESHOLD)
-      || first.line.centerDistance - second.line.centerDistance)[0];
+      || first.line.centerDistance - second.line.centerDistance);
+    const selected = ranked[guideCandidateIndex] || ranked[0];
     if (!selected) {
       if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
       else renderAdjustmentForecast();
@@ -1130,7 +1150,7 @@ function renderDirectionLines() {
         hovPathDistance, cruisePathDistance: blue ? centerDistance(blue) : undefined,
         maxCenterDistance: distances.maxCenterDistance, distance: distances.distance };
     });
-    const selected = selectLinkGuideCandidate(candidates);
+    const selected = selectRankedLinkGuideCandidate(candidates);
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
     if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {

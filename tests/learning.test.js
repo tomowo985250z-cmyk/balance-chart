@@ -420,6 +420,7 @@
     assert(run("dotOverlay.querySelectorAll('circle').length") === 2, 'red and blue dots rendered');
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 2, 'no-data pitch guides fallback');
     assert(run("getComputedStyle(dotOverlay).overflow") === 'visible', 'out of chart overflow preserved');
+    assert(run("guideCandidateIndex===0 && guideCandidateToggle.textContent==='ガイド線1' && guideCandidateToggle.getAttribute('aria-pressed')==='false'"), 'guide candidate starts at line 1');
     run("pitchModeToggle.click(); guideToggle.click();");
     assert(run('pitchAutoMode') && run("dotOverlay.classList.contains('guides-visible')"), 'auto and guide toggles');
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 2, 'auto no-data guides fallback');
@@ -669,6 +670,15 @@
     }
     assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===2,'TAB still selects by cruise endpoint');
     assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
+    run('guideCandidateToggle.click();');
+    assert(run("guideCandidateIndex===1 && guideCandidateToggle.textContent==='ガイド線2' && guideCandidateToggle.getAttribute('aria-pressed')==='true'"), 'guide candidate button switches to line 2');
+    assert(pickPair([pair(toward,toward,[0.1,0.1]),pair(toward,toward,[0.05,0.05])]).blade===1,'LINK line 2 uses the runner-up from the existing ranking');
+    assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===1,'TAB line 2 uses the second candidate from the existing ranking');
+    assert(run(`selectRankedLinkGuideCandidate([
+      {blade:1,direction:'UP',amount:1,hovPathDistance:0,cruisePathDistance:0,predictions:[{predictedDistance:0.1}],maxCenterDistance:0.1,distance:0.1}
+    ]).blade`)===1,'line 2 keeps line 1 when no runner-up exists');
+    run('guideCandidateToggle.click();');
+    assert(run("guideCandidateIndex===0 && guideCandidateToggle.textContent==='ガイド線1'"), 'guide candidate button returns to line 1');
     groups.push('LINK：両点改善・両有向線通過・最大距離/合計・HOV最接近・境界・TAB維持');
     run(`
       window.testPathSelection = paths => {
