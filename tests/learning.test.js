@@ -430,9 +430,9 @@
     })()`), 'guide line 1 confirms No./type/direction and leaves amount unchanged');
     assert(run(`(()=>{
       const guide=Object.values(forecastGuides)[0], saved=[...memoValues], initial=[];
-      memoValues.splice(0,4,'','','','');
+      memoValues.splice(0,4,'','','',''); updateMemoButtons();
       openMemoPicker(0); initial[0]=selectedMemoValue;
-      openMemoPicker(1); initial[1]=selectedMemoValue;
+      initial[1]=memoValues[1];
       memoValues[1]=guide.type; openMemoPicker(2); initial[2]=selectedMemoValue;
       memoValues[1]=''; openMemoPicker(3); initial[3]=selectedMemoValue;
       memoPicker.hidden=true; memoValues.splice(0,4,...saved); updateMemoButtons();
@@ -454,10 +454,10 @@
       && memoValues[2]==='2' && memoValues[3]===guide.direction;})()`), 'visible trim guide line 2 automatically confirms TAB values');
     run('guideCandidateToggle.click();');
     run(`
-      memoValues.splice(0,4,'','','',''); setGuidesVisible(false); applySelectedGuideAdjustment();
-      window.hiddenTrimValues=[...memoValues]; openMemoPicker(1); window.hiddenTrimPicker=selectedMemoValue; memoPicker.hidden=true;
+      memoValues.splice(0,4,'','','',''); updateMemoButtons(); setGuidesVisible(false); applySelectedGuideAdjustment();
+      window.hiddenTrimValues=[...memoValues]; memoPicker.hidden=true;
     `);
-    assert(run("hiddenTrimValues.every(value=>value==='') && hiddenTrimPicker==='LINK'"), 'hidden trim guide does not initialize or confirm guide values');
+    assert(run("hiddenTrimValues.join('/')==='/TAB//' && memoButtons[1].disabled"), 'hidden trim guide keeps only the page-fixed TAB value');
     run('guideToggle.click();');
     assert(run(`(()=>{const guide=getVisibleGuideAdjustment(); return guide?.type==='TAB'
       && memoValues[0]===String(guide.blade) && memoValues[1]==='TAB' && memoValues[3]===guide.direction;})()`), 'enabling visible trim guide confirms its values');
@@ -1292,6 +1292,10 @@
     assert(run(`JSON.stringify(independentSelections)===JSON.stringify([
       ['1','LINK','1/8','UP'],['2','LINK','1/4','DOWN'],['3','TAB','2','UP'],['1','TAB','3','DOWN']
     ])`), 'LINK/TAB guide lines 1/2 retain four independent adjustment selections');
+    run('memoPicker.hidden=true; memoButtons[1].click();');
+    assert(run("memoButtons[1].disabled && memoPicker.hidden && memoValues[1]==='TAB' && memoButtons[1].textContent.includes('TAB')"), 'TAB type is fixed and cannot open selection');
+    run('showChartPage(0); guideCandidateToggle.click();');
+    assert(run("memoButtons[1].disabled && memoValues[1]==='LINK' && memoButtons[1].textContent.includes('LINK')"), 'LINK type stays fixed on both guide lines');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

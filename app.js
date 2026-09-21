@@ -235,9 +235,11 @@ function restoreAdjustmentSelection() {
 }
 
 function updateMemoButtons() {
+  memoValues[1] = currentChartPage === 0 ? 'LINK' : 'TAB';
   memoButtons.forEach((button, index) => {
     button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
   });
+  memoButtons[1].disabled = true;
   const thirdOptions = getThirdMemoOptions();
   memoButtons[2].disabled = thirdOptions.length === 0;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
@@ -304,6 +306,7 @@ function renderMemoWheel(options, selected, index) {
 }
 
 function openMemoPicker(index) {
+  if (index === 1) return;
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
   activeMemoIndex = index;
