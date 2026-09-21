@@ -1278,6 +1278,20 @@
       run('learning.predict=identityPredict;');
     }
     assert(run('!forecastGuideMatches({},["1","LINK","1","UP"]) && !forecastGuideMatches({blade:1,direction:"UP"},[])'),'missing guide identity or adjustment hides forecast');
+    run(`
+      setGuidesVisible(false); showChartPage(0); if(guideCandidateIndex!==0) guideCandidateToggle.click();
+      memoValues.splice(0,4,'1','LINK','1/8','UP'); updateMemoButtons();
+      guideCandidateToggle.click(); memoValues.splice(0,4,'2','LINK','1/4','DOWN'); updateMemoButtons();
+      showChartPage(1); memoValues.splice(0,4,'3','TAB','2','UP'); updateMemoButtons();
+      guideCandidateToggle.click(); memoValues.splice(0,4,'1','TAB','3','DOWN'); updateMemoButtons();
+      showChartPage(0); window.independentSelections=[[...memoValues]];
+      guideCandidateToggle.click(); independentSelections.push([...memoValues]);
+      showChartPage(1); independentSelections.push([...memoValues]);
+      guideCandidateToggle.click(); independentSelections.push([...memoValues]);
+    `);
+    assert(run(`JSON.stringify(independentSelections)===JSON.stringify([
+      ['1','LINK','1/8','UP'],['2','LINK','1/4','DOWN'],['3','TAB','2','UP'],['1','TAB','3','DOWN']
+    ])`), 'LINK/TAB guide lines 1/2 retain four independent adjustment selections');
     frame.remove();
     output.textContent = `PASS: ${checks} checks\n${groups.join('\n')}`;
     document.title = 'PASS';

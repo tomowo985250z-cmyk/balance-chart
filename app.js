@@ -63,9 +63,11 @@ guideToggle.addEventListener('click', () => {
   if (visible) applySelectedGuideAdjustment();
 });
 guideCandidateToggle.addEventListener('click', () => {
+  saveAdjustmentSelection();
   guideCandidateIndex = guideCandidateIndex === 0 ? 1 : 0;
   guideCandidateToggle.textContent = `ガイド線${guideCandidateIndex + 1}`;
   guideCandidateToggle.setAttribute('aria-pressed', String(guideCandidateIndex === 1));
+  restoreAdjustmentSelection();
   renderDirectionLines();
   applySelectedGuideAdjustment();
 });
@@ -150,6 +152,7 @@ let activeTimeInputs = null;
 let activeMemoIndex = null;
 let selectedMemoValue = '';
 const memoValues = ['', '', '', ''];
+const adjustmentSelections = Array.from({ length: 4 }, () => ['', '', '', '']);
 let selectedHour = 0;
 let selectedMinute = 0;
 
@@ -218,6 +221,19 @@ function formatMemoInputValue(value, index) {
   return formatMemoValue(value, index, memoValues[1]) || '選択';
 }
 
+function getAdjustmentSelectionIndex() {
+  return currentChartPage * 2 + guideCandidateIndex;
+}
+
+function saveAdjustmentSelection() {
+  adjustmentSelections[getAdjustmentSelectionIndex()] = [...memoValues];
+}
+
+function restoreAdjustmentSelection() {
+  memoValues.splice(0, 4, ...adjustmentSelections[getAdjustmentSelectionIndex()]);
+  updateMemoButtons();
+}
+
 function updateMemoButtons() {
   memoButtons.forEach((button, index) => {
     button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
@@ -226,6 +242,7 @@ function updateMemoButtons() {
   memoButtons[2].disabled = thirdOptions.length === 0;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
   memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
+  saveAdjustmentSelection();
 }
 
 function getVisibleGuideAdjustment() {
@@ -247,6 +264,7 @@ function applySelectedGuideAdjustment() {
     memoValues[index] = value;
     memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
   });
+  saveAdjustmentSelection();
   updateAdjustmentForecast();
 }
 
@@ -493,9 +511,11 @@ trimModeToggle.addEventListener('click', () => {
 
 function showChartPage(page) {
   if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
+  saveAdjustmentSelection();
   saveRotation();
   manualMessageChanges = { red: false, blue: false };
   currentChartPage = page;
+  restoreAdjustmentSelection();
   dotOverlay.classList.toggle('trim-tab', page === 1);
   ({ hovAngle, cruiseAngle } = pageRotations[page]);
   if (page === 0 && pitchAutoMode) syncAutoPitchRotation();
