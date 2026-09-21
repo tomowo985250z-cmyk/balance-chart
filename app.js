@@ -397,17 +397,19 @@ function renderAdjustmentForecast() {
     if (adjustmentForecast.phase !== 'comparison') {
       const guide = forecastGuides[color];
       const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
-      if (!guide || guide.targetId !== target?.learningId || guide.type !== adjustmentForecast.type
-        || !target[color] || !Number.isFinite(distance) || distance < 0) return;
-      if (!forecastGuideMatches(guide, adjustmentForecast.values)) return;
+      const validGuide = guide && guide.targetId === target?.learningId && guide.type === adjustmentForecast.type
+        && target[color] && Number.isFinite(distance) && distance >= 0
+        && forecastGuideMatches(guide, adjustmentForecast.values);
       const visibleLine = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
-      if (!visibleLine) return;
-      const style = getComputedStyle(visibleLine);
-      if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || Number(style.opacity) === 0) return;
-      const start = getDotCoordinates(target[color]);
-      // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
-      x = start.x + guide.unit.x * distance;
-      y = start.y + guide.unit.y * distance;
+      const style = visibleLine && getComputedStyle(visibleLine);
+      const visibleGuide = validGuide && visibleLine && style.display !== 'none'
+        && style.visibility !== 'hidden' && style.visibility !== 'collapse' && Number(style.opacity) !== 0;
+      if (visibleGuide) {
+        const start = getDotCoordinates(target[color]);
+        // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
+        x = start.x + guide.unit.x * distance;
+        y = start.y + guide.unit.y * distance;
+      } else if (adjustmentForecast.phase !== 'fixed') return;
     }
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');

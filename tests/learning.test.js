@@ -995,6 +995,10 @@
     assert(run('getComputedStyle(dotOverlay.querySelector(".forecast-glow")).animationName')==='none','confirmed glow stops pulsing');
     run('learning.predict=()=>({distance:37,position:{x:999,y:999}}); renderDots(); renderDots();');
     assert(run('JSON.stringify(adjustmentForecast.points)')===fixedForecast && run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'confirmed positions never recompute or disappear');
+    run(`forecastGuides.red={...forecastGuides.red,direction:forecastGuides.red.direction==='UP'?'DOWN':'UP'}; renderAdjustmentForecast();`);
+    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===2,'confirmed forecast falls back to frozen positions when guide selection changes');
+    assert(run('[...dotOverlay.querySelectorAll(".adjustment-forecast [data-color]")].every(node=>{const point=adjustmentForecast.points.find(item=>item.color===node.dataset.color),matrix=node.transform.baseVal.getItem(0).matrix;return matrix.e===point.x&&matrix.f===point.y;})'),'guide mismatch restores confirmed forecast from frozen coordinates');
+    run('renderDirectionLines();');
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.7'];
       [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.8']; dotForm.requestSubmit();
