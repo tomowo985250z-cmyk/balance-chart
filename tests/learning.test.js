@@ -445,6 +445,14 @@
     run('showChartPage(1); trimModeToggle.click();');
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 1, 'no-data trim guide');
     assert(run("dotOverlay.classList.contains('trim-tab')"), 'trim page color class');
+    run(`
+      memoValues.splice(0,4,'','','',''); setGuidesVisible(false); applySelectedGuideAdjustment();
+      window.hiddenTrimValues=[...memoValues]; openMemoPicker(1); window.hiddenTrimPicker=selectedMemoValue; memoPicker.hidden=true;
+    `);
+    assert(run("hiddenTrimValues.every(value=>value==='') && hiddenTrimPicker==='LINK'"), 'hidden trim guide does not initialize or confirm guide values');
+    run('guideToggle.click();');
+    assert(run(`(()=>{const guide=getVisibleGuideAdjustment(); return guide?.type==='TAB'
+      && memoValues[0]===String(guide.blade) && memoValues[1]==='TAB' && memoValues[3]===guide.direction;})()`), 'enabling visible trim guide confirms its values');
     run("showChartPage(0); dotSets[0].blue=null; renderDots();");
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 1, 'HOV only preserved');
     groups.push('実画面：ドット・両ページ・トグル・初期ガイド・HOVのみ・枠外表示');

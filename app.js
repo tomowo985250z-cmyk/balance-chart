@@ -58,7 +58,9 @@ function setGuidesVisible(visible) {
 }
 
 guideToggle.addEventListener('click', () => {
-  setGuidesVisible(guideToggle.getAttribute('aria-pressed') !== 'true');
+  const visible = guideToggle.getAttribute('aria-pressed') !== 'true';
+  setGuidesVisible(visible);
+  if (visible) applySelectedGuideAdjustment();
 });
 guideCandidateToggle.addEventListener('click', () => {
   guideCandidateIndex = guideCandidateIndex === 0 ? 1 : 0;
@@ -226,8 +228,19 @@ function updateMemoButtons() {
   memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
 }
 
+function getVisibleGuideAdjustment() {
+  if (!dotOverlay.classList.contains('guides-visible')) return null;
+  const line = [...dotOverlay.querySelectorAll('.guide-direction-line')].find((candidate) => {
+    const style = getComputedStyle(candidate);
+    return style.display !== 'none' && style.visibility !== 'hidden'
+      && style.visibility !== 'collapse' && Number(style.opacity) !== 0;
+  });
+  if (!line) return null;
+  return forecastGuides[line.getAttribute('marker-end') === 'url(#redDirectionLineArrow)' ? 'red' : 'blue'] ?? null;
+}
+
 function applySelectedGuideAdjustment() {
-  const guide = Object.values(forecastGuides)[0];
+  const guide = getVisibleGuideAdjustment();
   if (!guide) return;
   [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
     const index = [0, 1, 3][position];
@@ -276,7 +289,7 @@ function openMemoPicker(index) {
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
   activeMemoIndex = index;
-  const guide = Object.values(forecastGuides)[0];
+  const guide = getVisibleGuideAdjustment();
   const guideValue = [guide?.blade, guide?.type, null, guide?.direction][index];
   const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1')
     : options.includes(String(guideValue)) ? String(guideValue) : options[0];
