@@ -92,10 +92,7 @@ const BalanceDistancePrior = (() => {
     }
     return { distance, source: actualCount ? 'prior-adjusted' : 'prior', actualCount, prior };
   }
-  function resolve(action, color, prediction, confirmedSamples = [], radius = 240) {
-    if (Number.isFinite(prediction?.distance) && prediction.distance >= 0) {
-      return { distance: prediction.distance, source: 'learned' };
-    }
+  function resolveFallback(action, color, confirmedSamples, radius) {
     const exact = resolveExact(action, color, confirmedSamples, radius);
     if (exact) return exact;
     const amounts = new Set(samples.filter(sample => sample.type === action.type && sample.color === color)
@@ -114,6 +111,29 @@ const BalanceDistancePrior = (() => {
     return { ...nearest.estimate, distance: nearest.estimate.distance * action.amount / nearest.amount,
       source: 'proportional-estimate', baseSource: nearest.estimate.source,
       baseAmount: nearest.amount, ratio: action.amount / nearest.amount };
+  }
+  function resolve(action, color, prediction, confirmedSamples = [], radius = 240) {
+    if (Number.isFinite(prediction?.distance) && prediction.distance >= 0) {
+      return { distance: prediction.distance, source: 'learned' };
+    }
+    const estimate = resolveFallback(action, color, confirmedSamples, radius);
+    if (action.type !== 'TAB' || !estimate) return estimate;
+    const amounts = [1, 2, 3];
+    const series = amounts.map(amount => ({ amount,
+      estimate: resolveFallback({ ...action, amount }, color, confirmedSamples, radius) }))
+      .filter(item => Number.isFinite(item.estimate?.distance));
+    const monotonic = series.every((item, index) => index === 0 || series[index - 1].estimate.distance < item.estimate.distance);
+    if (monotonic) return estimate;
+    const unitDistances = amounts.map(amount => {
+      const direct = resolveExact({ ...action, amount }, color, confirmedSamples, radius);
+      return Number.isFinite(direct?.distance) && direct.distance > 0 ? direct.distance / amount : null;
+    }).filter(Number.isFinite).sort((first, second) => first - second);
+    if (unitDistances.length < 2) return estimate;
+    const middle = Math.floor(unitDistances.length / 2);
+    const unitDistance = unitDistances.length % 2 ? unitDistances[middle]
+      : (unitDistances[middle - 1] + unitDistances[middle]) / 2;
+    return { ...estimate, distance: unitDistance * action.amount, source: 'tab-monotonic-estimate',
+      baseSource: estimate.source, unitDistance };
   }
   return Object.freeze({ samples, lookup, resolve });
 })();

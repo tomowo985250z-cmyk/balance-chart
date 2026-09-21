@@ -97,6 +97,18 @@
       assert(reference.distance>0 && reference.confidence==='low','reference positive and low confidence');
       near(BalanceDistancePrior.resolve(action,color,{distance:17}).distance,17,'learned overrides reference');
     }
+    const invertedTabAction={type:'TAB',blade:1,direction:'UP'};
+    const invertedTabPriors=[1,2].map(amount=>BalanceDistancePrior.lookup({...invertedTabAction,amount},'blue'));
+    assert(invertedTabPriors[0].distance>invertedTabPriors[1].distance,'raw TAB measurements reproduce the 1 degree / 2 degree inversion');
+    const monotonicTab=[1,2,3].map(amount=>BalanceDistancePrior.resolve({...invertedTabAction,amount},'blue',null));
+    assert(monotonicTab.every(estimate=>estimate.source==='tab-monotonic-estimate'),'only inverted TAB fallback uses monotonic normalization');
+    assert(monotonicTab[0].distance<monotonicTab[1].distance && monotonicTab[1].distance<monotonicTab[2].distance,'TAB fallback guarantees 1 degree < 2 degrees < 3 degrees');
+    near(monotonicTab[1].distance,monotonicTab[0].distance*2,'TAB two-degree distance uses common per-degree reference');
+    near(monotonicTab[2].distance,monotonicTab[0].distance*3,'TAB three-degree distance uses common per-degree reference');
+    const stableTab=BalanceDistancePrior.resolve({type:'TAB',blade:2,direction:'DOWN',amount:1},'blue',null);
+    assert(stableTab.source==='prior','already increasing TAB series keeps existing exact source');
+    near(stableTab.distance,0.15177001696073375*240,'already increasing TAB distance stays unchanged');
+    near(BalanceDistancePrior.resolve({...invertedTabAction,amount:2},'blue',{distance:77}).distance,77,'learned TAB prediction still overrides monotonic fallback');
     assert(BalanceDistancePrior.resolve(priorAction,'red',null).source==='prior','exact prior overrides pooled reference');
     const scaledHalf=BalanceDistancePrior.resolve({...priorAction,amount:1},'red',null);
     assert(scaledHalf.source==='proportional-estimate' && scaledHalf.baseAmount===0.5 && scaledHalf.ratio===2,'nearest lower amount scales upward');
@@ -1021,9 +1033,9 @@
     assert(run('dotOverlay.querySelector(".direction-lines").outerHTML===priorGuideBefore'),'prior preview never changes guide selection');
     assert(run('JSON.stringify(learning.inspect())===priorLearningBefore'),'UI prior never changes learning state');
     run('memoValues[2]="1"; updateAdjustmentForecast();');
-    assert(run('adjustmentForecast.points.length===0'),'UI unrecorded amount hides both without proportional scaling');
+    assert(run('adjustmentForecast.points.length===2 && adjustmentForecast.points.every(point=>point.source==="proportional-estimate" && point.ratio===4)'),'UI unrecorded amount proportionally scales both series');
     run('memoValues.splice(0,4,"1","LINK","1/2","UP"); updateAdjustmentForecast();');
-    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'LINK red prior never supplies missing blue');
+    assert(run('adjustmentForecast.points.length===2 && adjustmentForecast.points.find(point=>point.color==="red").source==="prior" && adjustmentForecast.points.find(point=>point.color==="blue").source==="proportional-estimate"'),'LINK red exact prior and blue nearest amount remain independent');
     run('showChartPage(1); memoValues.splice(0,4,"3","TAB","1","DOWN"); updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="blue"'),'purple prior appears; TAB red prior has no guide and stays hidden');
     near(run('forecastGeometry()[0].cross'),0,'purple prior lies on purple guide');
