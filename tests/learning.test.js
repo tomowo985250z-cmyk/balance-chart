@@ -442,9 +442,17 @@
     run("pitchModeToggle.click(); guideToggle.click();");
     assert(run('pitchAutoMode') && run("dotOverlay.classList.contains('guides-visible')"), 'auto and guide toggles');
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 2, 'auto no-data guides fallback');
-    run('showChartPage(1); trimModeToggle.click();');
+    run("memoValues.splice(0,4,'','','2',''); showChartPage(1); trimModeToggle.click();");
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 1, 'no-data trim guide');
     assert(run("dotOverlay.classList.contains('trim-tab')"), 'trim page color class');
+    assert(run(`(()=>{const guide=getVisibleGuideAdjustment(); return guide?.type==='TAB'
+      && memoValues[0]===String(guide.blade) && memoValues[1]==='TAB'
+      && memoValues[2]==='2' && memoValues[3]===guide.direction;})()`), 'visible trim guide line 1 automatically confirms TAB values');
+    run("memoValues.splice(0,4,'','','2',''); guideCandidateToggle.click();");
+    assert(run(`(()=>{const guide=getVisibleGuideAdjustment(); return guide?.type==='TAB'
+      && memoValues[0]===String(guide.blade) && memoValues[1]==='TAB'
+      && memoValues[2]==='2' && memoValues[3]===guide.direction;})()`), 'visible trim guide line 2 automatically confirms TAB values');
+    run('guideCandidateToggle.click();');
     run(`
       memoValues.splice(0,4,'','','',''); setGuidesVisible(false); applySelectedGuideAdjustment();
       window.hiddenTrimValues=[...memoValues]; openMemoPicker(1); window.hiddenTrimPicker=selectedMemoValue; memoPicker.hidden=true;

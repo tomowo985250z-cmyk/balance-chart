@@ -1243,6 +1243,7 @@ function renderDirectionLines() {
       };
     }
   });
+  if (currentChartPage === 1) applySelectedGuideAdjustment();
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
 }
