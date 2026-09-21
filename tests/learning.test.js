@@ -421,6 +421,17 @@
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 2, 'no-data pitch guides fallback');
     assert(run("getComputedStyle(dotOverlay).overflow") === 'visible', 'out of chart overflow preserved');
     assert(run("guideCandidateIndex===0 && guideCandidateToggle.textContent==='ガイド線1' && guideCandidateToggle.getAttribute('aria-pressed')==='false'"), 'guide candidate starts at line 1');
+    assert(run(`(()=>{
+      const guide=Object.values(forecastGuides)[0], saved=[...memoValues], initial=[];
+      memoValues.splice(0,4,'','','','');
+      openMemoPicker(0); initial[0]=selectedMemoValue;
+      openMemoPicker(1); initial[1]=selectedMemoValue;
+      memoValues[1]=guide.type; openMemoPicker(2); initial[2]=selectedMemoValue;
+      memoValues[1]=''; openMemoPicker(3); initial[3]=selectedMemoValue;
+      memoPicker.hidden=true; memoValues.splice(0,4,...saved); updateMemoButtons();
+      return initial[0]===String(guide.blade) && initial[1]===guide.type
+        && initial[2]===(guide.type==='LINK'?'1/8':'1') && initial[3]===guide.direction;
+    })()`), 'guide line 1 sets initial No./type/direction but keeps amount default');
     run("pitchModeToggle.click(); guideToggle.click();");
     assert(run('pitchAutoMode') && run("dotOverlay.classList.contains('guides-visible')"), 'auto and guide toggles');
     assert(run("dotOverlay.querySelectorAll('.guide-direction-line').length") === 2, 'auto no-data guides fallback');
@@ -672,6 +683,13 @@
     assert(run('testCandidateSelection([[0.2,1.2],[0.8,1.4]],1)')===null,'TAB still rejects worsening cruise candidates');
     run('guideCandidateToggle.click();');
     assert(run("guideCandidateIndex===1 && guideCandidateToggle.textContent==='ガイド線2' && guideCandidateToggle.getAttribute('aria-pressed')==='true'"), 'guide candidate button switches to line 2');
+    assert(run(`(()=>{
+      const guide=Object.values(forecastGuides)[0], saved=[...memoValues], initial=[];
+      memoValues.splice(0,4,'','','','');
+      for(const index of [0,1,3]) { openMemoPicker(index); initial[index]=selectedMemoValue; }
+      memoPicker.hidden=true; memoValues.splice(0,4,...saved); updateMemoButtons();
+      return initial[0]===String(guide.blade) && initial[1]===guide.type && initial[3]===guide.direction;
+    })()`), 'guide line 2 sets its initial No./type/direction');
     assert(pickPair([pair(toward,toward,[0.1,0.1]),pair(toward,toward,[0.05,0.05])]).blade===1,'LINK line 2 uses the runner-up from the existing ranking');
     assert(run('testCandidateSelection([[0.9,0.8],[0.2,0.4]],1)')===1,'TAB line 2 uses the second candidate from the existing ranking');
     assert(run(`selectRankedLinkGuideCandidate([

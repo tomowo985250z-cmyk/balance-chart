@@ -264,7 +264,10 @@ function openMemoPicker(index) {
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
   activeMemoIndex = index;
-  const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1') : options[0];
+  const guide = Object.values(forecastGuides)[0];
+  const guideValue = [guide?.blade, guide?.type, null, guide?.direction][index];
+  const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1')
+    : options.includes(String(guideValue)) ? String(guideValue) : options[0];
   selectedMemoValue = memoValues[index] || initialValue;
   memoPickerTitle.textContent = `調整量 ${index + 1} を選択`;
   renderMemoWheel(options, selectedMemoValue, index);
