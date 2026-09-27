@@ -1176,7 +1176,7 @@
       assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===colors.length,type+' learned forecasts restore after toggle');
       if(type==='LINK') {
         run('dotOverlay.querySelector(".guide-direction-line[marker-end=\'url(#redDirectionLineArrow)\']").style.display="none"; renderAdjustmentForecast();');
-        assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=red]") && Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]"))'),'individual red guide hidden leaves blue forecast visible');
+        assert(run('Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=red]")) && Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]"))'),'individual red guide hidden preserves all generated forecasts');
         run('renderDirectionLines();');
       }
       run('updateAdjustmentForecast(memoValues,true); hovAngle+=30; cruiseAngle-=20; renderDirectionLines();');
@@ -1275,22 +1275,22 @@
       assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),type+'/'+color+' selected guide identity displays forecast');
       near(run(`renderedForecastGeometry().find(p=>p.color==='${color}').forward`),24,type+'/'+color+' same learned distance maintained',1e-4);
       run('memoValues[3]=identityGuide.direction==="UP"?"DOWN":"UP"; updateAdjustmentForecast();');
-      assert(run(`!dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]')`),type+'/'+color+' opposite UP/DOWN hidden');
-      assert(run(`adjustmentForecast.points.some(p=>p.color==='${color}' && p.distance===24)`),'hidden prediction is retained');
+      assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),type+'/'+color+' opposite UP/DOWN preserves generated forecast');
+      assert(run(`adjustmentForecast.points.some(p=>p.color==='${color}' && p.distance===24)`),'displayed prediction is retained');
       run('memoValues[3]=identityGuide.direction; memoValues[0]=String(identityGuide.blade%3+1); updateAdjustmentForecast();');
-      assert(run(`!dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]')`),type+'/'+color+' different No. hidden');
+      assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),type+'/'+color+' different No. preserves generated forecast');
       run('memoValues[0]=String(identityGuide.blade); updateAdjustmentForecast(); setGuidesVisible(false);');
       assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),'guide OFF remains hidden');
       run('setGuidesVisible(true);');
       assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]'))`),'matching forecast restored');
       if(type==='LINK') {
         run(`forecastGuides['${color}']={...forecastGuides['${color}'],direction:identityGuide.direction==='UP'?'DOWN':'UP'}; renderAdjustmentForecast();`);
-        assert(run(`!dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]') && Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color==='red'?'blue':'red'}]'))`),'per-color guide identity is independent');
+        assert(run(`Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]')) && Boolean(dotOverlay.querySelector('.adjustment-forecast [data-color=${color==='red'?'blue':'red'}]'))`),'per-color guide mismatch preserves both generated forecasts');
       }
       assert(run('JSON.stringify(learning.inspect())===identityLearning && dotOverlay.querySelector(".direction-lines").outerHTML===identityLines'),'display gate leaves learning and rendered guides unchanged');
       run('learning.predict=identityPredict;');
     }
-    assert(run('!forecastGuideMatches({},["1","LINK","1","UP"]) && !forecastGuideMatches({blade:1,direction:"UP"},[])'),'missing guide identity or adjustment hides forecast');
+    assert(run('!forecastGuideMatches({},["1","LINK","1","UP"]) && !forecastGuideMatches({blade:1,direction:"UP"},[])'),'missing guide identity or adjustment prevents guide projection');
     run(`
       setGuidesVisible(false); showChartPage(0); if(guideCandidateIndex!==0) guideCandidateToggle.click();
       memoValues.splice(0,4,'1','LINK','1/8','UP'); updateMemoButtons();

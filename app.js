@@ -409,7 +409,8 @@ function renderAdjustmentForecast() {
         // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
         x = start.x + guide.unit.x * distance;
         y = start.y + guide.unit.y * distance;
-      } else if (adjustmentForecast.phase !== 'fixed') return;
+      }
+      // 対応する可視ガイドがなくても、生成済みの予測は保存座標で表示する。
     }
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
