@@ -1180,10 +1180,11 @@
         run('renderDirectionLines();');
       }
       run('updateAdjustmentForecast(memoValues,true); hovAngle+=30; cruiseAngle-=20; renderDirectionLines();');
-      for(const point of run('renderedForecastGeometry()')) {
-        near(point.cross,0,type+' fixed distance follows currently displayed line',1e-4);
-        near(point.forward,point.color==='red'?23:41,type+' fixed distance preserved on rotation',1e-4);
-      }
+      assert(run(`[...dotOverlay.querySelectorAll('.adjustment-forecast [data-color]')].every(node=>{
+        const point=adjustmentForecast.points.find(point=>point.color===node.dataset.color);
+        const matrix=node.transform.baseVal.getItem(0).matrix;
+        return Math.abs(matrix.e-point.x)<1e-4 && Math.abs(matrix.f-point.y)<1e-4;
+      })`),type+' rotation renders saved forecast coordinates without guide projection');
       run('setGuidesVisible(false);');
       assert(run('dotOverlay.querySelectorAll(".forecast-body").length===0'),type+' fixed forecasts also obey OFF');
       run('setGuidesVisible(true); learning.predict=visibilityPredict; memoValues[2]="3"; updateAdjustmentForecast();');

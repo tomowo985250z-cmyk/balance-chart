@@ -36,7 +36,7 @@
       if (type === 'LINK') assert(run('adjustmentForecast.points.some(p=>p.color==="red")'), 'real calculation generates HOV');
       for (const phase of ['preview', 'fixed', 'comparison']) {
         for (const color of type === 'LINK' ? ['blue', 'red'] : ['blue']) {
-          for (const condition of ['direction', 'blade', 'missing', 'hidden', 'transparent', 'removed']) {
+          for (const condition of ['direction', 'blade', 'missing', 'hidden', 'transparent', 'removed', 'matching-rotated']) {
             run(`
               adjustmentForecast.phase='${phase}';
               forecastGuides={...savedDisplayGuides};
@@ -49,6 +49,12 @@
               if ('${condition}'==='hidden') displayLine.style.display='none';
               if ('${condition}'==='transparent') displayLine.style.opacity='0';
               if ('${condition}'==='removed') displayLine.remove();
+              if ('${condition}'==='matching-rotated') {
+                const action=BalanceLearning.adjustment(adjustmentForecast.values);
+                const guide=forecastGuides['${color}'];
+                forecastGuides['${color}']={...guide,blade:action.blade,direction:action.direction,
+                  unit:{x:-guide.unit.y,y:guide.unit.x}};
+              }
               renderAdjustmentForecast();
             `);
             assert(run('dotOverlay.querySelectorAll(".forecast-body").length===adjustmentForecast.points.length'), `${type}/${phase}/${color}/${condition}: all generated dots rendered`);

@@ -392,26 +392,8 @@ function renderAdjustmentForecast() {
   const layer = document.createElementNS(ns, 'g');
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
   layer.style.pointerEvents = 'none';
-  adjustmentForecast.points.forEach(({ color, distance, x: storedX, y: storedY }) => {
-    let x = storedX, y = storedY;
-    if (adjustmentForecast.phase !== 'comparison') {
-      const guide = forecastGuides[color];
-      const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
-      const validGuide = guide && guide.targetId === target?.learningId && guide.type === adjustmentForecast.type
-        && target[color] && Number.isFinite(distance) && distance >= 0
-        && forecastGuideMatches(guide, adjustmentForecast.values);
-      const visibleLine = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
-      const style = visibleLine && getComputedStyle(visibleLine);
-      const visibleGuide = validGuide && visibleLine && style.display !== 'none'
-        && style.visibility !== 'hidden' && style.visibility !== 'collapse' && Number(style.opacity) !== 0;
-      if (visibleGuide) {
-        const start = getDotCoordinates(target[color]);
-        // 確定済み距離は再学習・再計算せず、表示だけを現在の対応線へ合わせる。
-        x = start.x + guide.unit.x * distance;
-        y = start.y + guide.unit.y * distance;
-      }
-      // 対応する可視ガイドがなくても、生成済みの予測は保存座標で表示する。
-    }
+  // 候補1/2の選択やガイドの有無に依存せず、生成済み座標をそのまま描画する。
+  adjustmentForecast.points.forEach(({ color, x, y }) => {
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
