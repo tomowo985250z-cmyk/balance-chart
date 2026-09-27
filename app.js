@@ -34,6 +34,7 @@ const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
 let guideCandidateIndex = 0;
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
+const forecastDisplayCache = new Map(); // 候補切替で失われない表示用の生成済み座標。
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 
 try {
@@ -356,6 +357,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
       });
       if (points.length || !['fixed', 'comparison'].includes(adjustmentForecast?.phase)) {
         adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
+        rememberForecastDisplay(adjustmentForecast);
       }
     }
     if (fixed && adjustmentForecast?.phase === 'preview' && adjustmentForecast.key === key) adjustmentForecast.phase = 'fixed';
@@ -374,6 +376,44 @@ function forecastGuideMatches(guide, values) {
   return Boolean(action && guide && guide.blade === action.blade && guide.direction === action.direction);
 }
 
+function getForecastDisplayEntry(forecast, create = false) {
+  // 編集・削除された測定や別の調整量へ、古い予測を流用しない。
+  for (const [key, entry] of forecastDisplayCache) {
+    const target = dotSets.find(set => set.learningId === entry.targetId);
+    if (!target || entry.measurements !== JSON.stringify([target.red, target.blue])) forecastDisplayCache.delete(key);
+  }
+  const target = dotSets.find(set => set.learningId === forecast.targetId);
+  if (!target) return null;
+  const key = JSON.stringify([forecast.targetId, forecast.type, forecast.values[2]]);
+  if (create && !forecastDisplayCache.has(key)) {
+    forecastDisplayCache.set(key, { targetId: forecast.targetId,
+      measurements: JSON.stringify([target.red, target.blue]), points: new Map() });
+  }
+  return forecastDisplayCache.get(key);
+}
+
+function rememberForecastDisplay(forecast) {
+  const entry = getForecastDisplayEntry(forecast, true);
+  if (!entry) return;
+  for (const point of forecast.points) {
+    if ([point.x, point.y].every(Number.isFinite)) {
+      entry.points.set(point.color, { ...point, savedValues: [...forecast.values] });
+    }
+  }
+}
+
+function getForecastDisplayPoints(forecast) {
+  const saved = getForecastDisplayEntry(forecast);
+  const points = [...forecast.points];
+  if (forecast.phase === 'preview' && forecast.targetId !== dotSets.at(-1)?.learningId) return points;
+  // 新しい候補で計算できない色だけ、同じ測定・種別・調整量の生成済み座標を復元する。
+  // 計算結果や学習用データには混ぜず、表示層だけで補う。
+  for (const point of saved?.points.values() ?? []) {
+    if (!points.some(current => current.color === point.color)) points.push(point);
+  }
+  return points;
+}
+
 function renderAdjustmentForecast() {
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
   const notice = document.getElementById('forecastLearningNotice');
@@ -381,9 +421,15 @@ function renderAdjustmentForecast() {
   notice.textContent = '';
   if (!adjustmentForecast) return;
   if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
-  if (adjustmentForecast.phase !== 'comparison' && adjustmentForecast.waiting?.length) {
-    notice.textContent = adjustmentForecast.waiting.map(color =>
-      `${color === 'red' ? 'HOV（赤）' : adjustmentForecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）'}：予測学習中`).join(' ／ ');
+  const displayPoints = getForecastDisplayPoints(adjustmentForecast);
+  const noticeColors = [...new Set([...(adjustmentForecast.waiting ?? []),
+    ...displayPoints.filter(point => point.savedValues).map(point => point.color)])];
+  if (adjustmentForecast.phase !== 'comparison' && noticeColors.length) {
+    notice.textContent = noticeColors.map(color => {
+      const saved = displayPoints.find(point => point.color === color)?.savedValues;
+      const label = color === 'red' ? 'HOV（赤）' : adjustmentForecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）';
+      return saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
+    }).join(' ／ ');
     notice.hidden = false;
   }
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
@@ -393,7 +439,7 @@ function renderAdjustmentForecast() {
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
   layer.style.pointerEvents = 'none';
   // 候補1/2の選択やガイドの有無に依存せず、生成済み座標をそのまま描画する。
-  adjustmentForecast.points.forEach(({ color, x, y }) => {
+  displayPoints.forEach(({ color, x, y, savedValues }) => {
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
@@ -401,6 +447,7 @@ function renderAdjustmentForecast() {
     group.dataset.color = color;
     const title = document.createElementNS(ns, 'title');
     title.textContent = `${color === 'red' ? 'HOV' : '巡航'}予想位置`;
+    if (savedValues) title.textContent += `（保存済み：${savedValues.map((value, index) => formatMemoValue(value, index, savedValues[1])).join(' ／ ')}）`;
     const ring = document.createElementNS(ns, 'circle');
     ring.setAttribute('r', '12');
     ring.setAttribute('class', 'forecast-glow');

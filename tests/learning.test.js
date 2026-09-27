@@ -1237,7 +1237,7 @@
     run('guideToggle.click();');
     assert(run('Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]"))'),'Cruise LINK ON restores valid distance');
     run('memoValues[0]="3"; updateAdjustmentForecast();');
-    assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]") && adjustmentForecast.points[0].source==="reference-estimate" && adjustmentForecast.points[0].color==="red"'),'Cruise n=1 stays hidden while independent HOV reference remains');
+    assert(run('Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")) && adjustmentForecast.points[0].source==="reference-estimate" && adjustmentForecast.points[0].color==="red"'),'Cruise n=1 keeps saved display while current calculation retains only independent HOV reference');
     run('memoValues[0]="2"; memoValues[2]="1/2"; updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.find(p=>p.color==="blue").source')==='proportional-estimate','Cruise scales nearest quarter-flat prior to half-flat');
     near(run('renderedForecastGeometry().find(p=>p.color==="blue").forward'),cruiseLinkPrior.distance*2,'Cruise proportional distance doubles with amount',1e-4);
