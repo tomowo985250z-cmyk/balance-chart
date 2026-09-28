@@ -205,10 +205,10 @@
       document.getElementById('hovGroup').setAttribute('transform', `rotate(${angles.hov} ${centerX} ${centerY})`);
       document.getElementById('cruiseGroup').setAttribute('transform', `rotate(${angles.cruise} ${centerX} ${centerY})`);
 
-      function notifyRotations(finished = false) {
+      function notifyRotations(finished = false, snapshot = false) {
         if (svg.dataset.rotationManagedByParent === 'true') return;
         window.parent.postMessage({
-          type: 'balance-chart-rotation', hovAngle: angles.hov, cruiseAngle: angles.cruise, finished
+          type: 'balance-chart-rotation', hovAngle: angles.hov, cruiseAngle: angles.cruise, finished, snapshot
         }, '*');
       }
 
@@ -229,7 +229,15 @@
       // 親ページの回転ロックスイッチは、object 内のSVGへメッセージで受け取る。
       window.addEventListener('message', (event) => {
         if (event.source !== window.parent) return;
-        if (event.data?.type === 'balance-chart-request-rotation') notifyRotations();
+        if (event.data?.type === 'balance-chart-restore-view') {
+          const view = event.data.viewBox;
+          if (Array.isArray(view) && view.length === 4 && view.every(Number.isFinite)
+            && view[2] > 0 && view[2] <= 794 && view[3] > 0 && view[3] <= 1123) {
+            zoom = baseViewBox.width / view[2];
+            setViewBox(...view);
+          }
+        }
+        if (event.data?.type === 'balance-chart-request-rotation') notifyRotations(false, true);
         if (event.data?.type === 'balance-chart-rotation-lock') {
           svg.dataset.rotationLocked = String(Boolean(event.data.locked));
         }

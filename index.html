@@ -4,10 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260927-display-colors" />
+    <link rel="stylesheet" href="style.css?v=20260928-preserve-state" />
   </head>
   <body>
   <main class="app">
+    <details class="state-tools" id="stateTools">
+      <summary>保存・引き継ぎ</summary>
+      <p id="storageStatus" role="status"></p>
+      <p>Safariとホーム画面では保存先が分かれる場合があります。Safariでバックアップを保存し、ホーム画面から同じファイルを読み込んでください。読み込みは別データとして保存し、元のデータを残します。自動同期はありません。</p>
+      <button id="exportState" type="button">バックアップを保存</button>
+      <label class="import-state">バックアップを読み込む<input id="importState" type="file" accept=".json,application/json" /></label>
+      <label>使用するデータ<select id="stateProfile"></select></label>
+      <p id="transferStatus" role="status"></p>
+    </details>
     <form class="dot-form" id="dotForm">
       <fieldset class="dot-set dot-set-red">
         <legend>HOV</legend>
@@ -65,7 +74,7 @@ LINK</button>
       <button id="resetLearning" class="learning-reset" type="button">自動補正の学習値をリセット</button>
     </div>
     <div class="chart-wrap">
-      <object data="chart.svg?v=20260915-pitch-auto" type="image/svg+xml" aria-label="バランスチャート"></object>
+      <object data="chart.svg?v=20260928-state-restore" type="image/svg+xml" aria-label="バランスチャート"></object>
       <svg id="dotOverlay" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
       <label class="chart-note">
         <span>メモ</span>
@@ -130,8 +139,10 @@ LINK</button>
       </div>
     </form>
   </dialog>
+  <script src="state-storage.js?v=20260928-preserve-state"></script>
   <script src="learning.js?v=20260920-distance-prior"></script>
   <script src="distance-prior.js?v=20260921-tab-monotonic-distance"></script>
-  <script src="app.js?v=20260927-forecast-display-restore"></script>
+  <script src="app.js?v=20260928-preserve-state"></script>
+  <script src="app-state.js?v=20260928-preserve-state"></script>
 </body>
 </html>

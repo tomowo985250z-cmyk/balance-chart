@@ -1,4 +1,6 @@
-﻿console.log("app.js loaded");
+console.log("app.js loaded");
+const appStorage = BalanceState.open();
+let restoringAppState = false;
 let hovAngle = 0;
 let cruiseAngle = 0;
 let rotationLocked = false;
@@ -38,14 +40,14 @@ const forecastDisplayCache = new Map(); // 候補切替で失われない表示�
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 
 try {
-  chartNote.value = localStorage.getItem(CHART_NOTE_STORAGE_KEY) || '';
+  chartNote.value = appStorage.getItem(CHART_NOTE_STORAGE_KEY) || '';
 } catch (error) {
   console.warn('チャートメモを読み込めませんでした。', error);
 }
 
 chartNote.addEventListener('input', () => {
   try {
-    localStorage.setItem(CHART_NOTE_STORAGE_KEY, chartNote.value);
+    appStorage.setItem(CHART_NOTE_STORAGE_KEY, chartNote.value);
   } catch (error) {
     console.warn('チャートメモを保存できませんでした。', error);
   }
@@ -72,12 +74,10 @@ guideCandidateToggle.addEventListener('click', () => {
   renderDirectionLines();
 });
 setGuidesVisible(true);
-window.addEventListener('pageshow', () => setGuidesVisible(true));
 const dotForm = document.getElementById('dotForm');
 const adjustmentForm = document.getElementById('adjustmentForm');
 const actualAdjustment = document.getElementById('actualAdjustment');
 actualAdjustment.checked = false;
-window.addEventListener('pageshow', () => { actualAdjustment.checked = false; });
 const redInputs = ['redHourInput', 'redMinuteInput', 'redValueInput'].map((id) => document.getElementById(id));
 const blueInputs = ['blueHourInput', 'blueMinuteInput', 'blueValueInput'].map((id) => document.getElementById(id));
 const addDotButton = document.getElementById('addDotButton');
@@ -172,7 +172,7 @@ function getNominalAdjustmentAngle(blade, direction) {
     towardEnd ? side.end.x - side.start.x : side.start.x - side.end.x) * 180 / Math.PI;
 }
 const learning = BalanceLearning.create({
-  storage: { getItem: key => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) },
+  storage: { getItem: key => appStorage.getItem(key), setItem: (key, value) => appStorage.setItem(key, value) },
   coordinates: getDotCoordinates, nominalAngle: getNominalAdjustmentAngle, radius: CHART_RADIUS
 });
 const manualLearningReference = { LINK: {}, TAB: {} };
@@ -259,6 +259,7 @@ function getVisibleGuideAdjustment() {
 }
 
 function applySelectedGuideAdjustment() {
+  if (restoringAppState) return;
   const guide = getVisibleGuideAdjustment();
   if (!guide) return;
   [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
@@ -329,6 +330,7 @@ function previewMemoSelection() {
 }
 
 function updateAdjustmentForecast(values = memoValues, fixed = false) {
+  if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   const action = BalanceLearning.adjustment(values);
   if (!target || !action) {
@@ -415,6 +417,7 @@ function getForecastDisplayPoints(forecast) {
 }
 
 function renderAdjustmentForecast() {
+  globalThis.balanceSaveState?.();
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
   const notice = document.getElementById('forecastLearningNotice');
   notice.hidden = true;
@@ -475,7 +478,7 @@ updateMemoButtons();
 
 function loadRotation() {
   try {
-    const saved = JSON.parse(localStorage.getItem(ROTATION_STORAGE_KEY) || '{}');
+    const saved = JSON.parse(appStorage.getItem(ROTATION_STORAGE_KEY) || '{}');
     const pages = Array.isArray(saved.pages) ? saved.pages : [saved];
     pages.slice(0, 2).forEach((page, index) => {
       pageRotations[index].hovAngle = Number.isFinite(page?.hovAngle) ? page.hovAngle : 0;
@@ -493,7 +496,7 @@ function saveRotation() {
     ? { ...manualPitchAngles }
     : { hovAngle, cruiseAngle: manualTrimCruiseAngle };
   try {
-    localStorage.setItem(ROTATION_STORAGE_KEY, JSON.stringify({ pages: pageRotations }));
+    appStorage.setItem(ROTATION_STORAGE_KEY, JSON.stringify({ pages: pageRotations }));
   } catch {
     // 保存領域を利用できない場合は、この表示中だけ回転角を保持する。
   }
@@ -749,7 +752,7 @@ function newLearningId() {
 
 function loadDotSets() {
   try {
-    const saved = JSON.parse(localStorage.getItem(DOT_STORAGE_KEY) || '[]');
+    const saved = JSON.parse(appStorage.getItem(DOT_STORAGE_KEY) || '[]');
     if (!Array.isArray(saved)) return [];
 
     return saved.reduce((sets, set) => {
@@ -774,7 +777,7 @@ function loadDotSets() {
 
 function saveDotSets() {
   try {
-    localStorage.setItem(DOT_STORAGE_KEY, JSON.stringify(dotSets));
+    appStorage.setItem(DOT_STORAGE_KEY, JSON.stringify(dotSets));
   } catch {
     // プライベートブラウズなど、端末の保存領域が使えない場合は何もしない。
   }
@@ -1504,7 +1507,7 @@ function renderHistoricalLearning() {
 }
 
 function renderDots() {
-  learning.sync(dotSets, {
+  if (!appStorage.readOnly) learning.sync(dotSets, {
     LINK: {
       red: pitchAutoMode && pitchAutoReady.red ? autoPitchAngles.hovAngle : manualPitchAngles.hovAngle,
       blue: pitchAutoMode && pitchAutoReady.blue ? autoPitchAngles.cruiseAngle : manualPitchAngles.cruiseAngle
@@ -1819,7 +1822,10 @@ function setupRotationControls() {
   new MutationObserver(() => {
     dotOverlay.setAttribute('viewBox', svg.getAttribute('viewBox') || '0 0 794 1123');
   }).observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
-  renderDots();
+  // SVGの遅延読込で、復元済みの入力・予測を新しい候補で上書きしない。
+  const wasRestoring = restoringAppState;
+  restoringAppState = true;
+  try { renderDots(); } finally { restoringAppState = wasRestoring; }
 
   // 回転用リング以外では、モバイルの縦スクロールを優先する。
   svg.style.touchAction = 'pan-y';
@@ -1933,6 +1939,11 @@ renderDots();
 window.addEventListener('message', (event) => {
   if (event.source !== chartObject.contentWindow) return;
   const message = event.data;
+  // 初期SVGの応答は操作ではない。復元した親画面の角度を優先する。
+  if (message?.type === 'balance-chart-rotation' && message.snapshot) {
+    chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle, page: currentChartPage }, '*');
+    return;
+  }
   if (message?.type === 'balance-chart-rotation'
     && Number.isFinite(message.hovAngle) && Number.isFinite(message.cruiseAngle)) {
     if ((currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
