@@ -88,14 +88,18 @@
       // 同じ欠落条件を線2側にも設定し、復元が候補番号を特別扱いしないことを確認する。
       run(`guideCandidateToggle.click();
         memoOne.click(); selectedMemoValue='3'; confirmMemoPicker.click();`);
-      const latestBlue=snapshot('guide2/new-generated/' + automatic).forecast.points.find(point=>point.color==='blue');
+      let latestBlue=snapshot('guide2/new-generated/' + automatic).forecast.points.find(point=>point.color==='blue');
       run(`memoFour.click(); selectedMemoValue='DOWN'; confirmMemoPicker.click();`);
       const reverse=snapshot('guide2/missing-estimate/' + automatic);
       assert(reverse.estimate===null, 'same missing estimate on guide2');
-      checkSaved(reverse,latestBlue);
+      assert(!reverse.dom.length, 'manual blade hides generated dots on guide2');
       selectAmount('1/2');
       assert(!snapshot('different-amount/' + automatic).dom.some(point=>point.color==='blue'), 'do not reuse quarter-flat prediction for half-flat');
-      selectAmount('1/4'); checkSaved(snapshot('restored-amount/' + automatic),latestBlue);
+      selectAmount('1/4');
+      assert(!snapshot('manual-restored-amount/' + automatic).dom.length, 'amount change keeps manual blade hidden');
+      run('applySelectedGuideAdjustment();');
+      latestBlue=snapshot('automatic-restored/' + automatic).forecast.points.find(point=>point.color==='blue');
+      checkSaved(snapshot('restored-amount/' + automatic),latestBlue);
       assert(run('JSON.stringify(learning.inspect())===lifecycleLearning'), 'display cache never changes learning or correction');
       assert(run('JSON.stringify({...localStorage})===lifecycleStorage'), 'display cache never writes measurement or learning storage');
       run(`dotSets.push({...dotSets.at(-1),learningId:newLearningId()}); selectedAdjustmentTarget=dotSets[0];

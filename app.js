@@ -31,6 +31,8 @@ let trimAutoMode = true;
 let trimAutoReady = false;
 let manualTrimCruiseAngle = 0;
 let autoTrimCruiseAngle = 0;
+// 同じ自動算出角度の再適用で、引き継いだ最新の表示角度を巻き戻さない。
+const lastAutoRotation = { LINK: {}, TAB: {} };
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
@@ -268,7 +270,12 @@ function applySelectedGuideAdjustment() {
     memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
   });
   saveAdjustmentSelection();
-  updateAdjustmentForecast();
+  updateAdjustmentForecast(memoValues, false, false);
+}
+
+function isManualBladeSelection(values) {
+  const guide = getVisibleGuideAdjustment();
+  return Boolean(guide && String(guide.blade) !== values[0]);
 }
 
 function renderMemoWheel(options, selected, index) {
@@ -326,10 +333,11 @@ function previewMemoSelection() {
   const values = [...memoValues];
   values[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1 && values[1] !== memoValues[1]) values[2] = '';
-  updateAdjustmentForecast(values);
+  updateAdjustmentForecast(values, false, isManualBladeSelection(values));
 }
 
-function updateAdjustmentForecast(values = memoValues, fixed = false) {
+function updateAdjustmentForecast(values = memoValues, fixed = false,
+  manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0])) {
   if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   const action = BalanceLearning.adjustment(values);
@@ -358,7 +366,8 @@ function updateAdjustmentForecast(values = memoValues, fixed = false) {
           baseAmount: estimate.baseAmount, ratio: estimate.ratio }] : [];
       });
       if (points.length || !['fixed', 'comparison'].includes(adjustmentForecast?.phase)) {
-        adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values] };
+        // 表示可否だけを保持する。予測座標・距離・学習用データは変更しない。
+        adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values], manualBlade };
         rememberForecastDisplay(adjustmentForecast);
       }
     }
@@ -423,6 +432,7 @@ function renderAdjustmentForecast() {
   notice.hidden = true;
   notice.textContent = '';
   if (!adjustmentForecast) return;
+  if (adjustmentForecast.manualBlade) return;
   if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
   const displayPoints = getForecastDisplayPoints(adjustmentForecast);
   const noticeColors = [...new Set([...(adjustmentForecast.waiting ?? []),
@@ -464,16 +474,16 @@ function renderAdjustmentForecast() {
 }
 
 memoButtons.forEach((button, index) => button.addEventListener('click', () => openMemoPicker(index)));
-closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(); });
+closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues)); });
 confirmMemoPicker.addEventListener('click', () => {
   if (activeMemoIndex === null) return;
   memoValues[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1) memoValues[2] = '';
   updateMemoButtons();
   memoPicker.hidden = true;
-  updateAdjustmentForecast();
+  updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues));
 });
-memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { memoPicker.hidden = true; updateAdjustmentForecast(); } });
+memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues)); } });
 updateMemoButtons();
 
 function loadRotation() {
@@ -520,6 +530,9 @@ function updatePitchModeUI() {
 
 pitchModeToggle.addEventListener('click', () => {
   manualMessageChanges = { red: false, blue: false };
+  Object.assign(manualPitchAngles, { hovAngle, cruiseAngle });
+  Object.assign(autoPitchAngles, { hovAngle, cruiseAngle });
+  for (const color of ['red', 'blue']) lastAutoRotation.LINK[color] = getLearnedRotation('LINK', color) ?? getLatestLinkSyncAngle(color);
   if (pitchAutoMode) Object.assign(manualLearningReference.LINK, { red: hovAngle, blue: cruiseAngle });
   else manualLearningReference.LINK = {};
   pitchAutoMode = !pitchAutoMode;
@@ -538,6 +551,8 @@ function updateTrimModeUI() {
 
 trimModeToggle.addEventListener('click', () => {
   manualMessageChanges = { red: false, blue: false };
+  manualTrimCruiseAngle = autoTrimCruiseAngle = cruiseAngle;
+  lastAutoRotation.TAB.blue = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
   manualLearningReference.TAB = trimAutoMode ? { blue: cruiseAngle } : {};
   trimAutoMode = !trimAutoMode;
   if (trimAutoMode) syncAutoTrimRotation();
@@ -862,6 +877,7 @@ function getLatestLinkSyncAngle(color) {
 function applyChartRotation(redAngle, blueAngle) {
   hovAngle = redAngle;
   cruiseAngle = blueAngle;
+  pageRotations[currentChartPage] = { hovAngle, cruiseAngle };
   const svgDocument = chartObject.contentDocument;
   if (svgDocument) {
     const hovGroup = svgDocument.getElementById('hovGroup');
@@ -874,21 +890,26 @@ function applyChartRotation(redAngle, blueAngle) {
 
 function syncAutoPitchRotation() {
   if (!pitchAutoMode) return;
-  const nextAngles = { hovAngle, cruiseAngle };
+  const nextAngles = currentChartPage === 0 ? { hovAngle, cruiseAngle } : { ...pageRotations[0] };
   for (const [color, key] of [['red', 'hovAngle'], ['blue', 'cruiseAngle']]) {
     const angle = getLearnedRotation('LINK', color) ?? getLatestLinkSyncAngle(color);
     pitchAutoReady[color] = angle !== null;
-    if (angle !== null) {
+    if (!restoringAppState && angle !== null && angle !== lastAutoRotation.LINK[color]) {
       autoPitchAngles[key] = angle;
       nextAngles[key] = autoPitchAngles[key];
     }
+    lastAutoRotation.LINK[color] = angle;
   }
+  if (restoringAppState) return;
+  Object.assign(manualPitchAngles, nextAngles);
+  pageRotations[0] = { ...nextAngles };
   if (currentChartPage === 0) applyChartRotation(nextAngles.hovAngle, nextAngles.cruiseAngle);
   updatePitchModeUI();
 }
 
 function applyCruiseRotation(angle) {
   cruiseAngle = angle;
+  pageRotations[currentChartPage] = { hovAngle, cruiseAngle };
   const group = chartObject.contentDocument?.getElementById('cruiseGroup');
   if (group) setGroupRotation(group, angle);
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-set-rotation', hovAngle, cruiseAngle: angle, page: currentChartPage }, '*');
@@ -898,8 +919,14 @@ function syncAutoTrimRotation() {
   if (!trimAutoMode) return;
   const angle = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
   trimAutoReady = angle !== null;
-  if (angle !== null) autoTrimCruiseAngle = angle;
-  if (currentChartPage === 1) applyCruiseRotation(autoTrimCruiseAngle);
+  const changed = !restoringAppState && angle !== null && angle !== lastAutoRotation.TAB.blue;
+  lastAutoRotation.TAB.blue = angle;
+  if (restoringAppState) return;
+  if (changed) autoTrimCruiseAngle = angle;
+  const nextAngle = changed ? autoTrimCruiseAngle : currentChartPage === 1 ? cruiseAngle : pageRotations[1].cruiseAngle;
+  manualTrimCruiseAngle = nextAngle;
+  pageRotations[1].cruiseAngle = nextAngle;
+  if (currentChartPage === 1) applyCruiseRotation(nextAngle);
   trimModeToggle.textContent = `紫六角形：${trimAutoReady ? '自動' : '自動（条件待ち）'}`;
 }
 
