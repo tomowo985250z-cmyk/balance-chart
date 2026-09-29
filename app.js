@@ -994,7 +994,11 @@ function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection)
     ? (-projection + Math.sqrt(discriminant)) / vectorLengthSquared
     : 280 / Math.sqrt(vectorLengthSquared);
   const lineStart = { x: center.x + startT * vector.x, y: center.y + startT * vector.y };
+  // 円との交点が後方にある場合も、表示する矢印は調整方向へ延ばす。
+  // 候補の距離評価に使う endT / maxTravel は変更しない。
+  const displayEndT = endT > 1e-9 ? endT : 280 / Math.sqrt(vectorLengthSquared);
   const arrowTip = { x: center.x + endT * vector.x, y: center.y + endT * vector.y };
+  const displayEnd = { x: center.x + displayEndT * vector.x, y: center.y + displayEndT * vector.y };
   const centerDistance = (centerProgress >= 0
     ? Math.abs(vector.x * towardCenterY - vector.y * towardCenterX) / Math.sqrt(vectorLengthSquared)
     : Math.hypot(towardCenterX, towardCenterY)) / CHART_RADIUS;
@@ -1008,8 +1012,27 @@ function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection)
     direction,
     number: segment.number,
     start: lineStart,
-    end: arrowTip
+    end: arrowTip,
+    displayEnd
   };
+}
+
+function getGuideMovementUnit(line) {
+  if (line.unit) return line.unit;
+  const dx = line.end.x - line.base.x, dy = line.end.y - line.base.y;
+  const length = Math.hypot(dx, dy);
+  return length > 0 ? { x: dx / length, y: dy / length } : { x: 0, y: 0 };
+}
+
+function getGuidePathDistance(line) {
+  const unit = getGuideMovementUnit(line);
+  const x = line.base.x - CHART_CENTER_X, y = line.base.y - CHART_CENTER_Y;
+  const travel = Math.max(0, -(x * unit.x + y * unit.y));
+  return Math.hypot(x + travel * unit.x, y + travel * unit.y) / CHART_RADIUS;
+}
+
+function getPredictionGuideLine(prediction) {
+  return prediction.fallbackLine ?? { base: prediction.start, start: prediction.start, end: prediction.position };
 }
 
 function getLatestPitchDistanceRatio() {
@@ -1184,27 +1207,15 @@ function getLearnedGuideLines(finalSet) {
     const epsilon = 1e-9; // IPS単位の幾何判定誤差。
     for (const candidate of candidates) {
       const hov = candidate.predictions[0];
-      const arrow = getDirectionLine(finalSet.red, 'red', null, candidate.blade, candidate.direction).arrowTarget;
-      candidate.hovArrowTarget = arrow;
-      const dx = arrow.x - hov.start.x, dy = arrow.y - hov.start.y;
-      candidate.hovDirectionVector = { dx, dy };
-      const length = Math.hypot(dx, dy);
-      const ux = length > 0 ? dx / length : 0, uy = length > 0 ? dy / length : 0;
-      const x = hov.start.x - CHART_CENTER_X, y = hov.start.y - CHART_CENTER_Y;
-      // 始点から矢印方向への半直線。反対側の最接近点は使用しない。
-      const travel = Math.max(0, -(x * ux + y * uy));
-      const pathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
+      const hovLine = getPredictionGuideLine(hov);
+      const unit = getGuideMovementUnit(hovLine);
+      candidate.hovDirectionVector = { dx: unit.x, dy: unit.y };
+      const pathDistance = getGuidePathDistance(hovLine);
       candidate.hovPathDistance = pathDistance <= epsilon ? 0 : pathDistance;
       candidate.hovPathPasses = candidate.hovPathDistance <= CENTER_DISTANCE_THRESHOLD + epsilon;
       const cruise = candidate.predictions[1];
       if (cruise) {
-        const target = getDirectionLine(finalSet.blue, 'blue', null, candidate.blade, candidate.direction).arrowTarget;
-        const vx = target.x - cruise.start.x, vy = target.y - cruise.start.y;
-        const size = Math.hypot(vx, vy);
-        const ux = size > 0 ? vx / size : 0, uy = size > 0 ? vy / size : 0;
-        const x = cruise.start.x - CHART_CENTER_X, y = cruise.start.y - CHART_CENTER_Y;
-        const travel = Math.max(0, -(x * ux + y * uy));
-        candidate.cruisePathDistance = Math.hypot(x + travel * ux, y + travel * uy) / CHART_RADIUS;
+        candidate.cruisePathDistance = getGuidePathDistance(getPredictionGuideLine(cruise));
       }
     }
     selected = selectRankedLinkGuideCandidate(candidates);
@@ -1217,7 +1228,7 @@ function getLearnedGuideLines(finalSet) {
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
     blade: selected.blade, direction: selected.direction,
-    line: prediction.fallbackLine ?? { base: prediction.start, start: prediction.start, end: prediction.position },
+    line: getPredictionGuideLine(prediction),
     color: prediction.color === 'red' ? DOT_COLORS.red : type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue,
     marker: `${prediction.color}DirectionLineArrow`
   })) : [];
@@ -1268,16 +1279,7 @@ function renderDirectionLines() {
     selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
   } else if (redDots.length) {
     // 学習不足・手動時は既存の移動距離予測を使い、同じ順位で選ぶ。
-    const centerDistance = (line) => {
-      const vx = line.arrowTarget.x - line.base.x;
-      const vy = line.arrowTarget.y - line.base.y;
-      const length = Math.hypot(vx, vy);
-      const ux = length > 0 ? vx / length : 0, uy = length > 0 ? vy / length : 0;
-      const dx = CHART_CENTER_X - line.base.x;
-      const dy = CHART_CENTER_Y - line.base.y;
-      const travel = Math.max(0, dx * ux + dy * uy);
-      return Math.hypot(dx - travel * ux, dy - travel * uy) / CHART_RADIUS;
-    };
+    const centerDistance = getGuidePathDistance;
     const ratio = getLatestPitchDistanceRatio() ?? { red: 1, blue: 2 };
     const candidates = redDots.map(({ line }) => {
       const blue = blueDots.find(candidate => candidate.line.number === line.number
@@ -1305,15 +1307,16 @@ function renderDirectionLines() {
 
   appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);
   selectedLines.forEach(({ line, color, marker, blade = line.number, direction = line.direction }) => {
-    // 範囲外では実際のドットから描画し、選択判定と既存の矢印先端は維持する。
+    // 範囲外では実際のドットを始点に、候補評価と同じ調整方向へ描画する。
     const start = Math.hypot(line.base.x - CHART_CENTER_X, line.base.y - CHART_CENTER_Y) > CHART_RADIUS
       ? line.base : line.start;
+    const end = line.displayEnd ?? line.end;
     const directionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     directionLine.setAttribute('class', 'guide-direction-line');
     directionLine.setAttribute('x1', String(start.x));
     directionLine.setAttribute('y1', String(start.y));
-    directionLine.setAttribute('x2', String(line.end.x));
-    directionLine.setAttribute('y2', String(line.end.y));
+    directionLine.setAttribute('x2', String(end.x));
+    directionLine.setAttribute('y2', String(end.y));
     directionLine.setAttribute('stroke', color);
     directionLine.setAttribute('stroke-width', '1.8');
     directionLine.setAttribute('stroke-dasharray', '9 7');
@@ -1322,13 +1325,13 @@ function renderDirectionLines() {
     directionLine.setAttribute('marker-end', `url(#${marker})`);
     directionLine.style.pointerEvents = 'none';
     guideLayer.append(directionLine);
-    const dx = line.end.x - start.x, dy = line.end.y - start.y;
-    const length = Math.hypot(dx, dy);
+    const unit = getGuideMovementUnit(line);
+    const length = Math.hypot(unit.x, unit.y);
     if (Number.isFinite(length) && length > 0) {
       forecastGuides[marker === 'redDirectionLineArrow' ? 'red' : 'blue'] = {
         targetId: finalSet.learningId, type: currentChartPage === 0 ? 'LINK' : 'TAB',
         blade, direction,
-        unit: { x: dx / length, y: dy / length }
+        unit
       };
     }
   });
