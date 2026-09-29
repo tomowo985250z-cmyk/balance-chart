@@ -1234,6 +1234,62 @@ function getLearnedGuideLines(finalSet) {
   })) : [];
 }
 
+const guideDisplayGeometry = new WeakMap();
+
+// 描画専用。候補評価・予測計算の線は変更しない。
+function getGuideViewportEnd(line, bounds) {
+  const original = line.displayEnd ?? line.end;
+  const unit = getGuideMovementUnit(line);
+  const x = line.base.x - CHART_CENTER_X, y = line.base.y - CHART_CENTER_Y;
+  const projection = x * unit.x + y * unit.y;
+  const discriminant = projection * projection - (x * x + y * y - CHART_RADIUS * CHART_RADIUS);
+  if (discriminant >= -1e-8 && -projection + Math.sqrt(Math.max(0, discriminant)) >= 0) return original;
+  let enter = 0, exit = Infinity;
+  for (const [position, direction, minimum, maximum] of [
+    [line.base.x, unit.x, bounds.left, bounds.right],
+    [line.base.y, unit.y, bounds.top, bounds.bottom]
+  ]) {
+    if (Math.abs(direction) < 1e-12) {
+      if (position < minimum || position > maximum) return original;
+      continue;
+    }
+    const first = (minimum - position) / direction, second = (maximum - position) / direction;
+    enter = Math.max(enter, Math.min(first, second));
+    exit = Math.min(exit, Math.max(first, second));
+  }
+  if (!Number.isFinite(exit) || exit <= enter) return original;
+  return { x: line.base.x + unit.x * exit, y: line.base.y + unit.y * exit };
+}
+
+function updateGuideViewportEnds() {
+  const matrix = dotOverlay.getScreenCTM();
+  if (!matrix) return;
+  const rect = dotOverlay.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const left = Math.max(rect.left, viewport?.offsetLeft ?? 0) + 12;
+  const top = Math.max(rect.top, viewport?.offsetTop ?? 0) + 12;
+  const right = Math.min(rect.right, (viewport?.offsetLeft ?? 0) + (viewport?.width ?? innerWidth)) - 12;
+  const bottom = Math.min(rect.bottom, (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight)) - 12;
+  if (right <= left || bottom <= top) return;
+  const inverse = matrix.inverse();
+  const first = new DOMPoint(left, top).matrixTransform(inverse);
+  const last = new DOMPoint(right, bottom).matrixTransform(inverse);
+  const bounds = { left: first.x, top: first.y, right: last.x, bottom: last.y };
+  dotOverlay.querySelectorAll('.guide-direction-line').forEach(node => {
+    const line = guideDisplayGeometry.get(node);
+    if (!line) return;
+    const end = getGuideViewportEnd(line, bounds);
+    node.setAttribute('x2', String(end.x));
+    node.setAttribute('y2', String(end.y));
+  });
+}
+
+new MutationObserver(updateGuideViewportEnds).observe(dotOverlay, { attributes: true, attributeFilter: ['viewBox'] });
+window.addEventListener('resize', updateGuideViewportEnds);
+window.addEventListener('scroll', updateGuideViewportEnds, { passive: true });
+window.visualViewport?.addEventListener('resize', updateGuideViewportEnds);
+window.visualViewport?.addEventListener('scroll', updateGuideViewportEnds);
+
 function renderDirectionLines() {
   forecastGuides = {};
   let guideLayer = dotOverlay.querySelector('.direction-lines');
@@ -1325,6 +1381,7 @@ function renderDirectionLines() {
     directionLine.setAttribute('marker-end', `url(#${marker})`);
     directionLine.style.pointerEvents = 'none';
     guideLayer.append(directionLine);
+    guideDisplayGeometry.set(directionLine, line);
     const unit = getGuideMovementUnit(line);
     const length = Math.hypot(unit.x, unit.y);
     if (Number.isFinite(length) && length > 0) {
@@ -1335,6 +1392,7 @@ function renderDirectionLines() {
       };
     }
   });
+  updateGuideViewportEnds();
   applySelectedGuideAdjustment();
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
