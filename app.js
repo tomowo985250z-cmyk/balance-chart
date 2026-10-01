@@ -238,8 +238,8 @@ function restoreAdjustmentSelection() {
 
 function updateMemoButtons() {
   if (!dotSets.length) {
-    memoValues[0] = memoValues[3] = '';
-    adjustmentSelections.forEach(values => { values[0] = values[3] = ''; });
+    memoValues[0] = memoValues[2] = memoValues[3] = '';
+    adjustmentSelections.forEach(values => { values[0] = values[2] = values[3] = ''; });
   }
   memoValues[1] = currentChartPage === 0 ? 'LINK' : 'TAB';
   memoButtons.forEach((button, index) => {
