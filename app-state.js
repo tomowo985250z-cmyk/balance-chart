@@ -5,6 +5,9 @@
   const status = document.getElementById('storageStatus');
   const transferStatus = document.getElementById('transferStatus');
   const profileSelect = document.getElementById('stateProfile');
+  const updateInitialPositionButton = () => {
+    document.getElementById('registerInitialPosition').classList.toggle('is-registered', Boolean(initialChartRotations[currentChartPage]));
+  };
   const capture = () => ({
     version: 1, measurements: JSON.stringify(dotSets),
     redInputs: redInputs.map(input => input.value), blueInputs: blueInputs.map(input => input.value),
@@ -46,6 +49,7 @@
     catch { updateStatus(); }
   }
   globalThis.balanceSaveState = () => {
+    updateInitialPositionButton();
     if (!ready || restoringAppState || queued) return;
     queued = true;
     queueMicrotask(() => { queued = false; flush(); });
@@ -119,6 +123,7 @@
   } catch (error) { appStorage.protect(error); }
   ready = true;
   updateStatus();
+  updateInitialPositionButton();
   const positionDialog = document.getElementById('initialPositionConfirmation');
   const positionStatus = document.getElementById('initialPositionStatus');
   let pendingInitialPosition = null;
@@ -139,6 +144,7 @@
     try {
       appStorage.setItem(BalanceState.uiKey, JSON.stringify({ ...capture(), initialChartRotations: next }));
       initialChartRotations = next;
+      updateInitialPositionButton();
       positionStatus.textContent = '初期位置を登録しました。';
     } catch {
       positionStatus.textContent = '保存できませんでした。登録位置は変更していません。';
