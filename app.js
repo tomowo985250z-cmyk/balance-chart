@@ -1883,6 +1883,7 @@ adjustmentForm.addEventListener('submit', (event) => {
   else learning.disarm(targetSet.learningId);
   actualAdjustment.checked = false;
   saveDotSets();
+  adjustmentSelections.forEach(values => { values[2] = ''; });
   memoValues.fill('');
   updateMemoButtons();
   adjustmentMessage.textContent = '';
