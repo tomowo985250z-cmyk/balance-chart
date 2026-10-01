@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20260928-preserve-state" />
+    <link rel="stylesheet" href="style.css?v=20261001-initial-position" />
   </head>
   <body>
   <main class="app">
@@ -76,6 +76,10 @@ LINK</button>
     <div class="chart-wrap">
       <object data="chart.svg?v=20260928-state-restore" type="image/svg+xml" aria-label="バランスチャート"></object>
       <svg id="dotOverlay" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+      <div class="initial-position-tools">
+        <button id="registerInitialPosition" type="button">初期位置登録</button>
+        <span id="initialPositionStatus" role="status"></span>
+      </div>
       <label class="chart-note">
         <span>メモ</span>
         <input id="chartNote" type="text" maxlength="40" autocomplete="off" />
@@ -139,10 +143,20 @@ LINK</button>
       </div>
     </form>
   </dialog>
-  <script src="state-storage.js?v=20260928-preserve-state"></script>
+  <dialog id="initialPositionConfirmation" class="delete-confirmation" aria-labelledby="initialPositionConfirmationTitle">
+    <form method="dialog">
+      <p id="initialPositionConfirmationTitle"></p>
+      <p>結果がない状態で起動すると、この位置から開始します。</p>
+      <div class="delete-confirmation-actions">
+        <button type="submit" value="cancel" autofocus>キャンセル</button>
+        <button type="submit" value="save">OK</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="state-storage.js?v=20261001-initial-position"></script>
   <script src="learning.js?v=20260920-distance-prior"></script>
   <script src="distance-prior.js?v=20260921-tab-monotonic-distance"></script>
   <script src="app.js?v=20261001-reset-amount"></script>
-  <script src="app-state.js?v=20260928-preserve-state"></script>
+  <script src="app-state.js?v=20261001-initial-position"></script>
 </body>
 </html>

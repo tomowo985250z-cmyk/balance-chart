@@ -20,6 +20,8 @@ const BalanceState = (() => {
       && [data.hovAngle, data.cruiseAngle, data.manualTrimCruiseAngle, data.autoTrimCruiseAngle].every(Number.isFinite)
       && angles(data.manualPitchAngles) && angles(data.autoPitchAngles)
       && Array.isArray(data.pageRotations) && data.pageRotations.length === 2 && data.pageRotations.every(angles)
+      && (data.initialChartRotations === undefined || (Array.isArray(data.initialChartRotations)
+        && data.initialChartRotations.length === 2 && data.initialChartRotations.every(value => value === null || angles(value))))
       && object(data.manualLearningReference) && ['LINK', 'TAB'].every(type => object(data.manualLearningReference[type])
         && Object.entries(data.manualLearningReference[type]).every(([color, angle]) => ['red', 'blue'].includes(color) && Number.isFinite(angle)))
       && target(data.selectedTarget) && target(data.cruiseTarget) && (data.cruiseInputDraft === null || strings(data.cruiseInputDraft, 3))

@@ -1,6 +1,7 @@
 /* 保存・復元と端末内ファイル移行のみを担当する。計算エンジンには触れない。 */
 (() => {
   let ready = false, queued = false;
+  let initialChartRotations = [null, null];
   const status = document.getElementById('storageStatus');
   const transferStatus = document.getElementById('transferStatus');
   const profileSelect = document.getElementById('stateProfile');
@@ -9,7 +10,7 @@
     redInputs: redInputs.map(input => input.value), blueInputs: blueInputs.map(input => input.value),
     memoValues: [...memoValues], adjustmentSelections: adjustmentSelections.map(values => [...values]),
     currentChartPage, guideCandidateIndex, pitchAutoMode, trimAutoMode,
-    hovAngle, cruiseAngle, pageRotations, manualPitchAngles, autoPitchAngles,
+    hovAngle, cruiseAngle, pageRotations, manualPitchAngles, autoPitchAngles, initialChartRotations,
     manualTrimCruiseAngle, autoTrimCruiseAngle, manualLearningReference,
     rotationLocked: rotationLock.checked, guidesVisible: dotOverlay.classList.contains('guides-visible'),
     actualAdjustment: actualAdjustment.checked,
@@ -52,6 +53,15 @@
   globalThis.balanceFlushState = flush;
   const restore = state => {
     BalanceState.validateUI(state);
+    initialChartRotations = (state.initialChartRotations ?? [null, null]).map(value => value ? { ...value } : null);
+    if (!dotSets.length && initialChartRotations.some(Boolean)) {
+      const pages = state.pageRotations.map((value, index) => ({ ...(initialChartRotations[index] ?? value) }));
+      const active = initialChartRotations[state.currentChartPage];
+      state = { ...state, pageRotations: pages,
+        ...(active ?? {}),
+        ...(initialChartRotations[0] ? { manualPitchAngles: { ...pages[0] }, autoPitchAngles: { ...pages[0] } } : {}),
+        ...(initialChartRotations[1] ? { manualTrimCruiseAngle: pages[1].cruiseAngle, autoTrimCruiseAngle: pages[1].cruiseAngle } : {}) };
+    }
     const setFor = id => dotSets.find(set => set.learningId === id) ?? null;
     restoringAppState = true;
     try {
@@ -109,6 +119,32 @@
   } catch (error) { appStorage.protect(error); }
   ready = true;
   updateStatus();
+  const positionDialog = document.getElementById('initialPositionConfirmation');
+  const positionStatus = document.getElementById('initialPositionStatus');
+  let pendingInitialPosition = null;
+  document.getElementById('registerInitialPosition').addEventListener('click', () => {
+    if (appStorage.readOnly) return;
+    pendingInitialPosition = { page: currentChartPage, angles: { hovAngle, cruiseAngle } };
+    document.getElementById('initialPositionConfirmationTitle').textContent =
+      `${currentChartPage === 0 ? 'ピッチリンク' : 'トリムタブ'}の現在の六角形位置を初期位置として登録しますか？`;
+    positionDialog.returnValue = '';
+    positionDialog.showModal();
+  });
+  positionDialog.addEventListener('close', () => {
+    const pending = pendingInitialPosition;
+    pendingInitialPosition = null;
+    if (positionDialog.returnValue !== 'save' || !pending || appStorage.readOnly) return;
+    const next = initialChartRotations.map(value => value ? { ...value } : null);
+    next[pending.page] = pending.angles;
+    try {
+      appStorage.setItem(BalanceState.uiKey, JSON.stringify({ ...capture(), initialChartRotations: next }));
+      initialChartRotations = next;
+      positionStatus.textContent = '初期位置を登録しました。';
+    } catch {
+      positionStatus.textContent = '保存できませんでした。登録位置は変更していません。';
+      updateStatus();
+    }
+  });
   window.addEventListener('balance-storage-status', updateStatus);
   for (const name of ['input', 'change', 'click', 'submit']) document.addEventListener(name, balanceSaveState);
   window.addEventListener('message', event => { if (event.source === chartObject.contentWindow) balanceSaveState(); });
