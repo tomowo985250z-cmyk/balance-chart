@@ -136,7 +136,7 @@ body {
   text-align: center;
 }
 .chart-swipe-hint { margin: 0; color: #586473; font-size: 13px; font-weight: 600; }
-.notices-trigger { position: absolute; top: -12px; right: 6px; min-height: 24px; padding: 4px 6px; border: 0; border-radius: 4px; background: transparent; color: #586473; font: inherit; font-size: 11px; line-height: 16px; text-decoration: underline; cursor: pointer; touch-action: manipulation; }
+.notices-trigger { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); min-height: 24px; padding: 4px 6px; border: 0; border-radius: 4px; background: transparent; color: #586473; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif; font-size: 11px; line-height: 16px; text-decoration: underline; cursor: pointer; touch-action: manipulation; }
 .notices-trigger:focus-visible { outline: 2px solid #1f5faa; outline-offset: 2px; }
 .notices-dialog h2 { margin: 0 0 12px; font-size: 18px; }
 .notices-dialog #noticesText { font-size: 14px; font-weight: 400; line-height: 1.7; }
@@ -217,7 +217,7 @@ object {
 .forecast-body { fill: currentColor; stroke: white; stroke-width: 2; }
 .forecast-learning-notice { margin: 2px 0; font-size: 12px; color: #596573; flex-basis: 100%; }
 .historical-learning { margin: 10px 0; font-size: 13px; }
-.historical-learning summary { cursor: pointer; }
+.historical-learning summary { position: relative; cursor: pointer; }
 .historical-learning-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #ccd3dc; }
 .historical-learning-row span { white-space: pre-line; flex: 1 1 240px; }
 .historical-learning-row button { min-height: 36px; cursor: pointer; }

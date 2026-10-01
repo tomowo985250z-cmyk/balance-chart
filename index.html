@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20261002-notices" />
+    <link rel="stylesheet" href="style.css?v=20261002-notices-position" />
   </head>
   <body>
   <main class="app">
@@ -57,7 +57,9 @@ LINK</button>
     </form>
 
     <details class="historical-learning">
-      <summary>過去の実調整を学習</summary>
+      <summary>過去の実調整を学習
+        <button id="openNotices" class="notices-trigger" type="button" aria-haspopup="dialog" aria-controls="noticesDialog">注意事項</button>
+      </summary>
       <p>前後の測定と調整内容を確認し、実際に行った調整だけを指定してください。</p>
       <div id="historicalLearningCandidates"></div>
       <p id="historicalLearningMessage" aria-live="polite"></p>
@@ -65,7 +67,6 @@ LINK</button>
     <h2 id="resultsHeading" class="results-heading">結果</h2>
     <ul id="dotList" class="dot-list" aria-labelledby="resultsHeading"></ul>
     <div class="chart-navigation" aria-label="チャート画面">
-      <button id="openNotices" class="notices-trigger" type="button" aria-haspopup="dialog" aria-controls="noticesDialog">注意事項</button>
       <h2 id="chartTitle">現在の調整：ピッチリンク</h2>
       <p class="chart-swipe-hint">← 左右にスワイプして切替 →</p>
       <div class="chart-pages" aria-label="ページ切替">
