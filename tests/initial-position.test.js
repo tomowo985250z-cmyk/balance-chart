@@ -15,6 +15,8 @@
       if(currentChartPage===0) Object.assign(manualPitchAngles,{hovAngle,cruiseAngle});else manualTrimCruiseAngle=cruiseAngle;
       saveRotation();balanceFlushState();`);
     const register=async(value)=>{
+      frame.scrollIntoView();
+      run(`document.getElementById('registerInitialPosition').scrollIntoView({block:'center'})`);
       run(`document.getElementById('registerInitialPosition').click()`);
       assert(run(`document.getElementById('initialPositionConfirmation').open`),'confirmation opens');
       const closed=new Promise(resolve=>frame.contentDocument.getElementById('initialPositionConfirmation').addEventListener('close',resolve,{once:true}));
@@ -69,7 +71,7 @@
     run('showChartPage(1)');equal(angles(),[9,-63],'new page instance retains TAB registration');
     output.textContent=`PASS: ${checks} checks`;document.title='PASS';
     if(new URLSearchParams(location.search).has('screenshot')){
-      run(`document.getElementById('initialPositionStatus').textContent='';chartWrap.scrollIntoView();`);frame.scrollIntoView();
+      run(`document.getElementById('initialPositionStatus').textContent='初期位置を登録しました。';chartWrap.scrollIntoView();`);frame.scrollIntoView();
     }
   }catch(error){output.textContent=`FAIL after ${checks} checks\n${error.stack}`;document.title='FAIL';}
 })();
