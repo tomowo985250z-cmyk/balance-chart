@@ -237,6 +237,10 @@ function restoreAdjustmentSelection() {
 }
 
 function updateMemoButtons() {
+  if (!dotSets.length) {
+    memoValues[0] = memoValues[3] = '';
+    adjustmentSelections.forEach(values => { values[0] = values[3] = ''; });
+  }
   memoValues[1] = currentChartPage === 0 ? 'LINK' : 'TAB';
   memoButtons.forEach((button, index) => {
     button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
@@ -1596,6 +1600,7 @@ function renderHistoricalLearning() {
 }
 
 function renderDots() {
+  if (!dotSets.length) updateMemoButtons();
   if (!appStorage.readOnly) learning.sync(dotSets, {
     LINK: {
       red: pitchAutoMode && pitchAutoReady.red ? autoPitchAngles.hovAngle : manualPitchAngles.hovAngle,
