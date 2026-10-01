@@ -680,7 +680,8 @@ function openTimePicker(hourInput, minuteInput) {
 function setupClockInput(input, pad = false, nextInput = null) {
   input.addEventListener('input', (event) => {
     input.value = input.value.replace(/\D/g, '').slice(0, 2);
-    const advances = /^[2-9]$/.test(input.value) || /^(10|11|12)$/.test(input.value);
+    const advances = pad ? /^(?:[6-9]|[0-5][0-9])$/.test(input.value)
+      : /^[2-9]$/.test(input.value) || /^(10|11|12)$/.test(input.value);
     if (nextInput && advances && !String(event.inputType).startsWith('delete')) nextInput.focus({ preventScroll: true });
   });
   input.addEventListener('change', () => {
@@ -712,7 +713,7 @@ function setupMeasurementValueInput(input, nextInput) {
 
 [redInputs, blueInputs].forEach((inputs) => {
   setupClockInput(inputs[0], false, inputs[1]);
-  setupClockInput(inputs[1], true);
+  setupClockInput(inputs[1], true, inputs === redInputs ? blueInputs[2] : null);
   setupMeasurementValueInput(inputs[2], inputs[0]);
 });
 
