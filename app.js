@@ -1707,32 +1707,6 @@ function renderDots() {
   // object 内のDOMに直接アクセスできないブラウザでも動作する。
   dotOverlay.replaceChildren();
   renderDirectionLines();
-  const labelBoxes = [];
-
-  function getLabelPosition(dotX, dotY, latest = false) {
-    const labelWidth = latest ? 30 : 18;
-    const labelHeight = latest ? 30 : 20;
-    const angles = [-45, 0, 45, 90, 135, 180, 225, 270];
-    for (let distance = latest ? 31 : 17; distance <= 101; distance += 14) {
-      for (const degrees of angles) {
-        const radians = degrees * Math.PI / 180;
-        const x = dotX + Math.cos(radians) * distance;
-        const y = dotY + Math.sin(radians) * distance + 5;
-        const box = { left: x - labelWidth / 2, top: y - labelHeight / 2, right: x + labelWidth / 2, bottom: y + labelHeight / 2 };
-        const overlaps = labelBoxes.some((other) => box.left < other.right && box.right > other.left
-          && box.top < other.bottom && box.bottom > other.top);
-        if (!overlaps) {
-          labelBoxes.push(box);
-          return { x, y };
-        }
-      }
-    }
-    // すべて近接候補が埋まった場合も、最後の候補へ置いて番号を失わないようにする。
-    const x = dotX + 115;
-    const y = dotY + 5;
-    labelBoxes.push({ left: x - labelWidth / 2, top: y - labelHeight / 2, right: x + labelWidth / 2, bottom: y + labelHeight / 2 });
-    return { x, y };
-  }
 
   const latestDotIndex = {
     red: dotSets.findLastIndex(set => Boolean(set.red)),
@@ -1771,12 +1745,13 @@ function renderDots() {
       dotOverlay.append(circle);
 
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      const labelPosition = getLabelPosition(x, y, latest);
       if (latest) {
         label.classList.add('latest-measured-number');
       }
-      label.setAttribute('x', String(labelPosition.x));
-      label.setAttribute('y', String(labelPosition.y));
+      label.dataset.dotX = String(x);
+      label.dataset.dotY = String(y);
+      label.setAttribute('x', String(x));
+      label.setAttribute('y', String(y));
       label.setAttribute('text-anchor', 'middle');
       label.setAttribute('fill', DOT_COLORS[dot.color]);
       label.classList.add(`chart-dot-${dot.color}`);
@@ -1793,7 +1768,64 @@ function renderDots() {
   });
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
+  layoutDotNumbers();
 }
+
+// 表示だけを再配置する。測定・予測・学習処理は呼び出さない。
+function layoutDotNumbers() {
+  const matrix = dotOverlay.getScreenCTM();
+  if (!matrix || !matrix.a || !matrix.d) return;
+  const gap = 2 / Math.min(Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d));
+  const boxes = [...dotOverlay.querySelectorAll('circle, ellipse')].map(node => {
+    const box = node.getBBox();
+    const stroke = parseFloat(getComputedStyle(node).strokeWidth) || 0;
+    return { x: box.x - stroke / 2, y: box.y - stroke / 2,
+      width: box.width + stroke, height: box.height + stroke };
+  });
+  const overlaps = (a, b) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x
+    && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
+  for (const label of dotOverlay.querySelectorAll('text[data-dot-x]')) {
+    label.setAttribute('x', '0');
+    label.setAttribute('y', '0');
+    const measured = label.getBBox();
+    // ズームによる字体のピクセル丸めと移動後のBBox差も吸収する。
+    const stroke = (parseFloat(getComputedStyle(label).strokeWidth) || 0) / 2 + 2;
+    const width = measured.width + 2 * stroke;
+    const height = measured.height + 2 * stroke;
+    const dotX = Number(label.dataset.dotX);
+    const dotY = Number(label.dataset.dotY);
+    let placed = false;
+    // 距離の小さい順に全方向を探す。密集時も重なる固定位置へ逃がさない。
+    for (let distance = 0; !placed; distance += 1) {
+      for (let angle = -45; angle < 315; angle += 5) {
+        const radians = angle * Math.PI / 180;
+        const box = { x: dotX + Math.cos(radians) * distance - width / 2,
+          y: dotY + Math.sin(radians) * distance - height / 2, width, height };
+        if (boxes.some(other => overlaps(box, other))) continue;
+        label.setAttribute('x', String(box.x - measured.x + stroke));
+        label.setAttribute('y', String(box.y - measured.y + stroke));
+        boxes.push(box);
+        placed = true;
+        break;
+      }
+    }
+  }
+}
+
+let dotNumberLayoutFrame = null;
+function scheduleDotNumberLayout() {
+  if (dotNumberLayoutFrame !== null) return;
+  dotNumberLayoutFrame = requestAnimationFrame(() => {
+    dotNumberLayoutFrame = null;
+    layoutDotNumbers();
+  });
+}
+new MutationObserver(scheduleDotNumberLayout).observe(dotOverlay,
+  { childList: true, subtree: true, attributes: true, attributeFilter: ['viewBox', 'class'] });
+new ResizeObserver(scheduleDotNumberLayout).observe(dotOverlay);
+window.addEventListener('resize', scheduleDotNumberLayout);
+window.visualViewport?.addEventListener('resize', scheduleDotNumberLayout);
+document.fonts?.ready.then(scheduleDotNumberLayout);
 
 dotForm.addEventListener('submit', (event) => {
   event.preventDefault();
