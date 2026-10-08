@@ -153,6 +153,8 @@ const confirmMemoPicker = document.getElementById('confirmMemoPicker');
 let activeTimeInputs = null;
 let activeMemoIndex = null;
 let selectedMemoValue = '';
+let memoPickerManualDirection = false;
+let memoPickerDirectionChanged = false;
 const memoValues = ['', '', '', ''];
 const adjustmentSelections = Array.from({ length: 4 }, () => ['', '', '', '']);
 let selectedHour = 0;
@@ -274,7 +276,7 @@ function applySelectedGuideAdjustment() {
     memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
   });
   saveAdjustmentSelection();
-  updateAdjustmentForecast(memoValues, false, false);
+  updateAdjustmentForecast(memoValues, false, false, false);
 }
 
 function isManualBladeSelection(values) {
@@ -322,6 +324,8 @@ function openMemoPicker(index) {
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
   activeMemoIndex = index;
+  memoPickerManualDirection = Boolean(adjustmentForecast?.manualDirection);
+  memoPickerDirectionChanged = false;
   const guide = getVisibleGuideAdjustment();
   const guideValue = [guide?.blade, guide?.type, null, guide?.direction][index];
   const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1')
@@ -337,11 +341,14 @@ function previewMemoSelection() {
   const values = [...memoValues];
   values[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1 && values[1] !== memoValues[1]) values[2] = '';
-  updateAdjustmentForecast(values, false, isManualBladeSelection(values));
+  memoPickerDirectionChanged ||= activeMemoIndex === 3 && selectedMemoValue !== memoValues[3];
+  updateAdjustmentForecast(values, false, isManualBladeSelection(values),
+    memoPickerManualDirection || memoPickerDirectionChanged);
 }
 
 function updateAdjustmentForecast(values = memoValues, fixed = false,
-  manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0])) {
+  manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0]),
+  manualDirection = Boolean(adjustmentForecast?.manualDirection && values[3] === adjustmentForecast.values[3])) {
   if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   const action = BalanceLearning.adjustment(values);
@@ -371,7 +378,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false,
       });
       if (points.length || !['fixed', 'comparison'].includes(adjustmentForecast?.phase)) {
         // 表示可否だけを保持する。予測座標・距離・学習用データは変更しない。
-        adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values], manualBlade };
+        adjustmentForecast = { key, targetId: target.learningId, type: action.type, phase: 'preview', points, waiting, values: [...values], manualBlade, manualDirection };
         rememberForecastDisplay(adjustmentForecast);
       }
     }
@@ -451,6 +458,7 @@ function renderAdjustmentForecast() {
   }
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
   if (!dotOverlay.classList.contains('guides-visible')) return;
+  if (adjustmentForecast.manualDirection) return;
   const ns = 'http://www.w3.org/2000/svg';
   const layer = document.createElementNS(ns, 'g');
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
@@ -478,16 +486,17 @@ function renderAdjustmentForecast() {
 }
 
 memoButtons.forEach((button, index) => button.addEventListener('click', () => openMemoPicker(index)));
-closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues)); });
+closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); });
 confirmMemoPicker.addEventListener('click', () => {
   if (activeMemoIndex === null) return;
+  const manualDirection = memoPickerManualDirection || memoPickerDirectionChanged || (activeMemoIndex === 3 && selectedMemoValue !== memoValues[3]);
   memoValues[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1) memoValues[2] = '';
   updateMemoButtons();
   memoPicker.hidden = true;
-  updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues));
+  updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), manualDirection);
 });
-memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues)); } });
+memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); } });
 updateMemoButtons();
 
 function loadRotation() {
