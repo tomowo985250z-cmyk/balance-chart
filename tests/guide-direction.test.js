@@ -52,6 +52,15 @@
             const expected=Math.hypot(x+t*dx/l,y+t*dy/l)/240;
             return Math.abs(expected-candidate.hovPathDistance)<1e-8;
           })`), 'learned candidate evaluates actual prediction ray '+label);
+          if(mode==='learned' && page===0 && rank===0 && run('!guidePredictionDebug.fallback')) {
+            assert(run(`(()=>{
+              const {candidates,selected}=guidePredictionDebug;
+              const inward=candidates.filter(candidate=>candidate.towardCenter);
+              const pool=inward.length?inward:candidates;
+              return selected && (!inward.length || selected.towardCenter)
+                && pool.every(candidate=>selected.maxCenterDistance<=candidate.maxCenterDistance+1e-9);
+            })()`), 'learned automatic priority uses direction then endpoint distance '+label);
+          }
           if(radius===1.8 && angle===145 && rotation===-37) traces.push({mode,page,rank,guides:run('JSON.parse(JSON.stringify(forecastGuides))')});
         }
       }

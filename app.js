@@ -1137,6 +1137,18 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
 
 function selectLinkGuideCandidate(candidates) {
   const epsilon = 1e-9;
+  if (pitchAutoMode) {
+    // 実際の予測・代替線の方向を先に評価し、終点距離で行き過ぎも比較する。
+    const inward = candidates.filter(candidate => candidate.towardCenter);
+    let pool = inward.length ? inward : [...candidates];
+    for (const field of ['maxCenterDistance', 'distance']) {
+      const minimum = Math.min(...pool.map(candidate => candidate[field]));
+      pool = pool.filter(candidate => candidate[field] <= minimum + epsilon);
+    }
+    return pool.sort((first, second) => first.blade - second.blade
+      || Number(first.direction === 'DOWN') - Number(second.direction === 'DOWN')
+      || first.amount - second.amount)[0];
+  }
   // 予測HOVを0.15以内に保てる候補があれば、その制約を後段で覆さない。
   const hovSafe = candidates.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD + epsilon);
   let pool = hovSafe.length ? hovSafe : candidates;
@@ -1168,6 +1180,12 @@ function selectRankedLinkGuideCandidate(candidates, rank = guideCandidateIndex) 
     if (index < rank) pool = pool.filter(candidate => candidate !== selected);
   }
   return selected;
+}
+
+function guideApproachesCenter(line) {
+  const unit = getGuideMovementUnit(line);
+  const x = CHART_CENTER_X - line.base.x, y = CHART_CENTER_Y - line.base.y;
+  return Math.hypot(x, y) <= 1e-9 || x * unit.x + y * unit.y > 1e-9;
 }
 
 function getLearnedGuideLines(finalSet) {
@@ -1220,6 +1238,7 @@ function getLearnedGuideLines(finalSet) {
   if (type === 'LINK') {
     const epsilon = 1e-9; // IPS単位の幾何判定誤差。
     for (const candidate of candidates) {
+      candidate.towardCenter = candidate.predictions.every(prediction => guideApproachesCenter(getPredictionGuideLine(prediction)));
       const hov = candidate.predictions[0];
       const hovLine = getPredictionGuideLine(hov);
       const unit = getGuideMovementUnit(hovLine);
@@ -1363,6 +1382,7 @@ function renderDirectionLines() {
         return { currentDistance, predictedDistance, improvement: currentDistance - predictedDistance };
       });
       return { line, blue, blade: line.number, direction: line.direction, amount: 0, predictions,
+        towardCenter: [line, blue].filter(Boolean).every(guideApproachesCenter),
         hovPathDistance, cruisePathDistance: blue ? centerDistance(blue) : undefined,
         maxCenterDistance: distances.maxCenterDistance, distance: distances.distance };
     });
