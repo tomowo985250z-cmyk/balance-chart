@@ -284,6 +284,17 @@ function isManualBladeSelection(values) {
   return Boolean(guide && String(guide.blade) !== values[0]);
 }
 
+function updateGuideSelectionVisibility(values) {
+  const layer = dotOverlay.querySelector('.direction-lines');
+  const line = layer?.querySelector('.guide-direction-line');
+  if (!line) return;
+  const guide = forecastGuides[line.getAttribute('marker-end') === 'url(#redDirectionLineArrow)' ? 'red' : 'blue'];
+  // 自動表示の番号・方向と個別に比較する。予測計算や手動方向の履歴には使わない。
+  const changed = guide && (values[0] !== String(guide.blade) || values[3] !== guide.direction);
+  // 子の表示状態は保ち、自動値の取得と既存の予測計算を維持する。
+  layer.style.opacity = changed ? '0' : '';
+}
+
 function renderMemoWheel(options, selected, index) {
   memoWheel.replaceChildren();
   options.forEach((value) => {
@@ -349,6 +360,7 @@ function previewMemoSelection() {
 function updateAdjustmentForecast(values = memoValues, fixed = false,
   manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0]),
   manualDirection = Boolean(adjustmentForecast?.manualDirection && values[3] === adjustmentForecast.values[3])) {
+  updateGuideSelectionVisibility(values);
   if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   const action = BalanceLearning.adjustment(values);
