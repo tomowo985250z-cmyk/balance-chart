@@ -290,9 +290,10 @@ function updateGuideSelectionVisibility(values) {
   if (!line) return;
   const guide = forecastGuides[line.getAttribute('marker-end') === 'url(#redDirectionLineArrow)' ? 'red' : 'blue'];
   // 自動表示の番号・方向と個別に比較する。予測計算や手動方向の履歴には使わない。
-  const changed = guide && (values[0] !== String(guide.blade) || values[3] !== guide.direction);
+  const bladeChanged = Boolean(guide && values[0] !== String(guide.blade));
+  const directionChanged = Boolean(guide && values[3] !== guide.direction);
   // 子の表示状態は保ち、自動値の取得と既存の予測計算を維持する。
-  layer.style.opacity = changed ? '0' : '';
+  layer.style.opacity = bladeChanged || directionChanged ? '0' : '';
 }
 
 function renderMemoWheel(options, selected, index) {

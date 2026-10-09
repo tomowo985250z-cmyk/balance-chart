@@ -32,6 +32,12 @@
       assert(!visible(), 'restoring blade alone keeps changed direction hidden');
       run(`openMemoPicker(3);selectedMemoValue=automaticValues[3];confirmMemoPicker.click();`);
       assert(visible(), 'restoring both shows');
+      run(`openMemoPicker(0);selectedMemoValue=automaticValues[0]==='1'?'2':'1';confirmMemoPicker.click();
+        openMemoPicker(3);selectedMemoValue=automaticValues[3]==='UP'?'DOWN':'UP';confirmMemoPicker.click();
+        openMemoPicker(3);selectedMemoValue=automaticValues[3];confirmMemoPicker.click();`);
+      assert(!visible(), 'restoring direction alone keeps changed blade hidden');
+      run(`openMemoPicker(0);selectedMemoValue=automaticValues[0];confirmMemoPicker.click();`);
+      assert(visible(), 'restoring blade shows despite direction history');
       run(`openMemoPicker(0);selectedMemoValue=automaticValues[0]==='1'?'2':'1';previewMemoSelection();closeMemoPicker.click();`);
       assert(visible(), 'cancel restores');
       assert(run('JSON.stringify(learning.inspect())===learningBefore'), 'learning unchanged');
