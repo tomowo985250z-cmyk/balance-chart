@@ -18,7 +18,7 @@
       redInputs.forEach((input,i)=>input.value=['2','0','0.5'][i]);
       blueInputs.forEach((input,i)=>input.value=['1','0','0.5'][i]);
       dotForm.requestSubmit(); setGuidesVisible(true);
-      if(guideCandidateIndex!==1) guideCandidateToggle.click();
+      while(guideCandidateIndex!==1 && !guideCandidateToggle.disabled) guideCandidateToggle.click();
       memoThree.click(); selectedMemoValue='1/4'; confirmMemoPicker.click();`);
     assert(run('!!dotOverlay.querySelector(".forecast-body")'), 'automatic blade displays forecasts');
     const learning = run('JSON.stringify(learning.inspect())');

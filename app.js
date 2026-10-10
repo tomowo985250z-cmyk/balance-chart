@@ -37,6 +37,9 @@ const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
 let guideCandidateIndex = 0;
+const guideCandidateIndices = [0, 0];
+let guideNumberChoices = [];
+let selectingGuideNumber = false;
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
 const forecastDisplayCache = new Map(); // 候補切替で失われない表示用の生成済み座標。
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
@@ -69,12 +72,21 @@ guideToggle.addEventListener('click', () => {
 });
 guideCandidateToggle.addEventListener('click', () => {
   saveAdjustmentSelection();
-  guideCandidateIndex = guideCandidateIndex === 0 ? 1 : 0;
-  guideCandidateToggle.textContent = `ガイド線${guideCandidateIndex + 1}`;
-  guideCandidateToggle.setAttribute('aria-pressed', String(guideCandidateIndex === 1));
+  guideCandidateIndex = (guideCandidateIndex + 1) % 3;
+  guideCandidateIndices[currentChartPage] = guideCandidateIndex;
   restoreAdjustmentSelection();
-  renderDirectionLines();
+  selectingGuideNumber = true;
+  try { renderDirectionLines(); } finally { selectingGuideNumber = false; }
 });
+
+function updateGuideCandidateToggle() {
+  const blade = guideNumberChoices[guideCandidateIndex]?.blade;
+  const type = currentChartPage === 0 ? 'LINK' : 'タブ';
+  guideCandidateToggle.textContent = `${type} No.${blade ?? '—'}`;
+  guideCandidateToggle.setAttribute('aria-label', `${type} No.${blade ?? '未選択'}、優先順位${guideCandidateIndex + 1}位。次のNoに切替`);
+  guideCandidateToggle.disabled = !guideNumberChoices.length;
+  guideCandidateToggle.dataset.rank = String(guideCandidateIndex + 1);
+}
 setGuidesVisible(true);
 const dotForm = document.getElementById('dotForm');
 const adjustmentForm = document.getElementById('adjustmentForm');
@@ -156,7 +168,7 @@ let selectedMemoValue = '';
 let memoPickerManualDirection = false;
 let memoPickerDirectionChanged = false;
 const memoValues = ['', '', '', ''];
-const adjustmentSelections = Array.from({ length: 4 }, () => ['', '', '', '']);
+const adjustmentSelections = Array.from({ length: 6 }, () => ['', '', '', '']);
 let selectedHour = 0;
 let selectedMinute = 0;
 
@@ -226,7 +238,7 @@ function formatMemoInputValue(value, index) {
 }
 
 function getAdjustmentSelectionIndex() {
-  return currentChartPage * 2 + guideCandidateIndex;
+  return currentChartPage * 3 + guideCandidateIndex;
 }
 
 function saveAdjustmentSelection() {
@@ -266,16 +278,22 @@ function getVisibleGuideAdjustment() {
   return forecastGuides[line.getAttribute('marker-end') === 'url(#redDirectionLineArrow)' ? 'red' : 'blue'] ?? null;
 }
 
-function applySelectedGuideAdjustment() {
+function applySelectedGuideAdjustment(preserveFixed = false) {
   if (restoringAppState) return;
-  const guide = getVisibleGuideAdjustment();
+  const guide = selectingGuideNumber ? (forecastGuides.red ?? forecastGuides.blue) : getVisibleGuideAdjustment();
   if (!guide) return;
   [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
     const index = [0, 1, 3][position];
     memoValues[index] = value;
     memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
   });
+  const retainedForecast = preserveFixed && ['fixed', 'comparison'].includes(adjustmentForecast?.phase) && !selectingGuideNumber;
+  if (selectingGuideNumber || (!memoValues[2] && !retainedForecast)) {
+    memoValues[2] = guide.amountText || memoValues[2] || (guide.type === 'LINK' ? '1/8' : '1');
+    memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
+  }
   saveAdjustmentSelection();
+  if (retainedForecast) return;
   updateAdjustmentForecast(memoValues, false, false, false);
 }
 
@@ -419,7 +437,7 @@ function getForecastDisplayEntry(forecast, create = false) {
   }
   const target = dotSets.find(set => set.learningId === forecast.targetId);
   if (!target) return null;
-  const key = JSON.stringify([forecast.targetId, forecast.type, forecast.values[2]]);
+  const key = JSON.stringify([forecast.targetId, forecast.type, forecast.values[0], forecast.values[3], forecast.values[2]]);
   if (create && !forecastDisplayCache.has(key)) {
     forecastDisplayCache.set(key, { targetId: forecast.targetId,
       measurements: JSON.stringify([target.red, target.blue]), points: new Map() });
@@ -441,7 +459,7 @@ function getForecastDisplayPoints(forecast) {
   const saved = getForecastDisplayEntry(forecast);
   const points = [...forecast.points];
   if (forecast.phase === 'preview' && forecast.targetId !== dotSets.at(-1)?.learningId) return points;
-  // 新しい候補で計算できない色だけ、同じ測定・種別・調整量の生成済み座標を復元する。
+  // 同じ測定・種別・No・方向・調整量の生成済み座標だけを復元する。
   // 計算結果や学習用データには混ぜず、表示層だけで補う。
   for (const point of saved?.points.values() ?? []) {
     if (!points.some(current => current.color === point.color)) points.push(point);
@@ -455,6 +473,7 @@ function renderAdjustmentForecast() {
   const notice = document.getElementById('forecastLearningNotice');
   notice.hidden = true;
   notice.textContent = '';
+  if (guideNumberChoices.length && !guideNumberChoices[guideCandidateIndex]?.candidate) return;
   if (!adjustmentForecast) return;
   if (adjustmentForecast.manualBlade) return;
   if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
@@ -476,7 +495,7 @@ function renderAdjustmentForecast() {
   const layer = document.createElementNS(ns, 'g');
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
   layer.style.pointerEvents = 'none';
-  // 候補1/2の選択やガイドの有無に依存せず、生成済み座標をそのまま描画する。
+  // 生成済み座標をそのまま描画する。
   displayPoints.forEach(({ color, x, y, savedValues }) => {
     if (![x, y].every(Number.isFinite)) return;
     const group = document.createElementNS(ns, 'g');
@@ -590,9 +609,11 @@ trimModeToggle.addEventListener('click', () => {
 function showChartPage(page) {
   if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
   saveAdjustmentSelection();
+  guideCandidateIndices[currentChartPage] = guideCandidateIndex;
   saveRotation();
   manualMessageChanges = { red: false, blue: false };
   currentChartPage = page;
+  guideCandidateIndex = guideCandidateIndices[page];
   restoreAdjustmentSelection();
   dotOverlay.classList.toggle('trim-tab', page === 1);
   ({ hovAngle, cruiseAngle } = pageRotations[page]);
@@ -1195,6 +1216,25 @@ function selectRankedLinkGuideCandidate(candidates, rank = guideCandidateIndex) 
   return selected;
 }
 
+// 表示候補だけをNoごとにまとめる。評価式・予測値は既存のものをそのまま使う。
+function selectGuideNumberCandidate(candidates, selectBest) {
+  let pool = [...candidates];
+  const choices = [];
+  while (pool.length) {
+    const candidate = selectBest(pool);
+    if (!candidate) break;
+    choices.push({ blade: candidate.blade, candidate });
+    pool = pool.filter(other => other.blade !== candidate.blade);
+  }
+  // 学習済みの改善候補がないNoも切替先に残し、予測を捏造しない。
+  for (const blade of [1, 2, 3]) {
+    if (!choices.some(choice => choice.blade === blade)) choices.push({ blade, candidate: null });
+  }
+  guideNumberChoices = candidates.length ? choices : [];
+  updateGuideCandidateToggle();
+  return choices[guideCandidateIndex]?.candidate;
+}
+
 function guideApproachesCenter(line) {
   const unit = getGuideMovementUnit(line);
   const x = CHART_CENTER_X - line.base.x, y = CHART_CENTER_Y - line.base.y;
@@ -1264,16 +1304,17 @@ function getLearnedGuideLines(finalSet) {
         candidate.cruisePathDistance = getGuidePathDistance(getPredictionGuideLine(cruise));
       }
     }
-    selected = selectRankedLinkGuideCandidate(candidates);
+    selected = selectGuideNumberCandidate(candidates, selectLinkGuideCandidate);
   } else {
     const ranked = candidates.filter(candidate => candidate.eligible).sort((first, second) =>
       Number(second.withinCenterThreshold) - Number(first.withinCenterThreshold)
       || first.maxCenterDistance - second.maxCenterDistance || first.distance - second.distance);
-    selected = ranked[guideCandidateIndex] || ranked[0];
+    selected = selectGuideNumberCandidate(candidates, pool => ranked.find(candidate => pool.includes(candidate)));
   }
   guidePredictionDebug = { type, fallback: false, reason: selected ? 'measured-vectors' : 'no-improving-candidate', selected, candidates };
   return selected ? selected.predictions.map(prediction => ({
     blade: selected.blade, direction: selected.direction,
+    amountText: selected.amountText,
     line: getPredictionGuideLine(prediction),
     color: prediction.color === 'red' ? DOT_COLORS.red : type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue,
     marker: `${prediction.color}DirectionLineArrow`
@@ -1338,6 +1379,7 @@ window.visualViewport?.addEventListener('scroll', updateGuideViewportEnds);
 
 function renderDirectionLines() {
   forecastGuides = {};
+  guideNumberChoices = [];
   let guideLayer = dotOverlay.querySelector('.direction-lines');
   if (!guideLayer) {
     guideLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -1367,12 +1409,17 @@ function renderDirectionLines() {
   let selectedLines = getLearnedGuideLines(finalSet);
   if (selectedLines !== null) {
     // 学習済み候補が全て悪化する場合は、旧候補で上書きしない。
+    if (!selectedLines.length && selectingGuideNumber && !restoringAppState) {
+      memoValues.splice(0, 4, String(guideNumberChoices[guideCandidateIndex].blade), currentChartPage === 0 ? 'LINK' : 'TAB', '', '');
+      updateMemoButtons();
+    }
   } else if (currentChartPage === 1) {
     // トリムタブは巡航線だけを、矢印方向で到達できる中心距離で選ぶ。
     const ranked = blueDots.sort((first, second) =>
       Number(second.line.centerDistance <= CENTER_DISTANCE_THRESHOLD) - Number(first.line.centerDistance <= CENTER_DISTANCE_THRESHOLD)
       || first.line.centerDistance - second.line.centerDistance);
-    const selected = ranked[guideCandidateIndex] || ranked[0];
+    const candidates = ranked.map(entry => ({ ...entry, blade: entry.line.number }));
+    const selected = selectGuideNumberCandidate(candidates, pool => pool[0]);
     if (!selected) {
       if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
       else renderAdjustmentForecast();
@@ -1399,17 +1446,18 @@ function renderDirectionLines() {
         hovPathDistance, cruisePathDistance: blue ? centerDistance(blue) : undefined,
         maxCenterDistance: distances.maxCenterDistance, distance: distances.distance };
     });
-    const selected = selectRankedLinkGuideCandidate(candidates);
+    const selected = selectGuideNumberCandidate(candidates, selectLinkGuideCandidate);
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
     if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
+    updateGuideCandidateToggle();
     if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
     else renderAdjustmentForecast();
     return;
   }
 
   appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);
-  selectedLines.forEach(({ line, color, marker, blade = line.number, direction = line.direction }) => {
+  selectedLines.forEach(({ line, color, marker, blade = line.number, direction = line.direction, amountText }) => {
     // 範囲外では実際のドットを始点に、候補評価と同じ調整方向へ描画する。
     const start = Math.hypot(line.base.x - CHART_CENTER_X, line.base.y - CHART_CENTER_Y) > CHART_RADIUS
       ? line.base : line.start;
@@ -1434,13 +1482,13 @@ function renderDirectionLines() {
     if (Number.isFinite(length) && length > 0) {
       forecastGuides[marker === 'redDirectionLineArrow' ? 'red' : 'blue'] = {
         targetId: finalSet.learningId, type: currentChartPage === 0 ? 'LINK' : 'TAB',
-        blade, direction,
+        blade, direction, amountText,
         unit
       };
     }
   });
   updateGuideViewportEnds();
-  applySelectedGuideAdjustment();
+  applySelectedGuideAdjustment(true);
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
 }

@@ -90,6 +90,10 @@
       rotationLock.checked=false; updateRotationLock(); setGuidesVisible(false);
       chartNote.value='再起動テストのメモ'; chartNote.dispatchEvent(new Event('input',{bubbles:true}));
       actualAdjustment.checked=true; dotOverlay.setAttribute('viewBox','100 100 397 561.5'); balanceFlushState();`);
+    // 実際のズームと同様、SVGにも反映して通知が落ち着いてから保存する。
+    run(`chartObject.contentWindow.postMessage({type:'balance-chart-restore-view',viewBox:[100,100,397,561.5]},'*')`);
+    await new Promise(resolve=>setTimeout(resolve,100));
+    run('balanceFlushState()');
     const saved=run('appStorage.getItem(BalanceState.uiKey)');
     const learnedBefore=run('JSON.stringify(learning.inspect().models)');
     const samplesBefore=run('JSON.stringify(learning.inspect().samples)');
@@ -115,7 +119,7 @@
     const exported=run('balanceFlushState(); appStorage.exportText()');
     const independent=BalanceState.open(memory()); independent.importText(exported);
     // ページ1/2、候補、編集途中も復元する。
-    run(`showChartPage(1); if(guideCandidateIndex!==1) guideCandidateToggle.click();
+    run(`showChartPage(1); while(guideCandidateIndex!==1 && !guideCandidateToggle.disabled) guideCandidateToggle.click();
       memoValues.splice(0,4,'2','TAB','2','UP'); updateMemoButtons(); updateAdjustmentForecast();
       startResultEdit(dotSets[1]); redInputs[2].value='0.63'; balanceFlushState();`);
     loaded=new Promise(resolve=>frame.onload=resolve); frame.contentWindow.location.reload(); await loaded;

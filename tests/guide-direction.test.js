@@ -34,14 +34,15 @@
           const end=line.displayEnd, dx=end.x-line.base.x,dy=end.y-line.base.y;
           return dx*line.unit.x+dy*line.unit.y>0 && Math.abs(dx*line.unit.y-dy*line.unit.x)<1e-6;
         })))`), 'no reversed circle intersection '+JSON.stringify({mode,page,radius,angle,rotation}));
-        for(const rank of [0,1]) {
-          run(`if(guideCandidateIndex!==${rank}) guideCandidateToggle.click();else renderDirectionLines();`);
+        for(const rank of [0,1,2]) {
+          run(`while(guideCandidateIndex!==${rank} && !guideCandidateToggle.disabled) guideCandidateToggle.click();renderDirectionLines();`);
           const label=JSON.stringify({mode,page,radius,angle,rotation,rank});
           assert(run(`[...dotOverlay.querySelectorAll('.guide-direction-line')].every(node=>{
             const color=node.getAttribute('marker-end').includes('red')?'red':'blue';
             const unit=forecastGuides[color].unit;
             const dx=node.x2.baseVal.value-node.x1.baseVal.value,dy=node.y2.baseVal.value-node.y1.baseVal.value;
-            return dx*unit.x+dy*unit.y>0 && Math.abs(dx*unit.y-dy*unit.x)/Math.hypot(dx,dy)<1e-6;
+            // SVGAnimatedLengthのfloat丸めを座標単位で許容する（短い3位候補も対象）。
+            return dx*unit.x+dy*unit.y>0 && Math.abs(dx*unit.y-dy*unit.x)<1e-4;
           })`), 'DOM shares movement direction '+label);
           assert(run(`guidePredictionDebug.fallback
             ? dotOverlay.querySelectorAll('.guide-direction-line').length===${page?1:2}
@@ -74,8 +75,8 @@
         adjustmentForecast=null; applyChartRotation(${rotation},0);
         redInputs.forEach((input,i)=>input.value=['4','50','1.80'][i]);blueInputs.forEach(input=>input.value='');
         dotForm.requestSubmit();pitchAutoMode=true;setGuidesVisible(true);`);
-      for(const rank of [0,1]) {
-        run(`if(guideCandidateIndex!==${rank}) guideCandidateToggle.click();`);
+      for(const rank of [0,1,2]) {
+        run(`while(guideCandidateIndex!==${rank} && !guideCandidateToggle.disabled) guideCandidateToggle.click();`);
         assert(run(`(()=>{const p=getDotCoordinates(dotSets.at(-1).red),u=forecastGuides.red?.unit;
           return u && (397-p.x)*u.x+(520-p.y)*u.y>0;})()`), 'HOV 1.80 / 4:50 approaches center on guide '+(rank+1));
         traces.push({hovOnly:true,rotation,rank,guides:run('JSON.parse(JSON.stringify(forecastGuides))')});

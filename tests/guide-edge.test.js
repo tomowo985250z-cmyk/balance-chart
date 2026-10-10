@@ -16,7 +16,7 @@
     for(const args of [[397,520,1,0],[700,520,-1,0],[637,100,0,1],[800,900,1,0]]){
       assert(run(`(()=>{const line=edgeLine(${args});return getGuideViewportEnd(line,edgeBounds)===line.end;})()`),'crossing, tangent or invisible ray unchanged '+args);
     }
-    for(const page of [0,1])for(const rank of [0,1]){
+    for(const page of [0,1])for(const rank of [0,1,2]){
       run(`pitchAutoMode=false;trimAutoMode=false;showChartPage(${page});dotSets.splice(0);adjustmentForecast=null;
         dotSets.push({learningId:newLearningId(),adjustments:[],red:{color:'red',clock:'4:50',radius:1.8,angle:145},blue:{color:'blue',clock:'4:50',radius:1.8,angle:145}});
         applyChartRotation(-37,-37);guideCandidateIndex=${rank};setGuidesVisible(true);renderDots();chartWrap.scrollIntoView();`);

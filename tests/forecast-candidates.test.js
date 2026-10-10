@@ -38,7 +38,7 @@
         adjustmentSelections.forEach(values=>values.fill(''));
         memoValues.fill(''); pitchAutoMode=false; trimAutoMode=false;
         showChartPage(${type === 'LINK' ? 0 : 1});
-        if(guideCandidateIndex!==0) guideCandidateToggle.click();
+        guideCandidateIndex=0;
         hovAngle=0; cruiseAngle=0;
         redInputs.forEach((input,index)=>input.value=['2','0','0.5'][index]);
         blueInputs.forEach((input,index)=>input.value=['5','0','0.5'][index]);
@@ -70,29 +70,34 @@
         window.candidateForecastSnapshot=JSON.stringify(adjustmentForecast);
         window.candidateLearningSnapshot=JSON.stringify(learning.inspect());
         window.candidateStorageSnapshot=JSON.stringify({...localStorage});
+        window.candidateAdjustmentsSnapshot=JSON.stringify(dotSets);
       `);
       assert(run('adjustmentForecast.phase==="fixed"'), type + ': actual adjustment form fixes generated forecast');
       const candidates = [];
       // 実際の切替ボタンと手動回転処理を使う。予測・候補選択関数は差し替えない。
       for (const angle of [0, 30, 60, 90, 120, 180]) {
         run(`applyChartRotation(${angle},${angle}); renderDirectionLines();`);
-        for (const rank of [0, 1, 0]) {
-          run(`if(guideCandidateIndex!==${rank}) guideCandidateToggle.click();`);
-          assert(run(`guideCandidateIndex===${rank} && guideCandidateToggle.textContent==='ガイド線${rank + 1}'`), 'actual candidate button selects requested guide');
+        for (const rank of [1, 2, 0]) {
+          run(`while(guideCandidateIndex!==${rank}) guideCandidateToggle.click();`);
+          assert(run(`guideCandidateIndex===${rank} && guideCandidateToggle.textContent==='${type==='LINK'?'LINK':'タブ'} No.'+guideNumberChoices[${rank}].blade`), 'actual candidate button selects requested No');
           candidates.push(run('JSON.stringify({guides:Object.values(forecastGuides).map(({blade,direction})=>[blade,direction]),amount:guidePredictionDebug.selected?.amount})'));
-          assert(run('adjustmentForecast.points.some(point=>point.color==="blue")'), type + '/guide' + (rank + 1) + ': Cruise still retained');
-          assert(run('JSON.stringify(adjustmentForecast)===candidateForecastSnapshot'), 'candidate switch leaves fixed forecast unchanged');
+          if (!run('guideNumberChoices[guideCandidateIndex].candidate')) {
+            assert(run('!dotOverlay.querySelector(".forecast-body")'), 'no improving candidate hides forecasts');
+            continue;
+          }
+          assert(run('adjustmentForecast.phase==="preview" && adjustmentForecast.values.every((value,index)=>value===memoValues[index])'), 'candidate switch shows the selected No preview');
+          assert(run('JSON.stringify(dotSets)===candidateAdjustmentsSnapshot'), 'candidate switch preserves recorded adjustments');
           checkCoordinates(type + (automatic ? '/AUTO' : '/manual') + '/guide' + (rank + 1) + '/rotation' + angle);
         }
       }
       assert(new Set(candidates).size>1, type + ': exercised distinct guide candidates');
       assert(run('JSON.stringify(learning.inspect())===candidateLearningSnapshot'), 'candidate display leaves learning unchanged');
       assert(run('JSON.stringify({...localStorage})===candidateStorageSnapshot'), 'candidate display leaves storage unchanged');
-      for (const rank of [1, 0]) {
-        run(`if(guideCandidateIndex!==${rank}) guideCandidateToggle.click(); guideToggle.click();`);
+      for (const rank of [1, 2, 0]) {
+        run(`while(guideCandidateIndex!==${rank}) guideCandidateToggle.click(); guideToggle.click();`);
         assert(run('!dotOverlay.querySelector(".forecast-body")'), 'guide OFF hides forecast');
         run('guideToggle.click();');
-        checkCoordinates(type + '/guide' + (rank + 1) + '/ON');
+        if (run('guideNumberChoices[guideCandidateIndex].candidate')) checkCoordinates(type + '/No-rank' + (rank + 1) + '/ON');
       }
       // プレビュー・比較でも描画処理だけでは保存データを変更しない。
       for (const phase of ['preview', 'comparison']) {
@@ -101,7 +106,7 @@
         assert(run('JSON.stringify(adjustmentForecast)===phaseSnapshot'), 'renderer leaves forecast phase and data unchanged');
       }
     }
-    output.textContent = `PASS: ${checks} checks — actual guide 1/2 buttons, saved coordinates, LINK HOV/Cruise and TAB\n`;
+    output.textContent = `PASS: ${checks} checks — three Nos, linked previews, recorded adjustments, LINK HOV/Cruise and TAB\n`;
     document.title = 'PASS';
   } catch (error) {
     output.textContent = `FAIL after ${checks} checks\n${error.stack}\n`;

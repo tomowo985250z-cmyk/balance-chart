@@ -8,7 +8,7 @@
     frame.src = '../index.html'; document.body.append(frame); await loaded;
     const run = code => frame.contentWindow.eval(code);
     const visible = () => run(`dotOverlay.querySelector('.direction-lines').style.opacity !== '0'`);
-    for (const page of [0, 1]) for (const rank of [0, 1]) {
+    for (const page of [0, 1]) for (const rank of [0, 1, 2]) {
       run(`adjustmentForecast=null;selectedAdjustmentTarget=null;learning.reset([]);dotSets.splice(0);
         currentChartPage=${page};guideCandidateIndex=${rank};pitchAutoMode=false;trimAutoMode=false;
         dotSets.push({learningId:newLearningId(),red:{...parseDotInput('2','0','0.5'),color:'red'},

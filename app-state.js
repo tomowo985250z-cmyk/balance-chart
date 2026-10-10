@@ -12,7 +12,7 @@
     version: 1, measurements: JSON.stringify(dotSets),
     redInputs: redInputs.map(input => input.value), blueInputs: blueInputs.map(input => input.value),
     memoValues: [...memoValues], adjustmentSelections: adjustmentSelections.map(values => [...values]),
-    currentChartPage, guideCandidateIndex, pitchAutoMode, trimAutoMode,
+    currentChartPage, guideCandidateIndex, guideCandidateIndices: guideCandidateIndices.map((rank, page) => page === currentChartPage ? guideCandidateIndex : rank), pitchAutoMode, trimAutoMode,
     hovAngle, cruiseAngle, pageRotations, manualPitchAngles, autoPitchAngles, initialChartRotations,
     manualTrimCruiseAngle, autoTrimCruiseAngle, manualLearningReference,
     rotationLocked: rotationLock.checked, guidesVisible: dotOverlay.classList.contains('guides-visible'),
@@ -70,6 +70,8 @@
     restoringAppState = true;
     try {
       currentChartPage = state.currentChartPage; guideCandidateIndex = state.guideCandidateIndex;
+      guideCandidateIndices.splice(0, 2, ...(state.guideCandidateIndices ?? [0, 0]));
+      guideCandidateIndices[currentChartPage] = guideCandidateIndex;
       pitchAutoMode = state.pitchAutoMode; trimAutoMode = state.trimAutoMode;
       pageRotations.splice(0, 2, ...state.pageRotations);
       for (const key of ['hovAngle', 'cruiseAngle']) {
@@ -78,7 +80,10 @@
       manualTrimCruiseAngle = state.manualTrimCruiseAngle; autoTrimCruiseAngle = state.autoTrimCruiseAngle;
       for (const type of ['LINK', 'TAB']) manualLearningReference[type] = { ...state.manualLearningReference[type] };
       memoValues.splice(0, 4, ...state.memoValues);
-      adjustmentSelections.splice(0, 4, ...state.adjustmentSelections);
+      const selections = state.adjustmentSelections.length === 4
+        ? [...state.adjustmentSelections.slice(0, 2), ['', '', '', ''], ...state.adjustmentSelections.slice(2), ['', '', '', '']]
+        : state.adjustmentSelections;
+      adjustmentSelections.splice(0, 6, ...selections);
       redInputs.forEach((input, index) => { input.value = state.redInputs[index]; });
       blueInputs.forEach((input, index) => { input.value = state.blueInputs[index]; });
       selectedAdjustmentTarget = setFor(state.selectedTarget);
@@ -96,8 +101,6 @@
         cruiseAdditionTarget = setFor(state.cruiseTarget); cruiseInputDraft = state.cruiseInputDraft;
       }
       dotOverlay.classList.toggle('trim-tab', currentChartPage === 1);
-      guideCandidateToggle.textContent = `ガイド線${guideCandidateIndex + 1}`;
-      guideCandidateToggle.setAttribute('aria-pressed', String(guideCandidateIndex === 1));
       chartTitle.textContent = chartNames[currentChartPage];
       chartPageButtons.forEach((button, index) => {
         button.classList.toggle('is-active', index === currentChartPage);

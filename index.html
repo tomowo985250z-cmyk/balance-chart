@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20261002-notices-position" />
+    <link rel="stylesheet" href="style.css?v=20261010-guide-numbers" />
   </head>
   <body>
   <main class="app">
@@ -86,7 +86,7 @@ LINK</button>
         <span>メモ</span>
         <input id="chartNote" type="text" maxlength="40" autocomplete="off" />
       </label>
-      <button id="guideCandidateToggle" class="rotation-lock guide-candidate-toggle" type="button" aria-pressed="false">ガイド線1</button>
+      <button id="guideCandidateToggle" class="rotation-lock guide-candidate-toggle" type="button" disabled>LINK No.—</button>
       <button id="guideToggle" class="rotation-lock guide-toggle" type="button" aria-pressed="true">
         <span class="rotation-lock-track" aria-hidden="true"></span>
         <span id="guideToggleText">ガイド ON</span>
@@ -165,10 +165,10 @@ LINK</button>
     </form>
   </dialog>
   <script src="notices.js?v=20261002-notices"></script>
-  <script src="state-storage.js?v=20261001-initial-position"></script>
+  <script src="state-storage.js?v=20261010-guide-numbers"></script>
   <script src="learning.js?v=20260920-distance-prior"></script>
   <script src="distance-prior.js?v=20260921-tab-monotonic-distance"></script>
-  <script src="app.js?v=20261010-stable-dot-numbers"></script>
-  <script src="app-state.js?v=20261001-blue-status"></script>
+  <script src="app.js?v=20261010-guide-numbers"></script>
+  <script src="app-state.js?v=20261010-guide-numbers"></script>
 </body>
 </html>

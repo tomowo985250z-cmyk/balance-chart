@@ -14,8 +14,10 @@ const BalanceState = (() => {
     const forecast = data?.forecast;
     const valid = object(data) && data.version === 1 && typeof data.measurements === 'string'
       && strings(data.redInputs, 3) && strings(data.blueInputs, 3) && strings(data.memoValues, 4)
-      && Array.isArray(data.adjustmentSelections) && data.adjustmentSelections.length === 4 && data.adjustmentSelections.every(value => strings(value, 4))
-      && [0, 1].includes(data.currentChartPage) && [0, 1].includes(data.guideCandidateIndex)
+      && Array.isArray(data.adjustmentSelections) && [4, 6].includes(data.adjustmentSelections.length) && data.adjustmentSelections.every(value => strings(value, 4))
+      && [0, 1].includes(data.currentChartPage) && [0, 1, 2].includes(data.guideCandidateIndex)
+      && (data.guideCandidateIndices === undefined || (Array.isArray(data.guideCandidateIndices)
+        && data.guideCandidateIndices.length === 2 && data.guideCandidateIndices.every(value => [0, 1, 2].includes(value))))
       && ['pitchAutoMode', 'trimAutoMode', 'rotationLocked', 'guidesVisible', 'actualAdjustment'].every(key => typeof data[key] === 'boolean')
       && [data.hovAngle, data.cruiseAngle, data.manualTrimCruiseAngle, data.autoTrimCruiseAngle].every(Number.isFinite)
       && angles(data.manualPitchAngles) && angles(data.autoPitchAngles)
