@@ -1786,6 +1786,7 @@ function renderDots() {
 
 // 表示だけを再配置する。測定・予測・学習処理は呼び出さない。
 function layoutDotNumbers() {
+  if (dotNumberViewInteracting) return;
   const matrix = dotOverlay.getScreenCTM();
   if (!matrix || !matrix.a || !matrix.d) return;
   const gap = 2 / Math.min(Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d));
@@ -1798,13 +1799,19 @@ function layoutDotNumbers() {
   const overlaps = (a, b) => a.x < b.x + b.width + gap && a.x + a.width + gap > b.x
     && a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
   for (const label of dotOverlay.querySelectorAll('text[data-dot-x]')) {
-    label.setAttribute('x', '0');
-    label.setAttribute('y', '0');
-    const measured = label.getBBox();
+    const current = label.getBBox();
     // ズームによる字体のピクセル丸めと移動後のBBox差も吸収する。
     const stroke = (parseFloat(getComputedStyle(label).strokeWidth) || 0) / 2 + 2;
-    const width = measured.width + 2 * stroke;
-    const height = measured.height + 2 * stroke;
+    const width = current.width + 2 * stroke;
+    const height = current.height + 2 * stroke;
+    const currentBox = { x: current.x - stroke, y: current.y - stroke, width, height };
+    // 衝突しない番号は座標に触れず、ズーム前の相対位置を保つ。
+    if (!boxes.some(other => overlaps(currentBox, other))) {
+      boxes.push(currentBox);
+      continue;
+    }
+    const measured = { x: current.x - Number(label.getAttribute('x')),
+      y: current.y - Number(label.getAttribute('y')) };
     const dotX = Number(label.dataset.dotX);
     const dotY = Number(label.dataset.dotY);
     let placed = false;
@@ -1826,19 +1833,35 @@ function layoutDotNumbers() {
 }
 
 let dotNumberLayoutFrame = null;
-function scheduleDotNumberLayout() {
-  if (dotNumberLayoutFrame !== null) return;
-  dotNumberLayoutFrame = requestAnimationFrame(() => {
-    dotNumberLayoutFrame = null;
-    layoutDotNumbers();
-  });
+let dotNumberLayoutTimer = null;
+let dotNumberViewInteracting = false;
+function scheduleDotNumberLayout(delay = 0) {
+  clearTimeout(dotNumberLayoutTimer);
+  dotNumberLayoutTimer = null;
+  if (dotNumberLayoutFrame !== null) cancelAnimationFrame(dotNumberLayoutFrame);
+  dotNumberLayoutFrame = null;
+  if (dotNumberViewInteracting) return;
+  const enqueue = () => {
+    dotNumberLayoutTimer = null;
+    dotNumberLayoutFrame = requestAnimationFrame(() => {
+      dotNumberLayoutFrame = null;
+      layoutDotNumbers();
+    });
+  };
+  if (delay) dotNumberLayoutTimer = setTimeout(enqueue, delay);
+  else enqueue();
 }
-new MutationObserver(scheduleDotNumberLayout).observe(dotOverlay,
+// viewBox・画面サイズの連続変化が止まってから、必要な番号だけ重なりを回避する。
+const scheduleDotNumberViewportLayout = () => scheduleDotNumberLayout(180);
+new MutationObserver(records => {
+  if (records.some(record => record.attributeName === 'viewBox')) scheduleDotNumberViewportLayout();
+  else scheduleDotNumberLayout();
+}).observe(dotOverlay,
   { childList: true, subtree: true, attributes: true, attributeFilter: ['viewBox', 'class'] });
-new ResizeObserver(scheduleDotNumberLayout).observe(dotOverlay);
-window.addEventListener('resize', scheduleDotNumberLayout);
-window.visualViewport?.addEventListener('resize', scheduleDotNumberLayout);
-document.fonts?.ready.then(scheduleDotNumberLayout);
+new ResizeObserver(scheduleDotNumberViewportLayout).observe(dotOverlay);
+window.addEventListener('resize', scheduleDotNumberViewportLayout);
+window.visualViewport?.addEventListener('resize', scheduleDotNumberViewportLayout);
+document.fonts?.ready.then(() => scheduleDotNumberLayout());
 
 dotForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -2134,7 +2157,9 @@ window.addEventListener('message', (event) => {
     renderDirectionLines();
   }
   if (message?.type === 'balance-chart-viewbox' && typeof message.viewBox === 'string') {
+    dotNumberViewInteracting = message.interacting === true;
     dotOverlay.setAttribute('viewBox', message.viewBox);
+    scheduleDotNumberViewportLayout();
   }
   if (message?.type === 'balance-chart-swipe' && (message.direction === -1 || message.direction === 1)) {
     showChartPage(currentChartPage + message.direction);

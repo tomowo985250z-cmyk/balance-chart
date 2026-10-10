@@ -266,7 +266,12 @@
           clamp(y, baseViewBox.y, baseViewBox.y + baseViewBox.height - height)
         } ${width} ${height}`;
         svg.setAttribute('viewBox', viewBox);
-        window.parent.postMessage({ type: 'balance-chart-viewbox', viewBox }, '*');
+        notifyViewBox();
+      }
+
+      function notifyViewBox() {
+        window.parent.postMessage({ type: 'balance-chart-viewbox',
+          viewBox: svg.getAttribute('viewBox'), interacting: pinching || panning }, '*');
       }
 
       function currentViewBox() {
@@ -287,7 +292,7 @@
         setViewBox(x, y, width, height);
       }
 
-      window.parent.postMessage({ type: 'balance-chart-viewbox', viewBox: svg.getAttribute('viewBox') }, '*');
+      notifyViewBox();
 
       function touchDistance(touches) {
         return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
@@ -336,6 +341,7 @@
           if (active) stopRotation({ pointerId: active.pointerId });
           panning = false;
           panStart = null;
+          notifyViewBox();
           return;
         }
 
@@ -344,6 +350,7 @@
           panning = true;
           panStart = { x: event.touches[0].clientX, y: event.touches[0].clientY, viewBox };
           svg.dataset.panning = 'true';
+          notifyViewBox();
           event.preventDefault();
           return;
         }
@@ -389,6 +396,17 @@
           panStart = null;
           delete svg.dataset.panning;
         }
+        notifyViewBox();
+      });
+
+      svg.addEventListener('touchcancel', () => {
+        pinching = false;
+        panning = false;
+        panStart = null;
+        swipeStart = null;
+        delete svg.dataset.pinching;
+        delete svg.dataset.panning;
+        notifyViewBox();
       });
 
       function pointerAngle(event) {
