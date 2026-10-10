@@ -47,7 +47,7 @@
         if (available) {
           assert(run(`Object.values(forecastGuides).every(guide=>guide.blade===${order[rank]} && memoValues[0]===String(guide.blade) && memoValues[3]===guide.direction)`), 'No and direction match both guides');
           assert(run('memoValues.every(Boolean)'), 'selected No supplies adjustment amount');
-          if (mode === 'learned') assert(run('memoValues[2]===guidePredictionDebug.selected.amountText'), 'learned optimal amount matches existing candidate');
+          assert(run(`memoValues[2]==='${page?'1':'1/4'}'`), 'No selection keeps the shared amount instead of the learned candidate amount');
           assert(run('adjustmentForecast?.values.every((value,index)=>value===memoValues[index])'), 'forecast follows selected action');
           assert(run(`adjustmentForecast.points.every(point=>{
             const action=BalanceLearning.adjustment(memoValues),start=getDotCoordinates(dotSets.at(-1)[point.color]);
@@ -94,8 +94,8 @@
     loaded = new Promise(resolve => frame.onload = resolve);
     frame.contentWindow.location.reload(); await loaded;
     assert(run(`!appStorage.error && adjustmentSelections.length===6
-      && adjustmentSelections[0][2]==='1/4' && adjustmentSelections[1][2]==='1/2'
-      && adjustmentSelections[3][2]==='1' && adjustmentSelections[4][2]==='2'`), 'legacy selections migrate into the correct pages');
+      && adjustmentSelections.slice(0,3).every(values=>values[2]==='1/4')
+      && adjustmentSelections.slice(3).every(values=>values[2]==='2')`), 'legacy selected amounts become shared within the correct pages');
     // 両画面・両モードで高さと上下位置を揃え、狭い画面でも重なり・文字切れを防ぐ。
     for (const width of [320, 375, 390, 430, 1000]) {
       // スマホではスクロールバーがレイアウト幅を消費しない。

@@ -84,6 +84,14 @@
         ? [...state.adjustmentSelections.slice(0, 2), ['', '', '', ''], ...state.adjustmentSelections.slice(2), ['', '', '', '']]
         : state.adjustmentSelections;
       adjustmentSelections.splice(0, 6, ...selections);
+      // 旧形式の候補別の量は、表示中（他画面は選択中）の値を共有値として引き継ぐ。
+      for (const page of [0, 1]) {
+        const values = adjustmentSelections.slice(page * 3, page * 3 + 3);
+        const amount = (page === currentChartPage ? memoValues[2] : '')
+          || values[guideCandidateIndices[page]][2] || values.find(value => value[2])?.[2]
+          || (page === 0 ? '1/4' : '1');
+        values.forEach(value => { value[2] = amount; });
+      }
       redInputs.forEach((input, index) => { input.value = state.redInputs[index]; });
       blueInputs.forEach((input, index) => { input.value = state.blueInputs[index]; });
       selectedAdjustmentTarget = setFor(state.selectedTarget);

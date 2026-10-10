@@ -241,8 +241,16 @@ function getAdjustmentSelectionIndex() {
   return currentChartPage * 3 + guideCandidateIndex;
 }
 
+function getSharedAdjustmentAmount(page = currentChartPage) {
+  return adjustmentSelections[page * 3][2] || (page === 0 ? '1/4' : '1');
+}
+
 function saveAdjustmentSelection() {
+  const amount = memoValues[2] || getSharedAdjustmentAmount();
   adjustmentSelections[getAdjustmentSelectionIndex()] = [...memoValues];
+  // No・方向は候補別、量だけは同じ種別のNo.1〜3で共有する。
+  adjustmentSelections.slice(currentChartPage * 3, currentChartPage * 3 + 3)
+    .forEach(values => { values[2] = amount; });
 }
 
 function restoreAdjustmentSelection() {
@@ -252,8 +260,8 @@ function restoreAdjustmentSelection() {
 
 function updateMemoButtons() {
   if (!dotSets.length) {
-    memoValues[0] = memoValues[2] = memoValues[3] = '';
-    adjustmentSelections.forEach(values => { values[0] = values[2] = values[3] = ''; });
+    memoValues[0] = memoValues[3] = '';
+    adjustmentSelections.forEach(values => { values[0] = values[3] = ''; });
   }
   memoValues[1] = currentChartPage === 0 ? 'LINK' : 'TAB';
   memoButtons.forEach((button, index) => {
@@ -262,7 +270,7 @@ function updateMemoButtons() {
   memoButtons[1].disabled = true;
   const thirdOptions = getThirdMemoOptions();
   memoButtons[2].disabled = false;
-  if (!thirdOptions.includes(memoValues[2])) memoValues[2] = '';
+  if (!thirdOptions.includes(memoValues[2])) memoValues[2] = getSharedAdjustmentAmount();
   memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
   saveAdjustmentSelection();
 }
@@ -288,10 +296,8 @@ function applySelectedGuideAdjustment(preserveFixed = false) {
     memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
   });
   const retainedForecast = preserveFixed && ['fixed', 'comparison'].includes(adjustmentForecast?.phase) && !selectingGuideNumber;
-  if (selectingGuideNumber || (!memoValues[2] && !retainedForecast)) {
-    memoValues[2] = guide.amountText || memoValues[2] || (guide.type === 'LINK' ? '1/8' : '1');
-    memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
-  }
+  memoValues[2] ||= getSharedAdjustmentAmount();
+  memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
   saveAdjustmentSelection();
   if (retainedForecast) return;
   updateAdjustmentForecast(memoValues, false, false, false);
@@ -358,7 +364,7 @@ function openMemoPicker(index) {
   memoPickerDirectionChanged = false;
   const guide = getVisibleGuideAdjustment();
   const guideValue = [guide?.blade, guide?.type, null, guide?.direction][index];
-  const initialValue = index === 2 ? (memoValues[1] === 'LINK' ? '1/8' : '1')
+  const initialValue = index === 2 ? getSharedAdjustmentAmount()
     : options.includes(String(guideValue)) ? String(guideValue) : options[0];
   selectedMemoValue = memoValues[index] || initialValue;
   memoPickerTitle.textContent = `調整量 ${index + 1} を選択`;
@@ -2034,7 +2040,6 @@ adjustmentForm.addEventListener('submit', (event) => {
   else learning.disarm(targetSet.learningId);
   actualAdjustment.checked = false;
   saveDotSets();
-  adjustmentSelections.forEach(values => { values[2] = ''; });
   memoValues.fill('');
   updateMemoButtons();
   adjustmentMessage.textContent = '';
