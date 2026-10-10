@@ -245,6 +245,11 @@ function getSharedAdjustmentAmount(page = currentChartPage) {
   return adjustmentSelections[page * 3][2] || (page === 0 ? '1/4' : '1');
 }
 
+function resetSharedAdjustmentAmounts() {
+  adjustmentSelections.forEach((values, index) => { values[2] = index < 3 ? '1/4' : '1'; });
+  memoValues[2] = getSharedAdjustmentAmount();
+}
+
 function saveAdjustmentSelection() {
   const amount = memoValues[2] || getSharedAdjustmentAmount();
   adjustmentSelections[getAdjustmentSelectionIndex()] = [...memoValues];
@@ -2040,6 +2045,7 @@ adjustmentForm.addEventListener('submit', (event) => {
   else learning.disarm(targetSet.learningId);
   actualAdjustment.checked = false;
   saveDotSets();
+  resetSharedAdjustmentAmounts();
   memoValues.fill('');
   updateMemoButtons();
   adjustmentMessage.textContent = '';

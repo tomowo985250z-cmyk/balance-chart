@@ -28,7 +28,7 @@
         selectedAdjustmentTarget=null;currentChartPage=${page};guideCandidateIndex=0;guideCandidateIndices.fill(0);
         adjustmentSelections.forEach(values=>values.fill(''));memoValues.fill('');
         pitchAutoMode='${mode}'!=='manual';trimAutoMode=pitchAutoMode;applyChartRotation(0,0);
-        const dot=(x,y,color)=>({color,clock:'12:00',radius:Math.hypot(x-397,y-520)/240,angle:Math.atan2(x-397,520-y)*180/Math.PI});
+        const dot=(x,y,color)=>({clock:'12:00',angle:Math.atan2(x-397,520-y)*180/Math.PI,radius:Math.hypot(x-397,y-520)/240,color});
         if('${mode}'==='learned') for(let i=0;i<4;i++) {
           if(i)learning.arm(dotSets,dotSets.at(-1).learningId);
           dotSets.push({learningId:newLearningId(),red:dot(597+(3-i)*80,620+(3-i)*46.188,'red'),
@@ -71,20 +71,58 @@
       checkAmount(amount, 'other type change does not overwrite current type');
       assert(run('JSON.stringify(learning.inspect())===sharedLearning'), 'selection changes preserve learning');
       assert(run('JSON.stringify(BalanceState.keys.filter(key=>key!==ROTATION_STORAGE_KEY).map(key=>appStorage.getItem(key)))===sharedRecords'), 'selection changes preserve recorded measurements and adjustments');
+
+      // 両方の種別を同時に初期化し、記録と確定済み予測には選択していた量を残す。
+      run(`window.beforeSubmit=[...memoValues];window.beforeForecast=JSON.stringify(adjustmentForecast);
+        actualAdjustment.checked=false;adjustmentForm.requestSubmit()`);
+      assert(run('JSON.stringify(dotSets.at(-1).adjustments.at(-1))===JSON.stringify(beforeSubmit)'), type+'/'+mode+': add records chosen amount');
+      assert(run(`JSON.stringify(adjustmentForecast)===JSON.stringify({...JSON.parse(beforeForecast),phase:'fixed'})`), 'add preserves generated forecast at recorded amount');
+      assert(run(`['models','samples'].every(key=>JSON.stringify(learning.inspect()[key])===JSON.stringify(JSON.parse(sharedLearning)[key]))`), 'practice add leaves learned models and samples unchanged');
+      checkAmount(initial, type+'/'+mode+': successful add resets shared amount');
+      run('memoThree.click()');
+      assert(run(`selectedMemoValue==='${initial}' && memoWheel.querySelector('[aria-selected="true"]').dataset.value==='${initial}'`), 'picker opens at default after add');
+      run('closeMemoPicker.click()');
+      for (let cycle = 0; cycle < 3; cycle++) {
+        run('guideCandidateToggle.click()');
+        checkAmount(initial, 'add reset reaches all three Nos');
+      }
+      run(`showChartPage(${1-page})`);
+      checkAmount(page ? '1/4' : '1', 'add also resets other type selection');
+      for (let cycle = 0; cycle < 3; cycle++) {
+        run('guideCandidateToggle.click()');
+        checkAmount(page ? '1/4' : '1', 'other type reset reaches all three Nos');
+      }
+      run(`showChartPage(${page})`);
+      selectAmount(page ? '2' : '1/2');
+      run(`memoValues[0]='';updateMemoButtons();window.rejectedRecords=JSON.stringify(dotSets);adjustmentForm.requestSubmit()`);
+      checkAmount(page ? '2' : '1/2', 'incomplete submission preserves selected amount');
+      assert(run('JSON.stringify(dotSets)===rejectedRecords && Boolean(adjustmentMessage.textContent)'), 'incomplete submission preserves records');
+      run('applySelectedGuideAdjustment();actualAdjustment.checked=true;adjustmentForm.requestSubmit()');
+      checkAmount(page ? '2' : '1/2', 'rejected learning designation preserves selected amount');
+      assert(run('JSON.stringify(dotSets)===rejectedRecords && Boolean(adjustmentMessage.textContent)'), 'rejected learning designation preserves records');
+      run('actualAdjustment.checked=false;adjustmentForm.requestSubmit()');
+      checkAmount(initial, 'next successful add resets newly selected amount');
     }
 
     run('showChartPage(0)'); selectAmount('2/3');
     run('showChartPage(1)'); selectAmount('2');
-    run('saveDotSets();balanceFlushState()'); await reload();
-    checkAmount('2', 'TAB shared amount survives reload');
-    run('showChartPage(0)'); checkAmount('2/3', 'LINK shared amount survives reload');
+    run(`saveDotSets();balanceFlushState();window.startupRecords=JSON.stringify(dotSets);
+      window.startupLearning=JSON.stringify(learning.inspect());window.startupForecast=JSON.stringify(adjustmentForecast)`);
+    const startupSnapshot = run('[startupRecords,startupLearning,startupForecast]');
+    await reload();
+    checkAmount('1', 'TAB starts at one degree after reload');
+    assert(run('JSON.stringify(dotSets)')===startupSnapshot[0], 'startup reset preserves measurement and adjustment history');
+    assert(run('JSON.stringify(learning.inspect())')===startupSnapshot[1], 'startup reset preserves learning');
+    assert(run('JSON.stringify(adjustmentForecast)')===startupSnapshot[2], 'startup reset preserves generated forecast');
+    run('showChartPage(0)'); checkAmount('1/4', 'LINK starts at quarter flat after reload');
+    run('showChartPage(1)');selectAmount('2');run('showChartPage(0)');selectAmount('2/3');
     run(`balanceFlushState();const sharedBackup=appStorage.exportText();BalanceState.validateRecords(JSON.parse(sharedBackup).records);
       appStorage.importText(sharedBackup);restoringAppState=true;`);
     await reload();
-    checkAmount('2/3', 'shared amount survives backup import');
-    run('showChartPage(1)'); checkAmount('2', 'other type survives backup import');
+    checkAmount('1/4', 'backup import starts LINK at default');
+    run('showChartPage(1)'); checkAmount('1', 'backup import starts TAB at default');
 
-    // 旧6候補形式：表示中の量と、他画面で選択中の量を引き継ぐ。
+    // 旧6候補形式も両画面の量だけを初期化する。
     run(`balanceFlushState();const legacy=JSON.parse(appStorage.getItem(BalanceState.uiKey));
       legacy.adjustmentSelections=[['1','LINK','1/8','UP'],['2','LINK','1/2','DOWN'],['3','LINK','3/4','UP'],
         ['1','TAB','1','UP'],['2','TAB','2','DOWN'],['3','TAB','3','UP']];
@@ -92,20 +130,30 @@
       legacy.memoValues=['2','LINK','2/3','DOWN'];
       appStorage.setItem(BalanceState.uiKey,JSON.stringify(legacy));restoringAppState=true;`);
     await reload();
-    checkAmount('2/3', 'legacy active draft takes priority over candidate amounts');
-    run('showChartPage(1)'); checkAmount('3', 'legacy other page retains selected candidate amount');
+    checkAmount('1/4', 'legacy active draft amount resets on startup');
+    run('showChartPage(1)'); checkAmount('1', 'legacy other page amount resets on startup');
 
-    // 登録済み履歴は固定し、次の入力や空の状態でも共有量を維持する。
+    // 編集・結果削除では共有量を維持し、空の状態も起動時に初期化する。
     run(`showChartPage(0);pitchAutoMode=false;trimAutoMode=false;setGuidesVisible(true);renderDots();applySelectedGuideAdjustment();
-      window.beforeSubmit=[...memoValues];actualAdjustment.checked=false;adjustmentForm.requestSubmit();`);
+      memoValues[2]='2/3';updateMemoButtons();window.beforeSubmit=[...memoValues];actualAdjustment.checked=false;adjustmentForm.requestSubmit();`);
     assert(run('JSON.stringify(dotSets.at(-1).adjustments.at(-1))===JSON.stringify(beforeSubmit)'), 'submit records the selected shared amount');
-    checkAmount('2/3', 'submit preserves shared amount');
+    checkAmount('1/4', 'submit resets shared LINK amount');
     selectAmount('1/2');
     assert(run('dotSets.at(-1).adjustments.at(-1)[2]==="2/3"'), 'changing shared amount does not rewrite history');
-    run('dotSets.splice(0);saveDotSets();renderDots();balanceFlushState()'); await reload();
-    checkAmount('1/2', 'shared LINK amount survives empty-state reload');
-    run('showChartPage(1)'); checkAmount('3', 'empty-state LINK does not clear TAB amount');
-    output.textContent=`PASS: ${checks} checks — defaults, No sharing, type isolation, forecasts, reload, backup and legacy restore`;
+    run('startAdjustmentEdit(dotSets.at(-1),dotSets.at(-1).adjustments.at(-1))');
+    selectAmount('3/4');run('adjustmentForm.requestSubmit()');
+    assert(run('!adjustmentEdit && dotSets.at(-1).adjustments.at(-1)[2]==="3/4"'), 'edit updates recorded amount');
+    checkAmount('1/2', 'edit completion restores existing draft amount without reset');
+    run('startAdjustmentEdit(dotSets.at(-1),dotSets.at(-1).adjustments.at(-1));cancelAdjustmentEdit.click()');
+    checkAmount('1/2', 'edit cancellation restores existing draft amount without reset');
+    run('showChartPage(1)');selectAmount('3');run('showChartPage(0);dotSets.splice(0);saveDotSets();renderDots()');
+    checkAmount('1/2', 'deleting all results preserves selected LINK amount');
+    run('adjustmentForm.requestSubmit()');checkAmount('1/2', 'submission without results preserves selected amount');
+    run('showChartPage(1)');checkAmount('3', 'deleting results preserves selected TAB amount');
+    run('balanceFlushState()');await reload();
+    checkAmount('1', 'empty-state startup resets TAB');
+    run('showChartPage(0)');checkAmount('1/4', 'empty-state startup resets LINK');
+    output.textContent=`PASS: ${checks} checks — startup/add reset, No sharing, type isolation, forecasts, failures, edits, backup and legacy restore`;
     document.title='PASS';
   } catch (error) { output.textContent=`FAIL after ${checks} checks\n${error.stack}`;document.title='FAIL'; }
 })();

@@ -95,7 +95,7 @@
     frame.contentWindow.location.reload(); await loaded;
     assert(run(`!appStorage.error && adjustmentSelections.length===6
       && adjustmentSelections.slice(0,3).every(values=>values[2]==='1/4')
-      && adjustmentSelections.slice(3).every(values=>values[2]==='2')`), 'legacy selected amounts become shared within the correct pages');
+      && adjustmentSelections.slice(3).every(values=>values[2]==='1')`), 'legacy selections restore with shared default amounts on startup');
     // 両画面・両モードで高さと上下位置を揃え、狭い画面でも重なり・文字切れを防ぐ。
     for (const width of [320, 375, 390, 430, 1000]) {
       // スマホではスクロールバーがレイアウト幅を消費しない。
