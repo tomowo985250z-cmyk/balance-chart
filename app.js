@@ -81,7 +81,7 @@ guideCandidateToggle.addEventListener('click', () => {
 
 function updateGuideCandidateToggle() {
   const blade = guideNumberChoices[guideCandidateIndex]?.blade;
-  const type = currentChartPage === 0 ? 'LINK' : 'タブ';
+  const type = currentChartPage === 0 ? 'LINK' : 'TAB';
   guideCandidateToggle.textContent = `${type} No.${blade ?? '—'}`;
   guideCandidateToggle.setAttribute('aria-label', `${type} No.${blade ?? '未選択'}、優先順位${guideCandidateIndex + 1}位。次のNoに切替`);
   guideCandidateToggle.disabled = !guideNumberChoices.length;

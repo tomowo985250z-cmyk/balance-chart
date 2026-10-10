@@ -42,7 +42,7 @@
       const order = run('guideNumberChoices.map(choice=>choice.blade)');
       for (const [step, rank] of [0, 1, 2, 0].entries()) {
         assert(run(`guideCandidateIndex===${rank}`), 'cycles 1 → 2 → 3 → 1');
-        assert(run(`guideCandidateToggle.textContent==='${page?'タブ':'LINK'} No.${order[rank]}'`), 'button identifies selected No');
+        assert(run(`guideCandidateToggle.textContent==='${page?'TAB':'LINK'} No.${order[rank]}'`), 'button identifies selected No');
         const available = run(`Boolean(guideNumberChoices[guideCandidateIndex].candidate)`);
         if (available) {
           assert(run(`Object.values(forecastGuides).every(guide=>guide.blade===${order[rank]} && memoValues[0]===String(guide.blade) && memoValues[3]===guide.direction)`), 'No and direction match both guides');
@@ -96,17 +96,30 @@
     assert(run(`!appStorage.error && adjustmentSelections.length===6
       && adjustmentSelections[0][2]==='1/4' && adjustmentSelections[1][2]==='1/2'
       && adjustmentSelections[3][2]==='1' && adjustmentSelections[4][2]==='2'`), 'legacy selections migrate into the correct pages');
-    // スマホ幅で候補ボタンが自動/手動ボタンと重ならず、タッチ領域・文字を確保する。
-    for (const width of [320, 375, 390, 430]) {
+    // 両画面・両モードで高さと上下位置を揃え、狭い画面でも重なり・文字切れを防ぐ。
+    for (const width of [320, 375, 390, 430, 1000]) {
+      // スマホではスクロールバーがレイアウト幅を消費しない。
+      frame.contentDocument.documentElement.style.scrollbarWidth = width<=430 ? 'none' : 'auto';
       frame.style.width = width + 'px'; await tick();
-      for (const page of [0, 1]) {
-        run(`showChartPage(${page});chartWrap.scrollIntoView()`);
+      for (const page of [0, 1]) for (const auto of [false, true]) {
+        run(`showChartPage(${page});pitchAutoMode=trimAutoMode=${auto};
+          pitchAutoReady.red=pitchAutoReady.blue=trimAutoReady=false;
+          updatePitchModeUI();updateTrimModeUI();chartWrap.scrollIntoView()`);
         assert(run(`(()=>{
           const button=guideCandidateToggle,b=button.getBoundingClientRect();
-          const other=(${page}===0?pitchModeToggle:trimModeToggle).getBoundingClientRect();
-          return b.width>=44 && b.height>=44 && b.left>=0 && b.right<=innerWidth
-            && button.scrollWidth<=button.clientWidth && (b.bottom<=other.top || b.top>=other.bottom || b.right<=other.left || b.left>=other.right);
-        })()`), 'mobile button fits without overlap '+width+'/'+page);
+          const mode=${page}===0?pitchModeToggle:trimModeToggle,other=mode.getBoundingClientRect();
+          return b.width>=44 && b.height===44 && other.height===b.height
+            && Math.abs(b.top-other.top)<0.5 && Math.abs(b.bottom-other.bottom)<0.5
+            && b.left>=0 && other.right<=innerWidth && b.right<=other.left
+            && button.scrollWidth<=button.clientWidth && mode.scrollWidth<=mode.clientWidth
+            && mode.scrollHeight<=mode.clientHeight;
+        })()`), 'buttons align without overlap or clipped text '+width+'/'+page+'/'+auto);
+        if (width>=375) assert(run(`(()=>{
+          const mode=${page}===0?pitchModeToggle:trimModeToggle;
+          const width=mode.getBoundingClientRect().width,limit=mode.style.maxWidth;
+          mode.style.maxWidth='none';const original=mode.getBoundingClientRect().width;
+          mode.style.maxWidth=limit;return Math.abs(width-original)<0.5;
+        })()`), 'mode button retains natural width '+width+'/'+page+'/'+auto);
       }
     }
     output.textContent = `PASS: ${checks} checks`; document.title = 'PASS';

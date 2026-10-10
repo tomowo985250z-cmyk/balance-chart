@@ -251,9 +251,9 @@ object {
 }
 
 .guide-toggle { left: 14px; right: auto; font-family: inherit; }
-.guide-candidate-toggle { left: 14px; right: auto; bottom: 66px; font-family: inherit; }
+.guide-candidate-toggle, .trim-mode-toggle { height: 44px; bottom: 66px; font-family: inherit; }
+.guide-candidate-toggle { left: 14px; right: auto; }
 .guide-candidate-toggle { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
-.trim-mode-toggle { bottom: 66px; font-family: inherit; }
 .trim-mode-toggle[hidden] { display: none; }
 .trim-mode-toggle[aria-pressed='true'] { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
 .pitch-mode-toggle[aria-pressed='true'] { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
@@ -495,8 +495,8 @@ object {
   }
 
   .guide-toggle { left: 10px; right: auto; }
-  .guide-candidate-toggle { left: 10px; right: auto; bottom: 118px; }
-  .trim-mode-toggle { bottom: 64px; }
+  .guide-candidate-toggle { left: 10px; right: auto; }
+  .guide-candidate-toggle, .trim-mode-toggle { bottom: 64px; }
 
   .dot-form {
     gap: 8px;
@@ -546,7 +546,13 @@ object {
   .dot-list .dot-result-row button { font-size: 14px; }
 }
 
+@media (max-width: 382px) {
+  .guide-candidate-toggle { left: 4px; }
+  .trim-mode-toggle { right: 4px; max-width: calc(100% - 100px); }
+}
+
 @media (max-width: 360px) {
+  .trim-mode-toggle { padding-block: 1px; line-height: 20px; }
   .dot-list li, .dot-list .dot-result-row button, .dot-list .dot-adjustment-row button { font-size: 13px; }
 }
 

@@ -79,7 +79,7 @@
         run(`applyChartRotation(${angle},${angle}); renderDirectionLines();`);
         for (const rank of [1, 2, 0]) {
           run(`while(guideCandidateIndex!==${rank}) guideCandidateToggle.click();`);
-          assert(run(`guideCandidateIndex===${rank} && guideCandidateToggle.textContent==='${type==='LINK'?'LINK':'タブ'} No.'+guideNumberChoices[${rank}].blade`), 'actual candidate button selects requested No');
+          assert(run(`guideCandidateIndex===${rank} && guideCandidateToggle.textContent==='${type} No.'+guideNumberChoices[${rank}].blade`), 'actual candidate button selects requested No');
           candidates.push(run('JSON.stringify({guides:Object.values(forecastGuides).map(({blade,direction})=>[blade,direction]),amount:guidePredictionDebug.selected?.amount})'));
           if (!run('guideNumberChoices[guideCandidateIndex].candidate')) {
             assert(run('!dotOverlay.querySelector(".forecast-body")'), 'no improving candidate hides forecasts');
