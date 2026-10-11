@@ -16,6 +16,9 @@
     const measure = () => run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);
       blueInputs.forEach((input,i)=>input.value=['5','0','0.3'][i]);dotForm.requestSubmit()`);
     const select = (index, value) => run(`openMemoPicker(${index});selectedMemoValue='${value}';confirmMemoPicker.click()`);
+    const remove = (resultIndex, adjustmentIndex = null, confirm = 'delete') => run(`
+      dotList.children[${resultIndex}].querySelectorAll('${adjustmentIndex === null ? '.dot-result-row button' : '.dot-adjustment-row button'}')[${adjustmentIndex ?? 0}].click();
+      deleteConfirmation.close('${confirm}');deleteConfirmation.dispatchEvent(new Event('close'));`);
     const snapshot = () => run(`JSON.stringify({lock:adjustmentLock,values:memoValues,
       selections:adjustmentSelections,checked:actualAdjustment.checked,forecast:adjustmentForecast,
       dots:dotSets,models:learning.inspect().models,samples:learning.inspect().samples})`);
@@ -121,27 +124,71 @@
       run(`showChartPage(${1-page});guideCandidateToggle.click()`);
       select(2, page ? '1/2' : '3');
       assert(run('memoValues[2]') === (page ? '1/2' : '3'), 'other type can operate after unlock');
+
+      // 同じ手動・学習待ち・学習済みの各状態で、削除による解除も確認する。
+      run(`showChartPage(${page})`);
+      select(2, page ? '2' : '1/2');select(0, '2');select(3, 'DOWN');
+      const recordsBeforeDelete = run('JSON.stringify(dotSets)');
+      const learningBeforeDelete = run('JSON.stringify([learning.inspect().models,learning.inspect().samples])');
+      run(`actualAdjustment.checked=${mode === 'learned'};adjustmentForm.requestSubmit()`);
+      assert(run('Boolean(adjustmentLock)'), 'add before deletion locks');
+      await reload();
+      const deletionSnapshot = snapshot();
+      const targetIndex = run('dotSets.length-1');
+      remove(targetIndex, 0, 'cancel');
+      assert(snapshot() === deletionSnapshot, 'deletion cancellation preserves lock and data');
+      run(`showChartPage(${1-page})`);
+      remove(targetIndex, 0);
+      assert(run(`!adjustmentLock && !addAdjustmentButton.disabled && !actualAdjustment.disabled
+        && !adjustmentTarget.disabled && !rotationLock.disabled && !memoButtons[0].disabled
+        && !memoButtons[2].disabled && !memoButtons[3].disabled && !guideCandidateToggle.disabled`), 'confirmed deletion immediately unlocks both types');
+      assert(run('JSON.parse(appStorage.getItem(BalanceState.uiKey)).adjustmentLock===null'), 'deletion saves unlocked state immediately');
+      assert(run('JSON.stringify(dotSets)') === recordsBeforeDelete, 'deletion preserves all other recorded data');
+      assert(run('JSON.stringify([learning.inspect().models,learning.inspect().samples])') === learningBeforeDelete, 'deletion preserves learned models and samples');
+      await reload();
+      assert(run('!adjustmentLock && !memoButtons[2].disabled && !addAdjustmentButton.disabled'), 'deletion unlock survives reload');
+      for (const restoredPage of [page, 1-page]) {
+        run(`showChartPage(${restoredPage});window.rankBeforeDeleteSwitch=guideCandidateIndex;guideCandidateToggle.click()`);
+        assert(run('guideCandidateIndex===(rankBeforeDeleteSwitch+1)%3 && !guideCandidateToggle.disabled'), 'both types regain No switching');
+        select(2, restoredPage ? '3' : '3/4');select(0, '1');select(3, 'DOWN');
+        assert(run('memoValues[0]==="1" && memoValues[3]==="DOWN" && !memoButtons[2].disabled'), 'both types regain amount, No and direction input');
+      }
+      run('adjustmentForm.requestSubmit()');
+      assert(run('Boolean(adjustmentLock) && dotSets.at(-1).adjustments.length===1'), 'addition works again after deletion');
+      run(`showChartPage(${page});adjustmentForm.requestSubmit()`);
+      assert(run('dotSets.at(-1).adjustments.length===1'), 're-addition still enforces LINK/TAB exclusion');
+      remove(targetIndex, 0);
+      assert(run('!adjustmentLock'), 'deleting replacement adjustment unlocks again');
     }
-    // 既存結果への巡航追加入力・履歴削除も、新規測定登録の代わりにはならない。
+    // 既存結果への巡航追加入力では固定し続け、対象削除では解除する。
     run(`learning.reset([]);dotSets.splice(0);selectedAdjustmentTarget=null;showChartPage(0);
       redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');
       dotForm.requestSubmit();actualAdjustment.checked=false;adjustmentForm.requestSubmit();`);
     assert(run('Boolean(adjustmentLock)'), 'HOV-only result locks');
     run(`startCruiseAddition(dotSets.at(-1));blueInputs.forEach((input,i)=>input.value=['5','0','0.3'][i]);dotForm.requestSubmit()`);
     assert(run('Boolean(adjustmentLock) && dotSets.length===1 && Boolean(dotSets[0].blue)'), 'adding Cruise to existing result keeps lock');
-    run(`dotSets[0].adjustments.splice(0);saveDotSets();renderDots();balanceFlushState()`);
+    remove(0, 0);
     await reload();
-    assert(run('Boolean(adjustmentLock) && addAdjustmentButton.disabled'), 'deleting action cannot bypass lock after reload');
-    run(`dotSets.splice(0);saveDotSets();renderDots();balanceFlushState()`);
+    assert(run('!adjustmentLock && !addAdjustmentButton.disabled'), 'deleting action unlocks after later Cruise input and reload');
+    run('adjustmentForm.requestSubmit()');
+    assert(run('Boolean(adjustmentLock)'), 're-add before whole result deletion locks');
+    remove(0);
     await reload();
-    assert(run('Boolean(adjustmentLock) && memoValues.every(Boolean)'), 'deleting result also preserves input lock');
+    assert(run('!adjustmentLock && !memoButtons[2].disabled && dotSets.length===0'), 'deleting result with locked action also persists unlock');
     measure();
-    assert(run('!adjustmentLock'), 'new measurement releases lock after deletion');
+    assert(run('!adjustmentLock'), 'new measurement works after result deletion');
     // 過去の追加先でも、ロックは両種別に共通。
     measure();
     run(`adjustmentTarget.value='0';adjustmentTarget.dispatchEvent(new Event('change',{bubbles:true}));
+      dotSets[0].adjustments.push([...memoValues]);dotSets[1].adjustments.push(['3','TAB','1','UP']);
       actualAdjustment.checked=false;adjustmentForm.requestSubmit();showChartPage(1);adjustmentForm.requestSubmit()`);
-    assert(run('adjustmentLock?.targetId===dotSets[0].learningId && dotSets[0].adjustments.length===1 && dotSets[1].adjustments.length===0'), 'historical target cannot bypass mutual exclusion');
+    assert(run('adjustmentLock?.targetId===dotSets[0].learningId && dotSets[0].adjustments.length===2 && dotSets[1].adjustments.length===1'), 'historical target cannot bypass mutual exclusion');
+    remove(1, 0);
+    assert(run('Boolean(adjustmentLock) && dotSets[0].adjustments.length===2'), 'deleting unrelated adjustment keeps lock');
+    remove(0, 0);
+    assert(run('Boolean(adjustmentLock) && dotSets[0].adjustments.length===1'), 'deleting older identical adjustment keeps lock');
+    remove(1);
+    assert(run('Boolean(adjustmentLock) && dotSets.length===1'), 'deleting unrelated result keeps lock');
     // 上限による登録失敗では解除しない。
     run(`while(getDotCount()<MAX_DOTS)dotSets.push({learningId:newLearningId(),red:{...dotSets[0].red},blue:null,adjustments:[]});
       renderDots()`);
@@ -149,7 +196,7 @@
     assert(run('Boolean(adjustmentLock) && getDotCount()===MAX_DOTS'), 'capacity failure retains lock');
     run('dotSets.splice(2);saveDotSets();renderDots()');measure();
     assert(run('!adjustmentLock'), 'successful measurement after capacity recovery unlocks');
-    output.textContent = `PASS: ${checks} checks — LINK/TAB exclusion, fixed input, reload, backup, redraw and measurement-only release`;
+    output.textContent = `PASS: ${checks} checks — LINK/TAB exclusion, fixed input, reload, backup, measurement/deletion release and unrelated history preservation`;
     document.title = 'PASS';
   } catch (error) { output.textContent = `FAIL after ${checks} checks\n${error.stack}`; document.title = 'FAIL'; }
 })();

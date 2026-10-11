@@ -1847,7 +1847,13 @@ function renderDots() {
     remove.type = 'button';
     remove.textContent = '削除';
     remove.setAttribute('aria-label', `セット${index + 1}を削除`);
-    remove.addEventListener('click', () => confirmDeletion(`結果${index + 1}を削除しますか？`, () => { dotSets.splice(index, 1); saveDotSets(); renderDots(); }));
+    remove.addEventListener('click', () => confirmDeletion(`結果${index + 1}を削除しますか？`, () => {
+      dotSets.splice(index, 1);
+      if (adjustmentLock?.targetId === set.learningId) releaseAdjustmentLock();
+      saveDotSets();
+      renderDots();
+      globalThis.balanceFlushState?.();
+    }));
     const resultRow = document.createElement('div');
     resultRow.className = 'dot-result-row';
     attachEditAction(resultRow, `結果${index + 1}を編集しますか？`, () => startResultEdit(set));
@@ -1874,7 +1880,15 @@ function renderDots() {
       deleteAdjustment.type = 'button';
       deleteAdjustment.textContent = '削除';
       deleteAdjustment.setAttribute('aria-label', `結果${index + 1}の調整量${adjustmentIndex + 1}を削除`);
-      deleteAdjustment.addEventListener('click', () => confirmDeletion(`結果${index + 1}の調整量${adjustmentIndex + 1}を削除しますか？`, () => { set.adjustments.splice(adjustmentIndex, 1); saveDotSets(); renderDots(); }));
+      deleteAdjustment.addEventListener('click', () => confirmDeletion(`結果${index + 1}の調整量${adjustmentIndex + 1}を削除しますか？`, () => {
+        // 固定対象は追加先の最後の調整。古い同内容の調整を削除しても解除しない。
+        const releasesLock = adjustmentLock?.targetId === set.learningId && set.adjustments.at(-1) === adjustment;
+        set.adjustments.splice(adjustmentIndex, 1);
+        if (releasesLock) releaseAdjustmentLock();
+        saveDotSets();
+        renderDots();
+        globalThis.balanceFlushState?.();
+      }));
       adjustmentRow.append(adjustmentLabel, deleteAdjustment);
       item.append(adjustmentRow);
     });
