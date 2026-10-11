@@ -37,7 +37,11 @@
       };
       window.rankPriorityCandidates=(candidates,automatic)=>{
         pitchAutoMode=automatic;
-        return [0,1].map(rank=>{const c=selectRankedLinkGuideCandidate(candidates,rank);
+        let pool=[...candidates];
+        return [0,1].map(rank=>{const c=automatic
+          ? BalanceLinkRanking.select(pool,dotSets.at(-1).red.radius,dotSets.at(-1).blue.radius)
+          : selectLinkGuideCandidate(pool);
+          pool=pool.filter(other=>other!==c);
           return {blade:c.blade,direction:c.direction,amount:c.amount,max:c.maxCenterDistance,sum:c.distance};});
       };
       // 距離は比較用の仮定値。端末の学習値を再現したものではない。
@@ -52,17 +56,23 @@
       const newRanks = run('rankPriorityCandidates(priorityCandidates,true)');
       comparisons.push({fixture: waiting ? 'hypothetical/Cruise-waiting' : 'hypothetical/both-predictions',oldRanks,newRanks});
       assert(oldRanks[0].blade === 1 && oldRanks[0].direction === 'UP', 'old HOV threshold prefers 1 UP');
-      assert(newRanks[0].blade === 3 && newRanks[0].direction === 'UP', 'direction priority selects 3 LINK UP');
-      assert(newRanks[1].blade === 2 && newRanks[1].direction === 'DOWN', 'second inward candidate precedes outward Cruise');
+      const fixture = run('priorityCandidates');
+      const expected = LinkRankingPolicy.select(fixture,Math.hypot(.05,.13),Math.hypot(.12,.64));
+      assert(newRanks[0].blade === expected.blade && newRanks[0].direction === expected.direction,
+        'new priority agrees with independent endpoint/HOV protection reference');
+      assert(newRanks[0].blade !== newRanks[1].blade, 'second distinct candidate retained');
       assert(run('JSON.stringify(priorityCandidates)===priorityCandidateSnapshot'), 'ranking preserves every prediction and distance');
       run(`window.shortPriority=makePriorityCandidate(3,'UP',.0625,.1,${waiting ? 'null' : '.64'});
         window.overshootRanking=rankPriorityCandidates([...priorityCandidates,shortPriority],true);`);
-      assert(run('overshootRanking[0].amount===.0625 && overshootRanking[1].amount===.125'), 'endpoint distance penalizes overshoot on the same inward ray');
+      const overshootPool = run('[...priorityCandidates,shortPriority]');
+      const overshootExpected = LinkRankingPolicy.select(overshootPool,Math.hypot(.05,.13),Math.hypot(.12,.64));
+      assert(run('overshootRanking[0].blade')===overshootExpected.blade
+        &&run('overshootRanking[0].amount')===overshootExpected.amount, 'overshoot compares actual endpoint');
       if (waiting) assert(run('priorityCandidates.every(c=>Math.abs(c.predictions[1].predictedDistance-1)<1e-9)'), 'Cruise waiting preserves existing circle endpoint calculation');
     }
     run(`window.outwardOnly=priorityCandidates.filter(c=>!c.towardCenter);
       window.outwardSnapshot=JSON.stringify(outwardOnly);`);
-    assert(run('selectLinkGuideCandidate(outwardOnly)===outwardOnly[0]'), 'no inward candidate still yields a fallback');
+    assert(run('BalanceLinkRanking.select(outwardOnly,dotSets.at(-1).red.radius,dotSets.at(-1).blue.radius)===outwardOnly[0]'), 'outward candidate remains eligible by endpoint');
     assert(run('JSON.stringify(outwardOnly)===outwardSnapshot'), 'fallback ranking does not alter inputs');
     // 画像の概算位置・角度を実際の未学習ガイド計算へ渡す。
     for (const automatic of [false,true]) {
@@ -70,11 +80,12 @@
       const guides = run('JSON.parse(JSON.stringify(forecastGuides))');
       comparisons.push({fixture:'image-approximation/unlearned',automatic,guides});
       if (automatic) {
-        assert(guides.red.blade===3 && guides.red.direction==='UP' && guides.blue.blade===3 && guides.blue.direction==='UP', 'actual unlearned selection chooses 3 LINK UP for both colors');
-        assert(run(`['red','blue'].every(color=>{
-          const point=getDotCoordinates(dotSets.at(-1)[color]),unit=forecastGuides[color].unit;
-          return (397-point.x)*unit.x+(520-point.y)*unit.y>0;
-        })`), 'rendered movement units both approach center');
+        assert(run(`(()=>{
+          const choices=guideNumberChoices.map(c=>c.candidate),pool=getLinkRankingCandidates(choices),target=dotSets.at(-1);
+          const best=BalanceLinkRanking.select(pool,target.red.radius,target.blue.radius);
+          return forecastGuides.red.blade===best.blade&&forecastGuides.red.direction===best.direction
+            &&forecastGuides.blue.blade===best.blade&&forecastGuides.blue.direction===best.direction;
+        })()`), 'actual unlearned guides follow endpoint priority at displayed amount');
       }
     }
     assert(run('JSON.stringify(learning.inspect())===priorityLearning'), 'learning state unchanged');

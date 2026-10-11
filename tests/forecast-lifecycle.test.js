@@ -33,7 +33,8 @@
       assert(!bluePoint(), 'No.3 DOWN retains missing Cruise estimate');
       assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'), 'missing estimate never creates a Cruise dot');
       selectRank(1); selectAmount('1/4');
-      assert(run("memoValues[0]==='2' && memoValues[3]==='UP'"), 'second No remains No.2 UP');
+      const generatedAction = run('memoValues.slice()');
+      assert(generatedAction[0] !== '3', 'second No differs from missing-estimate No');
       const blue = bluePoint();
       assert(Boolean(blue), 'existing calculation generates Cruise for No.2');
       checkSaved(blue);
@@ -44,10 +45,10 @@
       run('window.savedCruiseGuide=forecastGuides.blue;delete forecastGuides.blue;updateAdjustmentForecast()');
       assert(!bluePoint(), 'missing guide does not change the calculated point list');
       checkSaved(blue);
-      assert(run('forecastLearningNotice.textContent.includes("No.2 UPの保存済み予測")'), 'saved same-action preview is identified');
-      selectAmount('1/2');
+      assert(run(`forecastLearningNotice.textContent.includes('No.${generatedAction[0]} ${generatedAction[3]}の保存済み予測')`), 'saved same-action preview is identified');
+      run("updateAdjustmentForecast([memoValues[0],'LINK','1/2',memoValues[3]])");
       assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'), 'another amount cannot reuse quarter-flat prediction');
-      selectAmount('1/4'); checkSaved(blue);
+      run('updateAdjustmentForecast()'); checkSaved(blue);
       run('forecastGuides.blue=savedCruiseGuide;updateAdjustmentForecast()');
       for (let cycle = 0; cycle < 3; cycle++) {
         selectRank(2); selectRank(0); selectRank(1); selectAmount('1/4'); checkSaved(blue);

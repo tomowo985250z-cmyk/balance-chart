@@ -56,11 +56,9 @@
           if(mode==='learned' && page===0 && rank===0 && run('!guidePredictionDebug.fallback')) {
             assert(run(`(()=>{
               const {candidates,selected}=guidePredictionDebug;
-              const inward=candidates.filter(candidate=>candidate.towardCenter);
-              const pool=inward.length?inward:candidates;
-              return selected && (!inward.length || selected.towardCenter)
-                && pool.every(candidate=>selected.maxCenterDistance<=candidate.maxCenterDistance+1e-9);
-            })()`), 'learned automatic priority uses direction then endpoint distance '+label);
+              const pool=getLinkRankingCandidates(candidates),target=dotSets.at(-1);
+              return selected===BalanceLinkRanking.select(pool,target.red.radius,target.blue.radius)?.original;
+            })()`), 'learned automatic priority uses both-goal/HOV protection at displayed amount '+label);
           }
           if(radius===1.8 && angle===145 && rotation===-37) traces.push({mode,page,rank,guides:run('JSON.parse(JSON.stringify(forecastGuides))')});
         }

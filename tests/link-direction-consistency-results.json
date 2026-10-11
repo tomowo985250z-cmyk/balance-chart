@@ -1,0 +1,878 @@
+[
+  {
+    "basis": "screenshot approximation, not imported device state",
+    "currentHov": 0.32,
+    "currentCruise": 0.33,
+    "rotations": {
+      "hov": -41,
+      "cruise": -60
+    },
+    "amount": "1/4",
+    "order": [
+      {
+        "blade": 1,
+        "direction": "UP"
+      },
+      {
+        "blade": 2,
+        "direction": "DOWN"
+      },
+      {
+        "blade": 3,
+        "direction": "DOWN"
+      }
+    ],
+    "candidates": [
+      {
+        "blade": 1,
+        "direction": "UP",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.3199999999999998,
+            "endpoint": 0.19814216841281435,
+            "improvement": 0.12185783158718544,
+            "source": "reference-estimate",
+            "position": {
+              "x": 440.31940141465435,
+              "y": 539.6169271270495
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.41471998186266,
+            "improvement": -0.08471998186266011,
+            "source": "prior",
+            "position": {
+              "x": 380.10688123890327,
+              "y": 618.0887350710498
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": -0.9816296070570892,
+            "y": 0.1907965265641514
+          },
+          "blue": {
+            "x": -0.8660317548004094,
+            "y": 0.49998899955631404
+          }
+        }
+      },
+      {
+        "blade": 1,
+        "direction": "DOWN",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.3199999999999998,
+            "endpoint": 0.45073914867818604,
+            "improvement": -0.13073914867818626,
+            "source": "reference-estimate",
+            "position": {
+              "x": 504.9470694480207,
+              "y": 527.055432962591
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": null,
+            "improvement": null,
+            "source": "missing",
+            "position": null
+          }
+        ],
+        "units": {
+          "red": {
+            "x": 0.9816296070570892,
+            "y": -0.1907965265641514
+          },
+          "blue": {
+            "x": 0.8660317548004094,
+            "y": -0.49998899955631404
+          }
+        }
+      },
+      {
+        "blade": 2,
+        "direction": "UP",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.3199999999999998,
+            "endpoint": 0.3838535243982354,
+            "improvement": -0.0638535243982356,
+            "source": "prior",
+            "position": {
+              "x": 484.93017807650386,
+              "y": 547.4821943692284
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.4751560238739793,
+            "improvement": -0.1451560238739794,
+            "source": "reference-estimate",
+            "position": {
+              "x": 455.02859105948403,
+              "y": 618.1693518783637
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": 0.6560590289905072,
+            "y": 0.7547095802227721
+          },
+          "blue": {
+            "x": 0.8660254037844387,
+            "y": 0.5
+          }
+        }
+      },
+      {
+        "blade": 2,
+        "direction": "DOWN",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.3199999999999998,
+            "endpoint": 0.21944411089597546,
+            "improvement": 0.10055588910402433,
+            "source": "prior",
+            "position": {
+              "x": 447.2037322409031,
+              "y": 504.0828829632186
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.23495252142014786,
+            "improvement": 0.09504747857985205,
+            "source": "prior",
+            "position": {
+              "x": 363.29628312638977,
+              "y": 565.2076791998061
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": -0.6560590289905072,
+            "y": -0.7547095802227721
+          },
+          "blue": {
+            "x": -0.8660254037844387,
+            "y": -0.5
+          }
+        }
+      },
+      {
+        "blade": 3,
+        "direction": "UP",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.3199999999999998,
+            "endpoint": 0.3848562466087396,
+            "improvement": -0.06485624660873984,
+            "source": "prior",
+            "position": {
+              "x": 485.87960484790426,
+              "y": 494.86434242003264
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.16188418812813818,
+            "improvement": 0.16811581187186173,
+            "source": "prior",
+            "position": {
+              "x": 417.49791587418537,
+              "y": 553.0049888636707
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": 0.3255561442916281,
+            "y": -0.9455227109456276
+          },
+          "blue": {
+            "x": -0.000012702171670308234,
+            "y": -0.9999999999193273
+          }
+        }
+      },
+      {
+        "blade": 3,
+        "direction": "DOWN",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.3199999999999998,
+            "endpoint": 0.3278443089663801,
+            "improvement": -0.007844308966380331,
+            "source": "reference-estimate",
+            "position": {
+              "x": 461.91639566395344,
+              "y": 564.461427002377
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": null,
+            "improvement": null,
+            "source": "missing",
+            "position": null
+          }
+        ],
+        "units": {
+          "red": {
+            "x": -0.3255561442916281,
+            "y": 0.9455227109456276
+          },
+          "blue": {
+            "x": 0.000012702171670308234,
+            "y": 0.9999999999193273
+          }
+        }
+      }
+    ],
+    "displayed": [
+      {
+        "rank": 1,
+        "values": [
+          "1",
+          "LINK",
+          "1/4",
+          "UP"
+        ],
+        "guides": {
+          "red": {
+            "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+            "type": "LINK",
+            "blade": 1,
+            "direction": "UP",
+            "unit": {
+              "x": -0.9816296070570892,
+              "y": 0.1907965265641514
+            }
+          },
+          "blue": {
+            "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+            "type": "LINK",
+            "blade": 1,
+            "direction": "UP",
+            "unit": {
+              "x": -0.8660317548004094,
+              "y": 0.49998899955631404
+            }
+          }
+        },
+        "forecast": {
+          "key": "[\"8a223421-d433-473f-9667-fadfc1162562\",{\"radius\":0.32,\"angle\":100,\"color\":\"red\",\"clock\":\"test\"},{\"radius\":0.33,\"angle\":165,\"color\":\"blue\",\"clock\":\"5:30\"},[\"1\",\"LINK\",\"1/4\",\"UP\"]]",
+          "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+          "type": "LINK",
+          "phase": "preview",
+          "points": [
+            {
+              "color": "red",
+              "x": 440.31940141465435,
+              "y": 539.6169271270495,
+              "distance": 32.918560915821985,
+              "source": "reference-estimate",
+              "sampleCount": 4,
+              "medianDistance": 0.1371606704825916
+            },
+            {
+              "color": "blue",
+              "x": 380.10688123890327,
+              "y": 618.0887350710498,
+              "distance": 43.17576916314562,
+              "source": "prior"
+            }
+          ],
+          "waiting": [],
+          "values": [
+            "1",
+            "LINK",
+            "1/4",
+            "UP"
+          ],
+          "manualBlade": false,
+          "manualDirection": false
+        },
+        "notice": "予測不確実（学習不足・参考推定または欠測）。予測の実測精度は未検証です。0.18 IPSは参考目標です。"
+      },
+      {
+        "rank": 2,
+        "values": [
+          "2",
+          "LINK",
+          "1/4",
+          "DOWN"
+        ],
+        "guides": {
+          "red": {
+            "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+            "type": "LINK",
+            "blade": 2,
+            "direction": "DOWN",
+            "unit": {
+              "x": -0.6560590289905072,
+              "y": -0.7547095802227721
+            }
+          },
+          "blue": {
+            "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+            "type": "LINK",
+            "blade": 2,
+            "direction": "DOWN",
+            "unit": {
+              "x": -0.8660254037844387,
+              "y": -0.5
+            }
+          }
+        },
+        "forecast": {
+          "key": "[\"8a223421-d433-473f-9667-fadfc1162562\",{\"radius\":0.32,\"angle\":100,\"color\":\"red\",\"clock\":\"test\"},{\"radius\":0.33,\"angle\":165,\"color\":\"blue\",\"clock\":\"5:30\"},[\"2\",\"LINK\",\"1/4\",\"DOWN\"]]",
+          "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+          "type": "LINK",
+          "phase": "preview",
+          "points": [
+            {
+              "color": "red",
+              "x": 447.2037322409031,
+              "y": 504.0828829632186,
+              "distance": 38.76099873141507,
+              "source": "prior"
+            },
+            {
+              "color": "blue",
+              "x": 363.29628312638977,
+              "y": 565.2076791998061,
+              "distance": 62.587292484576224,
+              "source": "prior"
+            }
+          ],
+          "waiting": [],
+          "values": [
+            "2",
+            "LINK",
+            "1/4",
+            "DOWN"
+          ],
+          "manualBlade": false,
+          "manualDirection": false
+        },
+        "notice": "予測不確実（学習不足・参考推定または欠測）。予測の実測精度は未検証です。0.18 IPSは参考目標です。"
+      },
+      {
+        "rank": 3,
+        "values": [
+          "3",
+          "LINK",
+          "1/4",
+          "DOWN"
+        ],
+        "guides": {
+          "red": {
+            "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+            "type": "LINK",
+            "blade": 3,
+            "direction": "DOWN",
+            "unit": {
+              "x": -0.3255561442916281,
+              "y": 0.9455227109456276
+            }
+          },
+          "blue": {
+            "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+            "type": "LINK",
+            "blade": 3,
+            "direction": "DOWN",
+            "unit": {
+              "x": 0.000012702171670308234,
+              "y": 0.9999999999193273
+            }
+          }
+        },
+        "forecast": {
+          "key": "[\"8a223421-d433-473f-9667-fadfc1162562\",{\"radius\":0.32,\"angle\":100,\"color\":\"red\",\"clock\":\"test\"},{\"radius\":0.33,\"angle\":165,\"color\":\"blue\",\"clock\":\"5:30\"},[\"3\",\"LINK\",\"1/4\",\"DOWN\"]]",
+          "targetId": "8a223421-d433-473f-9667-fadfc1162562",
+          "type": "LINK",
+          "phase": "preview",
+          "points": [
+            {
+              "color": "red",
+              "x": 461.91639566395344,
+              "y": 564.461427002377,
+              "distance": 32.918560915821985,
+              "source": "reference-estimate",
+              "sampleCount": 4,
+              "medianDistance": 0.1371606704825916
+            }
+          ],
+          "waiting": [
+            "blue"
+          ],
+          "values": [
+            "3",
+            "LINK",
+            "1/4",
+            "DOWN"
+          ],
+          "manualBlade": false,
+          "manualDirection": false
+        },
+        "notice": "巡航（青）：予測学習中 ／ HOV予測：悪化（0.2 IPS超） ／ 巡航：予測欠測 ／ 予測不確実（学習不足・参考推定または欠測）。予測の実測精度は未検証です。0.18 IPSは参考目標です。"
+      }
+    ]
+  },
+  {
+    "basis": "screenshot approximation, not imported device state",
+    "currentHov": 0.19,
+    "currentCruise": 0.33,
+    "rotations": {
+      "hov": -41,
+      "cruise": -60
+    },
+    "amount": "1/4",
+    "order": [
+      {
+        "blade": 2,
+        "direction": "DOWN"
+      },
+      {
+        "blade": 1,
+        "direction": "UP"
+      },
+      {
+        "blade": 3,
+        "direction": "DOWN"
+      }
+    ],
+    "candidates": [
+      {
+        "blade": 1,
+        "direction": "UP",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.1900000000000002,
+            "endpoint": 0.1070031565211296,
+            "improvement": 0.0829968434788706,
+            "source": "reference-estimate",
+            "position": {
+              "x": 406.8150726658315,
+              "y": 543.7311115980774
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.41471998186266,
+            "improvement": -0.08471998186266011,
+            "source": "prior",
+            "position": {
+              "x": 380.10688123890327,
+              "y": 618.0887350710498
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": -0.9816296070570892,
+            "y": 0.1907965265641514
+          },
+          "blue": {
+            "x": -0.8660317548004094,
+            "y": 0.49998899955631404
+          }
+        }
+      },
+      {
+        "blade": 1,
+        "direction": "DOWN",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.1900000000000002,
+            "endpoint": 0.3136501610855364,
+            "improvement": -0.1236501610855362,
+            "source": "reference-estimate",
+            "position": {
+              "x": 471.4427406991979,
+              "y": 531.1696174336189
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": null,
+            "improvement": null,
+            "source": "missing",
+            "position": null
+          }
+        ],
+        "units": {
+          "red": {
+            "x": 0.9816296070570892,
+            "y": -0.1907965265641514
+          },
+          "blue": {
+            "x": 0.8660317548004094,
+            "y": -0.49998899955631404
+          }
+        }
+      },
+      {
+        "blade": 2,
+        "direction": "UP",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.1900000000000002,
+            "endpoint": 0.26221890474930326,
+            "improvement": -0.07221890474930306,
+            "source": "prior",
+            "position": {
+              "x": 451.425849327681,
+              "y": 551.5963788402563
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.4751560238739793,
+            "improvement": -0.1451560238739794,
+            "source": "reference-estimate",
+            "position": {
+              "x": 455.02859105948403,
+              "y": 618.1693518783637
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": 0.6560590289905072,
+            "y": 0.7547095802227721
+          },
+          "blue": {
+            "x": 0.8660254037844387,
+            "y": 0.5
+          }
+        }
+      },
+      {
+        "blade": 2,
+        "direction": "DOWN",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.1900000000000002,
+            "endpoint": 0.08520596921567822,
+            "improvement": 0.10479403078432198,
+            "source": "prior",
+            "position": {
+              "x": 413.69940349208025,
+              "y": 508.1970674342465
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.23495252142014786,
+            "improvement": 0.09504747857985205,
+            "source": "prior",
+            "position": {
+              "x": 363.29628312638977,
+              "y": 565.2076791998061
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": -0.6560590289905072,
+            "y": -0.7547095802227721
+          },
+          "blue": {
+            "x": -0.8660254037844387,
+            "y": -0.5
+          }
+        }
+      },
+      {
+        "blade": 3,
+        "direction": "UP",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.1900000000000002,
+            "endpoint": 0.2467962615194747,
+            "improvement": -0.056796261519474506,
+            "source": "prior",
+            "position": {
+              "x": 452.3752760990814,
+              "y": 498.97852689106054
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": 0.16188418812813818,
+            "improvement": 0.16811581187186173,
+            "source": "prior",
+            "position": {
+              "x": 417.49791587418537,
+              "y": 553.0049888636707
+            }
+          }
+        ],
+        "units": {
+          "red": {
+            "x": 0.3255561442916281,
+            "y": -0.9455227109456276
+          },
+          "blue": {
+            "x": -0.000012702171670308234,
+            "y": -0.9999999999193273
+          }
+        }
+      },
+      {
+        "blade": 3,
+        "direction": "DOWN",
+        "predictions": [
+          {
+            "color": "red",
+            "current": 0.1900000000000002,
+            "endpoint": 0.24103033961774825,
+            "improvement": -0.051030339617748055,
+            "source": "reference-estimate",
+            "position": {
+              "x": 428.4120669151306,
+              "y": 568.5756114734049
+            }
+          },
+          {
+            "color": "blue",
+            "current": 0.3299999999999999,
+            "endpoint": null,
+            "improvement": null,
+            "source": "missing",
+            "position": null
+          }
+        ],
+        "units": {
+          "red": {
+            "x": -0.3255561442916281,
+            "y": 0.9455227109456276
+          },
+          "blue": {
+            "x": 0.000012702171670308234,
+            "y": 0.9999999999193273
+          }
+        }
+      }
+    ],
+    "displayed": [
+      {
+        "rank": 1,
+        "values": [
+          "2",
+          "LINK",
+          "1/4",
+          "DOWN"
+        ],
+        "guides": {
+          "red": {
+            "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+            "type": "LINK",
+            "blade": 2,
+            "direction": "DOWN",
+            "unit": {
+              "x": -0.6560590289905072,
+              "y": -0.7547095802227721
+            }
+          },
+          "blue": {
+            "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+            "type": "LINK",
+            "blade": 2,
+            "direction": "DOWN",
+            "unit": {
+              "x": -0.8660254037844387,
+              "y": -0.5
+            }
+          }
+        },
+        "forecast": {
+          "key": "[\"0d9a4e1e-55b0-46b9-85ad-2ee04c1778be\",{\"radius\":0.19,\"angle\":112.5,\"color\":\"red\",\"clock\":\"test\"},{\"radius\":0.33,\"angle\":165,\"color\":\"blue\",\"clock\":\"5:30\"},[\"2\",\"LINK\",\"1/4\",\"DOWN\"]]",
+          "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+          "type": "LINK",
+          "phase": "preview",
+          "points": [
+            {
+              "color": "red",
+              "x": 413.69940349208025,
+              "y": 508.1970674342465,
+              "distance": 38.76099873141507,
+              "source": "prior"
+            },
+            {
+              "color": "blue",
+              "x": 363.29628312638977,
+              "y": 565.2076791998061,
+              "distance": 62.587292484576224,
+              "source": "prior"
+            }
+          ],
+          "waiting": [],
+          "values": [
+            "2",
+            "LINK",
+            "1/4",
+            "DOWN"
+          ],
+          "manualBlade": false,
+          "manualDirection": false
+        },
+        "notice": "予測不確実（学習不足・参考推定または欠測）。予測の実測精度は未検証です。0.18 IPSは参考目標です。"
+      },
+      {
+        "rank": 2,
+        "values": [
+          "1",
+          "LINK",
+          "1/4",
+          "UP"
+        ],
+        "guides": {
+          "red": {
+            "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+            "type": "LINK",
+            "blade": 1,
+            "direction": "UP",
+            "unit": {
+              "x": -0.9816296070570892,
+              "y": 0.1907965265641514
+            }
+          },
+          "blue": {
+            "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+            "type": "LINK",
+            "blade": 1,
+            "direction": "UP",
+            "unit": {
+              "x": -0.8660317548004094,
+              "y": 0.49998899955631404
+            }
+          }
+        },
+        "forecast": {
+          "key": "[\"0d9a4e1e-55b0-46b9-85ad-2ee04c1778be\",{\"radius\":0.19,\"angle\":112.5,\"color\":\"red\",\"clock\":\"test\"},{\"radius\":0.33,\"angle\":165,\"color\":\"blue\",\"clock\":\"5:30\"},[\"1\",\"LINK\",\"1/4\",\"UP\"]]",
+          "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+          "type": "LINK",
+          "phase": "preview",
+          "points": [
+            {
+              "color": "red",
+              "x": 406.8150726658315,
+              "y": 543.7311115980774,
+              "distance": 32.918560915821985,
+              "source": "reference-estimate",
+              "sampleCount": 4,
+              "medianDistance": 0.1371606704825916
+            },
+            {
+              "color": "blue",
+              "x": 380.10688123890327,
+              "y": 618.0887350710498,
+              "distance": 43.17576916314562,
+              "source": "prior"
+            }
+          ],
+          "waiting": [],
+          "values": [
+            "1",
+            "LINK",
+            "1/4",
+            "UP"
+          ],
+          "manualBlade": false,
+          "manualDirection": false
+        },
+        "notice": "予測不確実（学習不足・参考推定または欠測）。予測の実測精度は未検証です。0.18 IPSは参考目標です。"
+      },
+      {
+        "rank": 3,
+        "values": [
+          "3",
+          "LINK",
+          "1/4",
+          "DOWN"
+        ],
+        "guides": {
+          "red": {
+            "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+            "type": "LINK",
+            "blade": 3,
+            "direction": "DOWN",
+            "unit": {
+              "x": -0.3255561442916281,
+              "y": 0.9455227109456276
+            }
+          },
+          "blue": {
+            "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+            "type": "LINK",
+            "blade": 3,
+            "direction": "DOWN",
+            "unit": {
+              "x": 0.000012702171670308234,
+              "y": 0.9999999999193273
+            }
+          }
+        },
+        "forecast": {
+          "key": "[\"0d9a4e1e-55b0-46b9-85ad-2ee04c1778be\",{\"radius\":0.19,\"angle\":112.5,\"color\":\"red\",\"clock\":\"test\"},{\"radius\":0.33,\"angle\":165,\"color\":\"blue\",\"clock\":\"5:30\"},[\"3\",\"LINK\",\"1/4\",\"DOWN\"]]",
+          "targetId": "0d9a4e1e-55b0-46b9-85ad-2ee04c1778be",
+          "type": "LINK",
+          "phase": "preview",
+          "points": [
+            {
+              "color": "red",
+              "x": 428.4120669151306,
+              "y": 568.5756114734049,
+              "distance": 32.918560915821985,
+              "source": "reference-estimate",
+              "sampleCount": 4,
+              "medianDistance": 0.1371606704825916
+            }
+          ],
+          "waiting": [
+            "blue"
+          ],
+          "values": [
+            "3",
+            "LINK",
+            "1/4",
+            "DOWN"
+          ],
+          "manualBlade": false,
+          "manualDirection": false
+        },
+        "notice": "巡航（青）：予測学習中 ／ HOV予測：悪化（0.2 IPS超） ／ 巡航：予測欠測 ／ 予測不確実（学習不足・参考推定または欠測）。予測の実測精度は未検証です。0.18 IPSは参考目標です。"
+      }
+    ]
+  }
+]

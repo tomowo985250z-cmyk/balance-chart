@@ -1,0 +1,386 @@
+[
+  {
+    "basis": "image approximation; no device learning data imported",
+    "currentHov": 0.32,
+    "currentCruise": 0.33,
+    "amount": "1/4",
+    "oldOrder": [
+      "1 UP",
+      "2 DOWN",
+      "3 DOWN"
+    ],
+    "trialOrder": [
+      "1 UP",
+      "2 DOWN",
+      "3 DOWN"
+    ],
+    "directionOrder": [
+      "2 DOWN",
+      "1 UP",
+      "3 DOWN"
+    ],
+    "hybridOrder": [
+      "1 UP",
+      "2 DOWN",
+      "3 DOWN"
+    ],
+    "directionThree": "DOWN",
+    "hybridThree": "DOWN",
+    "hovExtraWorseningUP": 0.05701193764235951,
+    "cases": [
+      {
+        "direction": "UP",
+        "geometry": {
+          "radius": 0.32999999999999985,
+          "inwardCosine": 0.9659291137750872,
+          "angleToCenterDegrees": 14.999272219172582,
+          "inwardProjection": 0.3187566075457786,
+          "travelToClosest": 0.3187566075457786,
+          "minimumRadius": 0.08540623598957171,
+          "passTravelInterval": [
+            0.1379092275423802,
+            0.499603987549177
+          ],
+          "improvementTravelUpperBound": 0.6375132150915572
+        },
+        "predictedTravel": 0.18123473575805166,
+        "hovGeometry": {
+          "radius": 0.3199999999999998,
+          "inwardCosine": -0.15642191924075238,
+          "angleToCenterDegrees": 98.99927221917265,
+          "inwardProjection": -0.05005501415704073,
+          "travelToClosest": 0,
+          "minimumRadius": 0.3199999999999998,
+          "passTravelInterval": null,
+          "improvementTravelUpperBound": 0
+        },
+        "directionTier": 2,
+        "hovEndpoint": 0.3848562466087396,
+        "hovWorsening": 0.06485624660873962,
+        "cruiseEndpoint": 0.16188418812813818,
+        "uncertain": true
+      },
+      {
+        "direction": "DOWN",
+        "geometry": {
+          "radius": 0.32999999999999985,
+          "inwardCosine": -0.9659291137750872,
+          "angleToCenterDegrees": 165.00072778082742,
+          "inwardProjection": -0.3187566075457786,
+          "travelToClosest": 0,
+          "minimumRadius": 0.32999999999999985,
+          "passTravelInterval": null,
+          "improvementTravelUpperBound": 0
+        },
+        "predictedTravel": null,
+        "hovGeometry": {
+          "radius": 0.3199999999999998,
+          "inwardCosine": 0.15642191924075238,
+          "angleToCenterDegrees": 81.00072778082736,
+          "inwardProjection": 0.05005501415704073,
+          "travelToClosest": 0.05005501415704073,
+          "minimumRadius": 0.31606090482332405,
+          "passTravelInterval": null,
+          "improvementTravelUpperBound": 0.10011002831408146
+        },
+        "directionTier": 1,
+        "hovEndpoint": 0.3278443089663801,
+        "hovWorsening": 0.007844308966380109,
+        "cruiseEndpoint": null,
+        "uncertain": true
+      }
+    ],
+    "travelExamples": [
+      {
+        "travel": 0.01,
+        "cruiseEndpoint": 0.3203511633334338
+      },
+      {
+        "travel": 0.3187566075457786,
+        "cruiseEndpoint": 0.08540623598957171
+      },
+      {
+        "travel": 0.509603987549177,
+        "cruiseEndpoint": 0.20908598135711526
+      },
+      {
+        "travel": 0.6475132150915572,
+        "cruiseEndpoint": 0.3396691510145063
+      }
+    ]
+  },
+  {
+    "basis": "image approximation; no device learning data imported",
+    "currentHov": 0.19,
+    "currentCruise": 0.33,
+    "amount": "1/4",
+    "oldOrder": [
+      "2 DOWN",
+      "1 UP",
+      "3 DOWN"
+    ],
+    "trialOrder": [
+      "2 DOWN",
+      "1 UP",
+      "3 DOWN"
+    ],
+    "directionOrder": [
+      "2 DOWN",
+      "3 UP",
+      "1 UP"
+    ],
+    "hybridOrder": [
+      "2 DOWN",
+      "1 UP",
+      "3 UP"
+    ],
+    "directionThree": "UP",
+    "hybridThree": "UP",
+    "hovExtraWorseningUP": 0.005765921901726451,
+    "cases": [
+      {
+        "direction": "UP",
+        "geometry": {
+          "radius": 0.32999999999999985,
+          "inwardCosine": 0.9659291137750872,
+          "angleToCenterDegrees": 14.999272219172582,
+          "inwardProjection": 0.3187566075457786,
+          "travelToClosest": 0.3187566075457786,
+          "minimumRadius": 0.08540623598957171,
+          "passTravelInterval": [
+            0.1379092275423802,
+            0.499603987549177
+          ],
+          "improvementTravelUpperBound": 0.6375132150915572
+        },
+        "predictedTravel": 0.18123473575805166,
+        "hovGeometry": {
+          "radius": 0.1900000000000002,
+          "inwardCosine": 0.06106121800949195,
+          "angleToCenterDegrees": 86.49927221917261,
+          "inwardProjection": 0.011601631421803482,
+          "travelToClosest": 0.011601631421803482,
+          "minimumRadius": 0.1896454643495401,
+          "passTravelInterval": [
+            0,
+            0.07512011575232984
+          ],
+          "improvementTravelUpperBound": 0.023203262843606964
+        },
+        "directionTier": 0,
+        "hovEndpoint": 0.2467962615194747,
+        "hovWorsening": 0.0567962615194747,
+        "cruiseEndpoint": 0.16188418812813818,
+        "uncertain": true
+      },
+      {
+        "direction": "DOWN",
+        "geometry": {
+          "radius": 0.32999999999999985,
+          "inwardCosine": -0.9659291137750872,
+          "angleToCenterDegrees": 165.00072778082742,
+          "inwardProjection": -0.3187566075457786,
+          "travelToClosest": 0,
+          "minimumRadius": 0.32999999999999985,
+          "passTravelInterval": null,
+          "improvementTravelUpperBound": 0
+        },
+        "predictedTravel": null,
+        "hovGeometry": {
+          "radius": 0.1900000000000002,
+          "inwardCosine": -0.06106121800949195,
+          "angleToCenterDegrees": 93.50072778082742,
+          "inwardProjection": -0.011601631421803482,
+          "travelToClosest": 0,
+          "minimumRadius": 0.1900000000000002,
+          "passTravelInterval": null,
+          "improvementTravelUpperBound": 0
+        },
+        "directionTier": 3,
+        "hovEndpoint": 0.24103033961774825,
+        "hovWorsening": 0.05103033961774825,
+        "cruiseEndpoint": null,
+        "uncertain": true
+      }
+    ],
+    "travelExamples": [
+      {
+        "travel": 0.01,
+        "cruiseEndpoint": 0.3203511633334338
+      },
+      {
+        "travel": 0.3187566075457786,
+        "cruiseEndpoint": 0.08540623598957171
+      },
+      {
+        "travel": 0.509603987549177,
+        "cruiseEndpoint": 0.20908598135711526
+      },
+      {
+        "travel": 0.6475132150915572,
+        "cruiseEndpoint": 0.3396691510145063
+      }
+    ]
+  },
+  {
+    "directionFirstSyntheticSweep": {
+      "cases": 1296,
+      "changed": 418,
+      "endpointFirstJoint": 676,
+      "directionFirstJoint": 543,
+      "lostJoint": 133,
+      "gainedJoint": 0,
+      "hovEndpointWorse": 294,
+      "cruiseEndpointWorseAmongBothKnown": 136,
+      "endpointFirstHovPass": 1224,
+      "directionFirstHovPass": 1052,
+      "lostHovPass": 172,
+      "comparableCruise": 960,
+      "endpointFirstCruiseMissing": 180,
+      "directionFirstCruiseMissing": 276,
+      "maxDistanceWorseAmongBothKnown": 144,
+      "totalDistanceWorseAmongBothKnown": 124,
+      "examples": [
+        {
+          "currentHov": 0.05,
+          "currentCruise": 0.05,
+          "hovAngle": 60,
+          "cruiseAngle": 210,
+          "endpointFirst": {
+            "blade": 2,
+            "direction": "UP",
+            "hov": 0.10044687487034805,
+            "cruise": 0.18736168410228407,
+            "tier": 2
+          },
+          "directionFirst": {
+            "blade": 1,
+            "direction": "UP",
+            "hov": 0.0913471952044455,
+            "cruise": 0.22459577778608056,
+            "tier": 1
+          }
+        },
+        {
+          "currentHov": 0.05,
+          "currentCruise": 0.05,
+          "hovAngle": 60,
+          "cruiseAngle": 240,
+          "endpointFirst": {
+            "blade": 2,
+            "direction": "UP",
+            "hov": 0.10044687487034805,
+            "cruise": 0.1614808233853124,
+            "tier": 2
+          },
+          "directionFirst": {
+            "blade": 1,
+            "direction": "UP",
+            "hov": 0.0913471952044455,
+            "cruise": 0.22989903817661708,
+            "tier": 1
+          }
+        },
+        {
+          "currentHov": 0.05,
+          "currentCruise": 0.05,
+          "hovAngle": 60,
+          "cruiseAngle": 270,
+          "endpointFirst": {
+            "blade": 2,
+            "direction": "UP",
+            "hov": 0.10044687487034805,
+            "cruise": 0.13952365229561942,
+            "tier": 2
+          },
+          "directionFirst": {
+            "blade": 3,
+            "direction": "DOWN",
+            "hov": 0.10469726178316353,
+            "cruise": null,
+            "tier": 0
+          }
+        }
+      ]
+    },
+    "hybridSyntheticSweep": {
+      "cases": 1296,
+      "changed": 17,
+      "bothMeasured": 1296,
+      "endpointFirstJoint": 676,
+      "hybridJoint": 676,
+      "lostJoint": 0,
+      "gainedJoint": 0,
+      "endpointFirstHovPass": 1224,
+      "hybridHovPass": 1224,
+      "lostHovPass": 0,
+      "endpointFirstCruiseMissing": 180,
+      "hybridCruiseMissing": 184,
+      "newlyMissing": 8,
+      "recoveredMissing": 4,
+      "noHovSafeCases": 72,
+      "noHovSafeChanged": 17,
+      "hovEndpointWorse": 17,
+      "comparableCruise": 1108,
+      "cruiseEndpointWorseAmongBothKnown": 0,
+      "maxDistanceWorseAmongBothKnown": 0,
+      "totalDistanceWorseAmongBothKnown": 0,
+      "examples": [
+        {
+          "currentHov": 0.32,
+          "currentCruise": 0.05,
+          "hovAngle": 300,
+          "cruiseAngle": 0,
+          "endpointFirst": {
+            "blade": 1,
+            "direction": "DOWN",
+            "hov": 0.23443927976745418,
+            "cruise": null
+          },
+          "hybrid": {
+            "blade": 2,
+            "direction": "UP",
+            "hov": 0.24746607647145882,
+            "cruise": 0.16148082338531233
+          }
+        },
+        {
+          "currentHov": 0.32,
+          "currentCruise": 0.05,
+          "hovAngle": 300,
+          "cruiseAngle": 30,
+          "endpointFirst": {
+            "blade": 1,
+            "direction": "DOWN",
+            "hov": 0.23443927976745418,
+            "cruise": null
+          },
+          "hybrid": {
+            "blade": 2,
+            "direction": "UP",
+            "hov": 0.24746607647145882,
+            "cruise": 0.187361684102284
+          }
+        },
+        {
+          "currentHov": 0.32,
+          "currentCruise": 0.05,
+          "hovAngle": 300,
+          "cruiseAngle": 60,
+          "endpointFirst": {
+            "blade": 1,
+            "direction": "DOWN",
+            "hov": 0.23443927976745418,
+            "cruise": null
+          },
+          "hybrid": {
+            "blade": 3,
+            "direction": "DOWN",
+            "hov": 0.3232061285754601,
+            "cruise": null
+          }
+        }
+      ]
+    }
+  }
+]

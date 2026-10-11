@@ -43,6 +43,8 @@ let selectingGuideNumber = false;
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
 const forecastDisplayCache = new Map(); // 候補切替で失われない表示用の生成済み座標。
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
+let renderingDirectionLines = false;
+let evaluatedLinkAmount = null;
 
 try {
   chartNote.value = appStorage.getItem(CHART_NOTE_STORAGE_KEY) || '';
@@ -427,6 +429,11 @@ function updateAdjustmentForecast(values = memoValues, fixed = false,
     if (fixed && adjustmentForecast?.phase === 'preview' && adjustmentForecast.key === key) adjustmentForecast.phase = 'fixed';
   }
   renderAdjustmentForecast();
+  // 確定した共有量が変わった時だけ再順位付けする。pickerの仮選択は対象外。
+  if (!renderingDirectionLines && currentChartPage === 0 && pitchAutoMode
+    && evaluatedLinkAmount !== getSharedAdjustmentAmount(0)) {
+    renderDirectionLines(Boolean(adjustmentForecast?.manualBlade || adjustmentForecast?.manualDirection));
+  }
 }
 
 function compareAdjustmentForecast(result) {
@@ -497,6 +504,24 @@ function renderAdjustmentForecast() {
       const label = color === 'red' ? 'HOV（赤）' : adjustmentForecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）';
       return saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
     }).join(' ／ ');
+    notice.hidden = false;
+  }
+  if (currentChartPage === 0 && pitchAutoMode && adjustmentForecast.type === 'LINK') {
+    const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
+    const uncertain = ['red', 'blue'].some(color => target?.[color]
+      && !adjustmentForecast.points.some(point => point.color === color && point.source === 'learned'));
+    const hov = adjustmentForecast.points.find(point => point.color === 'red');
+    const hovEndpoint = hov ? Math.hypot(hov.x - CHART_CENTER_X, hov.y - CHART_CENTER_Y) / CHART_RADIUS : null;
+    const hovStart = target.red ? getDotCoordinates(target.red) : null;
+    const currentHov = hovStart ? Math.hypot(hovStart.x - CHART_CENTER_X, hovStart.y - CHART_CENTER_Y) / CHART_RADIUS : null;
+    const details = [];
+    if (hovEndpoint !== null && currentHov !== null && hovEndpoint > currentHov) {
+      details.push(`HOV予測：悪化${hovEndpoint > BalanceLinkRanking.limit ? '（0.2 IPS超）' : '（0.2 IPS以内）'}`);
+    }
+    if (target.blue && !adjustmentForecast.points.some(point => point.color === 'blue')) details.push('巡航：予測欠測');
+    if (details.length) notice.textContent += `${notice.textContent ? ' ／ ' : ''}${details.join(' ／ ')}`;
+    const status = uncertain ? '予測不確実（学習不足・参考推定または欠測）。' : '';
+    notice.textContent += `${notice.textContent ? ' ／ ' : ''}${status}予測の実測精度は未検証です。0.18 IPSは参考目標です。`;
     notice.hidden = false;
   }
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
@@ -1180,20 +1205,49 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
   target.append(defs);
 }
 
+function getLinkRankingCandidates(candidates) {
+  const amountText = getSharedAdjustmentAmount(0), target = dotSets.at(-1);
+  // 探索量・円周交点ではなく、表示する量・方向と既存の距離推定で評価する。
+  return candidates.filter(c => !c.amountText || c.amountText === amountText).map(original => {
+    const action = BalanceLearning.adjustment([String(original.blade), 'LINK', amountText, original.direction]);
+    const predictions = ['red', 'blue'].flatMap(color => {
+      if (!target?.[color]) return [];
+      const start = getDotCoordinates(target[color]);
+      const p = original.predictions.find(item => item.color === color);
+      const guide = original.line ? color === 'red' ? original.line : original.blue
+        : p ? getPredictionGuideLine(p) : null;
+      const prediction = learning.predict('LINK', color, action.blade, action.direction, action.amount, start);
+      const estimate = BalanceDistancePrior.resolve(action, color, prediction,
+        prediction ? [] : learning.inspect().samples, CHART_RADIUS);
+      const unit = guide ? getGuideMovementUnit(guide) : null;
+      const valid = estimate && Number.isFinite(estimate.distance) && estimate.distance >= 0
+        && unit && Math.hypot(unit.x, unit.y) > 0;
+      const position = valid ? { x: start.x + unit.x * estimate.distance, y: start.y + unit.y * estimate.distance } : null;
+      const currentDistance = Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS;
+      const predictedDistance = position ? Math.hypot(position.x - CHART_CENTER_X, position.y - CHART_CENTER_Y) / CHART_RADIUS : null;
+      // 前向きガイドの中心接近。移動量・予測終点・学習値とは独立した順位情報。
+      const unitLength = unit ? Math.hypot(unit.x, unit.y) : 0;
+      const inwardProjection = currentDistance > 0 && Number.isFinite(unitLength) && unitLength > 0
+        ? -(((start.x - CHART_CENTER_X) / CHART_RADIUS) * (unit.x / unitLength)
+          + ((start.y - CHART_CENTER_Y) / CHART_RADIUS) * (unit.y / unitLength)) : null;
+      return [{ color, start, position, currentDistance, predictedDistance,
+        inwardProjection,
+        improvement: position ? currentDistance - predictedDistance : null,
+        source: valid ? estimate.source : 'missing', uncertain: !valid || estimate.source !== 'learned' }];
+    });
+    return { ...original, original, amount: action.amount, amountText, predictions };
+  });
+}
+
 function selectLinkGuideCandidate(candidates) {
-  const epsilon = 1e-9;
   if (pitchAutoMode) {
-    // 実際の予測・代替線の方向を先に評価し、終点距離で行き過ぎも比較する。
-    const inward = candidates.filter(candidate => candidate.towardCenter);
-    let pool = inward.length ? inward : [...candidates];
-    for (const field of ['maxCenterDistance', 'distance']) {
-      const minimum = Math.min(...pool.map(candidate => candidate[field]));
-      pool = pool.filter(candidate => candidate[field] <= minimum + epsilon);
-    }
-    return pool.sort((first, second) => first.blade - second.blade
-      || Number(first.direction === 'DOWN') - Number(second.direction === 'DOWN')
-      || first.amount - second.amount)[0];
+    const normalized = getLinkRankingCandidates(candidates), target = dotSets.at(-1);
+    const selected = BalanceLinkRanking.select(normalized, target?.red?.radius, target?.blue?.radius);
+    // 方向・予測とも評価不能ならNo順の診断表示。達成を示す予測は作らない。
+    return (selected ?? normalized.sort((a, b) => a.blade - b.blade
+      || Number(a.direction === 'DOWN') - Number(b.direction === 'DOWN'))[0])?.original;
   }
+  const epsilon = 1e-9;
   // 予測HOVを0.15以内に保てる候補があれば、その制約を後段で覆さない。
   const hovSafe = candidates.filter(candidate => candidate.predictions[0].predictedDistance <= CENTER_DISTANCE_THRESHOLD + epsilon);
   let pool = hovSafe.length ? hovSafe : candidates;
@@ -1388,7 +1442,13 @@ window.addEventListener('scroll', updateGuideViewportEnds, { passive: true });
 window.visualViewport?.addEventListener('resize', updateGuideViewportEnds);
 window.visualViewport?.addEventListener('scroll', updateGuideViewportEnds);
 
-function renderDirectionLines() {
+function renderDirectionLines(preserveSelection = false) {
+  renderingDirectionLines = true;
+  try { drawDirectionLines(preserveSelection); }
+  finally { renderingDirectionLines = false; evaluatedLinkAmount = getSharedAdjustmentAmount(0); }
+}
+
+function drawDirectionLines(preserveSelection = false) {
   forecastGuides = {};
   guideNumberChoices = [];
   let guideLayer = dotOverlay.querySelector('.direction-lines');
@@ -1438,7 +1498,7 @@ function renderDirectionLines() {
     }
     selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
   } else if (redDots.length) {
-    // 学習不足・手動時は既存の移動距離予測を使い、同じ順位で選ぶ。
+    // 学習不足時も表示量の推定終点を評価する。手動の有向線評価は維持する。
     const centerDistance = getGuidePathDistance;
     const ratio = getLatestPitchDistanceRatio() ?? { red: 1, blue: 2 };
     const candidates = redDots.map(({ line }) => {
@@ -1458,6 +1518,7 @@ function renderDirectionLines() {
         maxCenterDistance: distances.maxCenterDistance, distance: distances.distance };
     });
     const selected = selectGuideNumberCandidate(candidates, selectLinkGuideCandidate);
+    if (!selected) { renderAdjustmentForecast(); return; }
     selectedLines = [{ line: selected.line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow' }];
     if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
@@ -1499,7 +1560,8 @@ function renderDirectionLines() {
     }
   });
   updateGuideViewportEnds();
-  applySelectedGuideAdjustment(true);
+  if (preserveSelection) updateGuideSelectionVisibility(memoValues);
+  else applySelectedGuideAdjustment(true);
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
 }

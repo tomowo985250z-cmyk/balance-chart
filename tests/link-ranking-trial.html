@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LINK順位 試験環境</title>
+<style>
+body{margin:12px;font:16px system-ui;color:#182c45}select{font:inherit;padding:6px;max-width:100%}iframe{width:100%;height:85vh;border:1px solid #96a6bc}table{border-collapse:collapse;font-size:14px}th,td{border:1px solid #bcc8d6;padding:5px;text-align:right}p{margin:10px 0}#status{font-weight:bold}#comparison{overflow-x:auto}
+</style>
+<body>
+<p><strong>LINK順位の試験環境</strong>：保存はこの画面のメモリ内のみ。再読込で消えます。実データはアプリ内のバックアップ取込で試験用に複製できます。</p>
+<label>順位方式 <select id="mode"><option value="target">新方式：目標0.18／合格0.2</option><option value="target20">比較：目標0.2／合格0.2</option><option value="legacy">旧方式：方向優先</option></select></label>
+<p id="status" role="status">起動中</p>
+<p>合格は0.2 IPS以下、0.18 IPSは参考目標のみで順位に影響しません。両方0.2以内の候補を最優先し、最大中心距離→合計中心距離を比較します。境界は丸めず厳密判定。巡航未測定ならHOV到達を優先します。旧方式の切替はこの比較試験画面だけに残し、本番は新方式のみです。</p>
+<p>同条件比較は表示中の調整量・同じ予測終点を使用。旧画面の探索量／連続最適位置による順位も別に表示します。未達時のHOV優先では最大・合計距離が増える場合があります。整備基準との整合・実機精度は未確認。</p>
+<div id="comparison"></div>
+<iframe id="app" title="保存領域を分離したLINK試験アプリ"></iframe>
+<script src="link-ranking-trial.js"></script>
+</body>
+</html>
