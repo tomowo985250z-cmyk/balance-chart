@@ -593,7 +593,16 @@ object {
   font: inherit; font-size: 16px; font-weight: 700; touch-action: manipulation;
 }
 .delete-confirmation .confirm-delete-button { background: #45414f; border-color: #34303e; color: #fff; }
+.adjustment-target-row { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.forecast-status {
+  display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
+  color: #737b85; font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap;
+}
+.forecast-status[data-state="learned"] { color: #397154; }
+.forecast-status[data-state="reference"] { color: #8b6d22; }
+.forecast-status-icon { font-size: 10px; }
 #adjustmentTarget {
+  min-width: 0; flex: 0 1 auto;
   min-height: 48px; max-width: 100%; padding: 10px 8px;
   border: 1px solid #8b9bb0; border-radius: 8px;
   background: #fff; color: #292631;

@@ -465,6 +465,7 @@ function invalidateAdjustmentForecast() {
   adjustmentForecast = null;
   forecastDisplayCache.clear();
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
+  renderForecastStatus();
 }
 
 function compareAdjustmentForecast(result) {
@@ -516,7 +517,39 @@ function getForecastDisplayPoints(forecast) {
   return points;
 }
 
+function renderForecastStatus() {
+  const status = document.getElementById('forecastStatus');
+  const forecast = adjustmentForecast;
+  let state = 'none';
+  if (forecast) {
+    const values = [...memoValues];
+    if (!memoPicker.hidden && activeMemoIndex !== null) values[activeMemoIndex] = selectedMemoValue;
+    const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+    const colors = forecast.type === 'TAB' ? ['blue'] : ['red', 'blue'];
+    // 描画キャッシュではなく、現在の選択に対する算出結果と既存の学習済み判定だけを使う。
+    const available = target?.learningId === forecast.targetId && target.red && target.blue
+      && values.every((value, index) => value && value === forecast.values[index])
+      && !forecast.manualBlade && !forecast.manualDirection
+      && (adjustmentLock || !guideNumberChoices.length || guideNumberChoices[guideCandidateIndex]?.candidate)
+      && ['red', 'blue'].every(color => {
+        const point = getDotCoordinates(target[color]);
+        return [point.x, point.y].every(Number.isFinite);
+      })
+      && colors.every(color => forecast.points.some(point => point.color === color
+        && [point.x, point.y, point.distance].every(Number.isFinite) && point.distance >= 0));
+    if (available) state = colors.every(color => forecast.points.some(point => point.color === color
+      && point.source === 'learned')) ? 'learned' : 'reference';
+  }
+  const [icon, label] = state === 'learned' ? ['●', '予測あり']
+    : state === 'reference' ? ['▲', '参考推定'] : ['—', '予測なし'];
+  if (status.dataset.state === state) return;
+  status.dataset.state = state;
+  status.querySelector('.forecast-status-icon').textContent = icon;
+  status.querySelector('.forecast-status-label').textContent = label;
+}
+
 function renderAdjustmentForecast() {
+  renderForecastStatus();
   globalThis.balanceSaveState?.();
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
   const notice = document.getElementById('forecastLearningNotice');
