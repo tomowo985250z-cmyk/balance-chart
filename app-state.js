@@ -129,6 +129,7 @@
         restoreView(); chartObject.addEventListener('load', restoreView, { once: true });
       }
     } finally { restoringAppState = false; }
+    if (adjustmentLock && !adjustmentForecast) refreshAdjustmentForecastAfterDeletion();
   };
   try {
     const saved = appStorage.getItem(BalanceState.uiKey);

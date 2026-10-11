@@ -407,8 +407,9 @@ function previewMemoSelection() {
 
 function updateAdjustmentForecast(values = memoValues, fixed = false,
   manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0]),
-  manualDirection = Boolean(adjustmentForecast?.manualDirection && values[3] === adjustmentForecast.values[3])) {
-  if (adjustmentLock) { renderAdjustmentForecast(); return; }
+  manualDirection = Boolean(adjustmentForecast?.manualDirection && values[3] === adjustmentForecast.values[3]),
+  refresh = false) {
+  if (adjustmentLock && !refresh) { renderAdjustmentForecast(); return; }
   updateGuideSelectionVisibility(values);
   if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
@@ -451,6 +452,19 @@ function updateAdjustmentForecast(values = memoValues, fixed = false,
     && evaluatedLinkAmount !== getSharedAdjustmentAmount(0)) {
     renderDirectionLines(Boolean(adjustmentForecast?.manualBlade || adjustmentForecast?.manualDirection));
   }
+}
+
+function refreshAdjustmentForecastAfterDeletion() {
+  if (restoringAppState || memoValues[1] !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
+  const guide = forecastGuides.red ?? forecastGuides.blue;
+  updateAdjustmentForecast(memoValues, Boolean(adjustmentLock), isManualBladeSelection(memoValues),
+    Boolean(guide && memoValues[3] !== guide.direction), true);
+}
+
+function invalidateAdjustmentForecast() {
+  adjustmentForecast = null;
+  forecastDisplayCache.clear();
+  dotOverlay.querySelector('.adjustment-forecast')?.remove();
 }
 
 function compareAdjustmentForecast(result) {
@@ -1475,6 +1489,8 @@ function renderDirectionLines(preserveSelection = false) {
   renderingDirectionLines = true;
   try { drawDirectionLines(preserveSelection); }
   finally { renderingDirectionLines = false; evaluatedLinkAmount = getSharedAdjustmentAmount(0); }
+  // 別チャート閲覧中の削除で破棄した固定予測は、追加側へ戻った時に生成し直す。
+  if (adjustmentLock && !adjustmentForecast) refreshAdjustmentForecastAfterDeletion();
 }
 
 function drawDirectionLines(preserveSelection = false) {
@@ -1849,9 +1865,11 @@ function renderDots() {
     remove.setAttribute('aria-label', `セット${index + 1}を削除`);
     remove.addEventListener('click', () => confirmDeletion(`結果${index + 1}を削除しますか？`, () => {
       dotSets.splice(index, 1);
+      invalidateAdjustmentForecast();
       if (adjustmentLock?.targetId === set.learningId) releaseAdjustmentLock();
       saveDotSets();
       renderDots();
+      refreshAdjustmentForecastAfterDeletion();
       globalThis.balanceFlushState?.();
     }));
     const resultRow = document.createElement('div');
@@ -1884,9 +1902,11 @@ function renderDots() {
         // 固定対象は追加先の最後の調整。古い同内容の調整を削除しても解除しない。
         const releasesLock = adjustmentLock?.targetId === set.learningId && set.adjustments.at(-1) === adjustment;
         set.adjustments.splice(adjustmentIndex, 1);
+        invalidateAdjustmentForecast();
         if (releasesLock) releaseAdjustmentLock();
         saveDotSets();
         renderDots();
+        refreshAdjustmentForecastAfterDeletion();
         globalThis.balanceFlushState?.();
       }));
       adjustmentRow.append(adjustmentLabel, deleteAdjustment);
