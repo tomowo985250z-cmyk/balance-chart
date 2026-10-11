@@ -12,6 +12,7 @@
     version: 1, measurements: JSON.stringify(dotSets),
     redInputs: redInputs.map(input => input.value), blueInputs: blueInputs.map(input => input.value),
     memoValues: [...memoValues], adjustmentSelections: adjustmentSelections.map(values => [...values]),
+    adjustmentLock,
     currentChartPage, guideCandidateIndex, guideCandidateIndices: guideCandidateIndices.map((rank, page) => page === currentChartPage ? guideCandidateIndex : rank), pitchAutoMode, trimAutoMode,
     hovAngle, cruiseAngle, pageRotations, manualPitchAngles, autoPitchAngles, initialChartRotations,
     manualTrimCruiseAngle, autoTrimCruiseAngle, manualLearningReference,
@@ -84,12 +85,19 @@
         ? [...state.adjustmentSelections.slice(0, 2), ['', '', '', ''], ...state.adjustmentSelections.slice(2), ['', '', '', '']]
         : state.adjustmentSelections;
       adjustmentSelections.splice(0, 6, ...selections);
-      // 起動時は入力する量だけを初期値へ戻し、保存済み履歴・予測はそのまま復元する。
-      resetSharedAdjustmentAmounts();
+      adjustmentLock = state.adjustmentLock ?? null;
+      // 追加後は入力も保存値を保持し、未追加の場合だけ従来の起動時初期化を行う。
+      if (!adjustmentLock) resetSharedAdjustmentAmounts();
       redInputs.forEach((input, index) => { input.value = state.redInputs[index]; });
       blueInputs.forEach((input, index) => { input.value = state.blueInputs[index]; });
       selectedAdjustmentTarget = setFor(state.selectedTarget);
       rotationLock.checked = state.rotationLocked; actualAdjustment.checked = state.actualAdjustment;
+      if (adjustmentLock) {
+        guideCandidateIndices[adjustmentLock.page] = adjustmentLock.rank;
+        if (currentChartPage === adjustmentLock.page) guideCandidateIndex = adjustmentLock.rank;
+        selectedAdjustmentTarget = setFor(adjustmentLock.targetId);
+        adjustmentMessage.textContent = '次の測定結果を登録するまで、追加した調整量を固定しています。';
+      }
       const matchingMeasurements = state.measurements === JSON.stringify(dotSets);
       if (matchingMeasurements) {
         adjustmentForecast = state.forecast;
@@ -97,7 +105,7 @@
         for (const [key, entry] of state.forecastCache) forecastDisplayCache.set(key, { ...entry, points: new Map(entry.points) });
         if (state.resultEdit && setFor(state.resultEdit.target)) resultEdit = { set: setFor(state.resultEdit.target), draft: state.resultEdit.draft };
         const editSet = state.adjustmentEdit && setFor(state.adjustmentEdit.target);
-        if (editSet?.adjustments[state.adjustmentEdit.index]) adjustmentEdit = { set: editSet,
+        if (!adjustmentLock && editSet?.adjustments[state.adjustmentEdit.index]) adjustmentEdit = { set: editSet,
           adjustment: editSet.adjustments[state.adjustmentEdit.index], draft: state.adjustmentEdit.draft,
           draftTarget: setFor(state.adjustmentEdit.draftTarget) };
         cruiseAdditionTarget = setFor(state.cruiseTarget); cruiseInputDraft = state.cruiseInputDraft;

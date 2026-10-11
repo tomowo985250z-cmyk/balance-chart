@@ -14,6 +14,12 @@ const BalanceState = (() => {
     const forecast = data?.forecast;
     const valid = object(data) && data.version === 1 && typeof data.measurements === 'string'
       && strings(data.redInputs, 3) && strings(data.blueInputs, 3) && strings(data.memoValues, 4)
+      && (data.adjustmentLock == null || (object(data.adjustmentLock)
+        && [0, 1].includes(data.adjustmentLock.page) && [0, 1, 2].includes(data.adjustmentLock.rank)
+        && strings(data.adjustmentLock.values, 4) && data.adjustmentLock.values.every(Boolean)
+        && data.adjustmentLock.values[1] === (data.adjustmentLock.page === 0 ? 'LINK' : 'TAB')
+        && ['1', '2', '3', '—'].includes(data.adjustmentLock.guideBlade)
+        && typeof data.adjustmentLock.targetId === 'string' && typeof data.adjustmentLock.actualAdjustment === 'boolean'))
       && Array.isArray(data.adjustmentSelections) && [4, 6].includes(data.adjustmentSelections.length) && data.adjustmentSelections.every(value => strings(value, 4))
       && [0, 1].includes(data.currentChartPage) && [0, 1, 2].includes(data.guideCandidateIndex)
       && (data.guideCandidateIndices === undefined || (Array.isArray(data.guideCandidateIndices)

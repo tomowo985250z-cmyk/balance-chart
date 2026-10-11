@@ -66,13 +66,11 @@
       if (type === 'LINK') assert(run('adjustmentForecast.points.some(point=>point.color==="red")'), 'real calculation generates HOV');
       checkCoordinates(type + (automatic ? '/AUTO' : '/manual') + '/preview');
       run(`
-        adjustmentForm.requestSubmit();
         window.candidateForecastSnapshot=JSON.stringify(adjustmentForecast);
         window.candidateLearningSnapshot=JSON.stringify(learning.inspect());
         window.candidateStorageSnapshot=JSON.stringify({...localStorage});
         window.candidateAdjustmentsSnapshot=JSON.stringify(dotSets);
       `);
-      assert(run('adjustmentForecast.phase==="fixed"'), type + ': actual adjustment form fixes generated forecast');
       const candidates = [];
       // 実際の切替ボタンと手動回転処理を使う。予測・候補選択関数は差し替えない。
       for (const angle of [0, 30, 60, 90, 120, 180]) {
@@ -99,12 +97,18 @@
         run('guideToggle.click();');
         if (run('guideNumberChoices[guideCandidateIndex].candidate')) checkCoordinates(type + '/No-rank' + (rank + 1) + '/ON');
       }
+      run('adjustmentForm.requestSubmit()');
+      assert(run('adjustmentForecast.phase==="fixed" && Boolean(adjustmentLock)'), type + ': actual adjustment form fixes generated forecast and input');
+      run('window.fixedCandidateRank=guideCandidateIndex;guideCandidateToggle.click()');
+      assert(run('guideCandidateIndex===fixedCandidateRank && guideCandidateToggle.disabled'), 'added candidate cannot switch');
       // プレビュー・比較でも描画処理だけでは保存データを変更しない。
       for (const phase of ['preview', 'comparison']) {
         run(`adjustmentForecast.phase='${phase}'; window.phaseSnapshot=JSON.stringify(adjustmentForecast); renderAdjustmentForecast();`);
         checkCoordinates(type + '/' + phase + '/saved');
         assert(run('JSON.stringify(adjustmentForecast)===phaseSnapshot'), 'renderer leaves forecast phase and data unchanged');
       }
+      run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');dotForm.requestSubmit()`);
+      assert(run('!adjustmentLock'), 'next measurement releases candidate input lock');
     }
     output.textContent = `PASS: ${checks} checks — three Nos, linked previews, recorded adjustments, LINK HOV/Cruise and TAB\n`;
     document.title = 'PASS';

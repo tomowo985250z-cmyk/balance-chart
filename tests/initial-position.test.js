@@ -44,7 +44,8 @@
     run(`redInputs.forEach((input,i)=>input.value=['2','0','0.5'][i]);
       blueInputs.forEach((input,i)=>input.value=['1','0','0.5'][i]);dotForm.requestSubmit();
       memoValues.splice(0,4,'1','LINK','1/4','UP');updateMemoButtons();updateAdjustmentForecast();
-      adjustmentForm.requestSubmit();`);
+      adjustmentForm.requestSubmit();
+      redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');dotForm.requestSubmit();`);
     rotate(52,64);
     const before=run('JSON.stringify({dots:dotSets,forecast:adjustmentForecast,learning:learning.inspect(),rawDots:appStorage.getItem(DOT_STORAGE_KEY),rawLearning:appStorage.getItem("balance-chart-learning-v1")})');
     await register('save');

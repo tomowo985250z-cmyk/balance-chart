@@ -911,26 +911,30 @@
     run("startCruiseAddition(dotSets[0]); [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.4']; dotForm.requestSubmit();");
     assert(run('getDotCount()') === 2 && run('dotSets.length') === 1, 'existing later cruise form');
     near(run('getDotCoordinates(dotSets[0].blue).y'), 616, 'unchanged cruise coordinate');
+    assert(run('Boolean(adjustmentLock)'), 'result edit and later Cruise preserve adjustment lock');
+    run("[redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.5']; blueInputs.forEach(input=>input.value=''); dotForm.requestSubmit();");
     run("startAdjustmentEdit(dotSets[0],dotSets[0].adjustments[0]); memoValues[2]='1/2'; adjustmentForm.requestSubmit();");
     assert(run('dotSets[0].adjustments[0][2]') === '1/2', 'existing adjustment edit');
     assert(run('learning.inspect().samples.length')===0,'ordinary form inputs do not train');
     run("dotList.querySelector('.dot-result-row button').click(); deleteConfirmation.close('delete');");
     await new Promise(resolve => setTimeout(resolve, 50));
-    assert(run('dotSets.length') === 0, 'existing confirmed deletion');
+    assert(run('dotSets.length') === 1, 'existing confirmed deletion');
+    run('dotSets.splice(0);saveDotSets();renderDots();');
     groups.push('実画面：測定入力・調整入力・編集・巡航後入力・削除');
 
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.8'];
       [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.8']; dotForm.requestSubmit();
-      memoValues.splice(0,4,'1','TAB','1','UP'); actualAdjustment.checked=true; adjustmentForm.requestSubmit();
+      showChartPage(1);memoValues.splice(0,4,'1','TAB','1','UP'); actualAdjustment.checked=true; adjustmentForm.requestSubmit();
     `);
     assert(run('learning.isArmed(dotSets[0])'),'real adjustment checkbox arms latest measurement');
-    assert(!run('actualAdjustment.checked'),'checkbox resets after recording');
+    assert(run('actualAdjustment.checked && actualAdjustment.disabled'),'checkbox stays fixed after recording');
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.6'];
       [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.5']; dotForm.requestSubmit();
     `);
     assert(run('learning.inspect().models["TAB:blue"].sampleCount')===1,'next measurement trains purple');
+    assert(!run('actualAdjustment.checked'),'checkbox resets after next measurement');
     run("startResultEdit(dotSets[1]); blueInputs[2].value='0.3'; dotForm.requestSubmit();");
     assert(run('learning.inspect().models["TAB:blue"]===undefined'),'edited measurement is not learned again');
     assert(run('learning.inspect().models["TAB:red"].sampleCount')===1,'editing cruise leaves confirmed HOV intact');
@@ -1072,8 +1076,9 @@
     assert(run('adjustmentForecast.points.length===2'),'LINK restores independent red and blue guides');
     run('learning.predict=(type,color)=>color==="red"?null:{distance:24}; updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.length===2 && adjustmentForecast.points.find(p=>p.color==="red").source!=="learned" && adjustmentForecast.points.find(p=>p.color==="blue").source==="learned"'),'missing learned red uses independent reference distance');
-    run('learning.predict=(type,color)=>color==="blue"?{distance:NaN}:{distance:12}; updateAdjustmentForecast();');
-    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'invalid blue distance hides only blue');
+    // 参考距離のない条件を明示する。解除時の候補順位に依存させない。
+    run('memoValues.splice(0,4,"3","LINK","3","DOWN"); learning.predict=(type,color)=>color==="blue"?{distance:NaN}:{distance:12}; updateAdjustmentForecast();');
+    assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'invalid blue distance without reference hides only blue');
     run('dotSets.at(-1).blue=null; renderDots();');
     assert(run('adjustmentForecast.points.length===1 && adjustmentForecast.points[0].color==="red"'),'missing current blue dot hides only blue');
     run('dotSets.at(-1).blue=testDot(397,640,"blue"); learning.predict=()=>({distance:24}); renderDots(); delete forecastGuides.red; updateAdjustmentForecast();');
@@ -1097,7 +1102,7 @@
     run('document.querySelector(".historical-learning-row button").click();');
     assert(run('learning.inspect().models["LINK:red"].sampleCount===1 && !learning.inspect().models["LINK:blue"]'),'UI confirms only clicked color');
     run('document.querySelectorAll(".historical-learning-row button")[1].click();');
-    assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'historical learning immediately enables pending red preview');
+    assert(run('Boolean(dotOverlay.querySelector(".adjustment-forecast [data-color=red]"))'),'historical learning immediately enables pending red preview');
     run('memoValues.splice(0,4,"1","LINK","1","UP"); updateAdjustmentForecast();');
     const learnedGeometry=run('forecastGeometry().find(p=>p.color==="red")');
     near(learnedGeometry.cross,0,'real learned forecast lies on selected guide');

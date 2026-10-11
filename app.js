@@ -45,6 +45,8 @@ const forecastDisplayCache = new Map(); // 候補切替で失われない表示�
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 let renderingDirectionLines = false;
 let evaluatedLinkAmount = null;
+// 次の新規測定が登録されるまで、両種別で共有する追加待ちロック。
+let adjustmentLock = null;
 
 try {
   chartNote.value = appStorage.getItem(CHART_NOTE_STORAGE_KEY) || '';
@@ -73,6 +75,7 @@ guideToggle.addEventListener('click', () => {
   if (visible) applySelectedGuideAdjustment();
 });
 guideCandidateToggle.addEventListener('click', () => {
+  if (adjustmentLock?.page === currentChartPage) return;
   saveAdjustmentSelection();
   guideCandidateIndex = (guideCandidateIndex + 1) % 3;
   guideCandidateIndices[currentChartPage] = guideCandidateIndex;
@@ -82,11 +85,12 @@ guideCandidateToggle.addEventListener('click', () => {
 });
 
 function updateGuideCandidateToggle() {
-  const blade = guideNumberChoices[guideCandidateIndex]?.blade;
+  const locked = adjustmentLock?.page === currentChartPage;
+  const blade = locked ? adjustmentLock.guideBlade : guideNumberChoices[guideCandidateIndex]?.blade;
   const type = currentChartPage === 0 ? 'LINK' : 'TAB';
   guideCandidateToggle.textContent = `${type} No.${blade ?? '—'}`;
-  guideCandidateToggle.setAttribute('aria-label', `${type} No.${blade ?? '未選択'}、優先順位${guideCandidateIndex + 1}位。次のNoに切替`);
-  guideCandidateToggle.disabled = !guideNumberChoices.length;
+  guideCandidateToggle.setAttribute('aria-label', `${type} No.${blade ?? '未選択'}、優先順位${guideCandidateIndex + 1}位。${locked ? '次の測定結果登録まで固定' : '次のNoに切替'}`);
+  guideCandidateToggle.disabled = locked || !guideNumberChoices.length;
   guideCandidateToggle.dataset.rank = String(guideCandidateIndex + 1);
 }
 setGuidesVisible(true);
@@ -253,6 +257,7 @@ function resetSharedAdjustmentAmounts() {
 }
 
 function saveAdjustmentSelection() {
+  if (adjustmentLock) return;
   const amount = memoValues[2] || getSharedAdjustmentAmount();
   adjustmentSelections[getAdjustmentSelectionIndex()] = [...memoValues];
   // No・方向は候補別、量だけは同じ種別のNo.1〜3で共有する。
@@ -261,11 +266,20 @@ function saveAdjustmentSelection() {
 }
 
 function restoreAdjustmentSelection() {
+  if (adjustmentLock) { updateMemoButtons(); return; }
   memoValues.splice(0, 4, ...adjustmentSelections[getAdjustmentSelectionIndex()]);
   updateMemoButtons();
 }
 
 function updateMemoButtons() {
+  if (adjustmentLock) {
+    memoValues.splice(0, 4, ...adjustmentLock.values);
+    memoButtons.forEach((button, index) => {
+      button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
+      button.disabled = true;
+    });
+    return;
+  }
   if (!dotSets.length) {
     memoValues[0] = memoValues[3] = '';
     adjustmentSelections.forEach(values => { values[0] = values[3] = ''; });
@@ -275,6 +289,7 @@ function updateMemoButtons() {
     button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
   });
   memoButtons[1].disabled = true;
+  memoButtons[0].disabled = memoButtons[3].disabled = false;
   const thirdOptions = getThirdMemoOptions();
   memoButtons[2].disabled = false;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = getSharedAdjustmentAmount();
@@ -294,7 +309,7 @@ function getVisibleGuideAdjustment() {
 }
 
 function applySelectedGuideAdjustment(preserveFixed = false) {
-  if (restoringAppState) return;
+  if (restoringAppState || adjustmentLock) return;
   const guide = selectingGuideNumber ? (forecastGuides.red ?? forecastGuides.blue) : getVisibleGuideAdjustment();
   if (!guide) return;
   [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
@@ -363,7 +378,7 @@ function renderMemoWheel(options, selected, index) {
 }
 
 function openMemoPicker(index) {
-  if (index === 1) return;
+  if (adjustmentLock || index === 1) return;
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
   activeMemoIndex = index;
@@ -381,6 +396,7 @@ function openMemoPicker(index) {
 }
 
 function previewMemoSelection() {
+  if (adjustmentLock) return;
   const values = [...memoValues];
   values[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1 && values[1] !== memoValues[1]) values[2] = '';
@@ -392,6 +408,7 @@ function previewMemoSelection() {
 function updateAdjustmentForecast(values = memoValues, fixed = false,
   manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0]),
   manualDirection = Boolean(adjustmentForecast?.manualDirection && values[3] === adjustmentForecast.values[3])) {
+  if (adjustmentLock) { renderAdjustmentForecast(); return; }
   updateGuideSelectionVisibility(values);
   if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
@@ -556,7 +573,7 @@ function renderAdjustmentForecast() {
 memoButtons.forEach((button, index) => button.addEventListener('click', () => openMemoPicker(index)));
 closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); });
 confirmMemoPicker.addEventListener('click', () => {
-  if (activeMemoIndex === null) return;
+  if (adjustmentLock || activeMemoIndex === null) return;
   const manualDirection = memoPickerManualDirection || memoPickerDirectionChanged || (activeMemoIndex === 3 && selectedMemoValue !== memoValues[3]);
   memoValues[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1) memoValues[2] = '';
@@ -600,6 +617,7 @@ Object.assign(autoPitchAngles, manualPitchAngles);
 autoTrimCruiseAngle = manualTrimCruiseAngle;
 
 function updatePitchModeUI() {
+  pitchModeToggle.disabled = adjustmentLock?.page === 0;
   pitchModeToggle.hidden = currentChartPage !== 0;
   const waiting = [!pitchAutoReady.red && 'HOV', !pitchAutoReady.blue && '巡航'].filter(Boolean);
   pitchModeToggle.textContent = pitchAutoMode
@@ -610,6 +628,7 @@ function updatePitchModeUI() {
 }
 
 pitchModeToggle.addEventListener('click', () => {
+  if (adjustmentLock?.page === 0) return;
   manualMessageChanges = { red: false, blue: false };
   Object.assign(manualPitchAngles, { hovAngle, cruiseAngle });
   Object.assign(autoPitchAngles, { hovAngle, cruiseAngle });
@@ -624,6 +643,7 @@ pitchModeToggle.addEventListener('click', () => {
 });
 
 function updateTrimModeUI() {
+  trimModeToggle.disabled = adjustmentLock?.page === 1;
   trimModeToggle.hidden = currentChartPage !== 1;
   trimModeToggle.textContent = `紫六角形：${trimAutoMode ? (trimAutoReady ? '自動' : '自動（条件待ち）') : '手動'}`;
   trimModeToggle.setAttribute('aria-pressed', String(trimAutoMode));
@@ -631,6 +651,7 @@ function updateTrimModeUI() {
 }
 
 trimModeToggle.addEventListener('click', () => {
+  if (adjustmentLock?.page === 1) return;
   manualMessageChanges = { red: false, blue: false };
   manualTrimCruiseAngle = autoTrimCruiseAngle = cruiseAngle;
   lastAutoRotation.TAB.blue = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
@@ -671,6 +692,7 @@ function showChartPage(page) {
   });
   renderDirectionLines();
   renderAdjustmentForecast();
+  updateEditingUI();
 }
 
 chartPageButtons.forEach((button, index) => button.addEventListener('click', () => showChartPage(index)));
@@ -814,7 +836,7 @@ timePicker.addEventListener('click', (event) => {
 });
 
 function updateRotationLock() {
-  rotationLocked = rotationLock.checked;
+  rotationLocked = rotationLock.checked || adjustmentLock?.page === currentChartPage;
   chartWrap.classList.toggle('is-rotation-locked', rotationLocked);
   const svg = chartObject.contentDocument?.documentElement;
   if (svg) svg.dataset.rotationLocked = String(rotationLocked);
@@ -1465,6 +1487,8 @@ function drawDirectionLines(preserveSelection = false) {
     dotOverlay.prepend(guideLayer);
   }
   guideLayer.replaceChildren();
+  // 固定入力との不一致で隠した追加側ガイドの状態を、閲覧先へ持ち越さない。
+  if (adjustmentLock && adjustmentLock.page !== currentChartPage) guideLayer.style.opacity = '';
   const redDots = [];
   const blueDots = [];
   // 基準線の候補は、現在の最終結果番号にある赤・青ドットだけに限定する。
@@ -1567,7 +1591,7 @@ function drawDirectionLines(preserveSelection = false) {
     }
   });
   updateGuideViewportEnds();
-  if (preserveSelection) updateGuideSelectionVisibility(memoValues);
+  if (adjustmentLock ? adjustmentLock.page === currentChartPage : preserveSelection) updateGuideSelectionVisibility(memoValues);
   else applySelectedGuideAdjustment(true);
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
@@ -1605,9 +1629,10 @@ let selectedAdjustmentTarget = null;
 
 function updateAdjustmentTarget() {
   if (!dotSets.includes(selectedAdjustmentTarget)) selectedAdjustmentTarget = null;
-  const target = selectedAdjustmentTarget ?? dotSets.at(-1);
+  const target = adjustmentLock ? dotSets.find(set => set.learningId === adjustmentLock.targetId)
+    : selectedAdjustmentTarget ?? dotSets.at(-1);
   adjustmentTarget.replaceChildren();
-  adjustmentTarget.disabled = !dotSets.length;
+  adjustmentTarget.disabled = Boolean(adjustmentLock) || !dotSets.length;
   if (!dotSets.length) {
     const option = document.createElement('option');
     option.textContent = '結果なし';
@@ -1624,6 +1649,7 @@ function updateAdjustmentTarget() {
 }
 
 adjustmentTarget.addEventListener('change', () => {
+  if (adjustmentLock) { updateAdjustmentTarget(); return; }
   selectedAdjustmentTarget = dotSets[Number(adjustmentTarget.value)] ?? null;
   updateAdjustmentForecast();
 });
@@ -1645,7 +1671,7 @@ function restoreInputs(inputs, values) {
 
 function cancelEditing() {
   if (adjustmentForecast?.phase === 'preview') { adjustmentForecast = null; renderAdjustmentForecast(); }
-  actualAdjustment.checked = false;
+  actualAdjustment.checked = adjustmentLock?.actualAdjustment ?? false;
   if (resultEdit) restoreInputs([...redInputs, ...blueInputs], resultEdit.draft);
   if (adjustmentEdit) {
     memoValues.splice(0, 4, ...adjustmentEdit.draft);
@@ -1670,6 +1696,21 @@ function updateEditingUI() {
   resultEditMessage.textContent = resultEdit ? `結果${dotSets.indexOf(resultEdit.set) + 1}を編集中` : '';
   adjustmentEditMessage.textContent = adjustmentEdit ? `結果${dotSets.indexOf(adjustmentEdit.set) + 1}の調整量を編集中` : '';
   addAdjustmentButton.textContent = adjustmentEdit ? '調整量を更新' : '調整量を追加';
+  addAdjustmentButton.disabled = actualAdjustment.disabled = Boolean(adjustmentLock);
+  if (adjustmentLock) actualAdjustment.checked = adjustmentLock.actualAdjustment;
+  rotationLock.disabled = adjustmentLock?.page === currentChartPage;
+}
+
+function releaseAdjustmentLock() {
+  if (!adjustmentLock) return;
+  adjustmentLock = null;
+  actualAdjustment.checked = false;
+  resetSharedAdjustmentAmounts();
+  restoreAdjustmentSelection();
+  adjustmentMessage.textContent = '';
+  updateEditingUI();
+  updatePitchModeUI();
+  updateTrimModeUI();
 }
 
 function startResultEdit(set) {
@@ -1692,6 +1733,7 @@ function startResultEdit(set) {
 }
 
 function startAdjustmentEdit(set, adjustment) {
+  if (adjustmentLock) return;
   if (!dotSets.includes(set) || !set.adjustments?.includes(adjustment)) return;
   cancelEditing();
   if (cruiseAdditionTarget) finishCruiseAddition();
@@ -1824,7 +1866,7 @@ function renderDots() {
     set.adjustments?.forEach((adjustment, adjustmentIndex) => {
       const adjustmentRow = document.createElement('div');
       adjustmentRow.className = 'dot-adjustment-row';
-      attachEditAction(adjustmentRow, 'この調整量を編集しますか？', () => startAdjustmentEdit(set, adjustment));
+      if (!adjustmentLock) attachEditAction(adjustmentRow, 'この調整量を編集しますか？', () => startAdjustmentEdit(set, adjustment));
       const adjustmentLabel = document.createElement('span');
       adjustmentLabel.className = 'dot-memo';
       adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}${learning.isArmed(set) ? '（実調整）' : ''}`;
@@ -2061,6 +2103,7 @@ dotForm.addEventListener('submit', (event) => {
   dotSets.push({ learningId: newLearningId(), red, blue, adjustments: [] });
   learning.acceptMeasurement(dotSets, dotSets.at(-1).learningId);
   compareAdjustmentForecast(dotSets.at(-1));
+  releaseAdjustmentLock();
   selectedAdjustmentTarget = null;
   saveDotSets();
   [...redInputs, ...blueInputs].forEach((input) => {
@@ -2070,11 +2113,16 @@ dotForm.addEventListener('submit', (event) => {
   dotMessage.textContent = '';
   renderDots();
 
+  globalThis.balanceFlushState?.();
   redInputs[0].focus();
 });
 
 adjustmentForm.addEventListener('submit', (event) => {
   event.preventDefault();
+  if (adjustmentLock) {
+    adjustmentMessage.textContent = '次の測定結果を登録するまで、調整量の操作・追加はできません。';
+    return;
+  }
   if (!dotSets.length) {
     adjustmentMessage.textContent = '先にドットを追加して、結果を作成してください。';
     return;
@@ -2112,13 +2160,19 @@ adjustmentForm.addEventListener('submit', (event) => {
   targetSet.adjustments.push([...memoValues]);
   if (actualAdjustment.checked) learning.arm(dotSets, targetSet.learningId);
   else learning.disarm(targetSet.learningId);
-  actualAdjustment.checked = false;
+  saveAdjustmentSelection();
+  adjustmentLock = { page: currentChartPage, values: [...memoValues], rank: guideCandidateIndex,
+    guideBlade: String(guideNumberChoices[guideCandidateIndex]?.blade ?? '—'),
+    targetId: targetSet.learningId, actualAdjustment: actualAdjustment.checked };
+  memoPicker.hidden = true;
+  activeMemoIndex = null;
   saveDotSets();
-  resetSharedAdjustmentAmounts();
-  memoValues.fill('');
   updateMemoButtons();
-  adjustmentMessage.textContent = '';
+  adjustmentMessage.textContent = '次の測定結果を登録するまで、追加した調整量を固定しています。';
+  updatePitchModeUI();
+  updateTrimModeUI();
   renderDots();
+  globalThis.balanceFlushState?.();
 });
 
 function setGroupRotation(group, angle) {
@@ -2266,7 +2320,7 @@ window.addEventListener('message', (event) => {
   }
   if (message?.type === 'balance-chart-rotation'
     && Number.isFinite(message.hovAngle) && Number.isFinite(message.cruiseAngle)) {
-    if ((currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
+    if (adjustmentLock?.page === currentChartPage || (currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
     manualMessageChanges.red ||= hovAngle !== message.hovAngle;
     manualMessageChanges.blue ||= cruiseAngle !== message.cruiseAngle;
     if (message.finished) {
