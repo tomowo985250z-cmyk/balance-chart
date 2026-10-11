@@ -19,7 +19,8 @@
       assert(policy.select(equal,currentHov,.33)===equal[1], 'exactly equal HOV worsening prioritizes improving Cruise endpoint');
       for(const delta of [1e-10,1e-12,adjacent(.34)-.34]) {
         const different=[make(3,'UP',.34+delta,.01),make(3,'DOWN',.34,.5)];
-        assert(policy.select(different,currentHov,.33)===different[1], 'different HOV worsening is never epsilon-equivalent');
+        assert(policy.select(different,currentHov,.33)===different[currentHov<=.2?0:1],
+          'inside HOV uses Cruise improvement; recovery retains strict HOV comparison');
       }
       const unknown=[make(3,'DOWN',.34,null),make(3,'UP',.34,.16)];
       assert(policy.select(unknown,currentHov,.33)===unknown[1], 'same HOV endpoint prefers known improving Cruise over missing forecast');
@@ -27,7 +28,8 @@
       assert(policy.select(joint,currentHov,.33)===joint[1], 'joint pass retains highest priority');
     }
     const missingCruise=[make(1,'UP',adjacent(.34),null),make(2,'DOWN',.34,null)];
-    assert(policy.select(missingCruise,.19,null)===missingCruise[1], 'unmeasured Cruise still compares HOV strictly');
+    assert(policy.select(missingCruise,.32,null)===missingCruise[1], 'unmeasured Cruise recovery compares HOV strictly');
+    assert(policy.select(missingCruise,.19,null)===missingCruise[0], 'HOV inside with unmeasured Cruise does not favor HOV centering');
     const sameInput=JSON.stringify(missingCruise);policy.select(missingCruise,.19,.33);
     assert(JSON.stringify(missingCruise)===sameInput, 'strict fallback leaves predictions unchanged');
     for (const hov of [.32,.19]) {

@@ -4,7 +4,7 @@
   const equal=(a,b,label)=>assert(JSON.stringify(a)===JSON.stringify(b),label+' actual='+JSON.stringify(a)+' expected='+JSON.stringify(b));
   try{
     if(new URLSearchParams(location.search).get('isolated')!=='1')throw Error('Use isolated profile');
-    let frame=document.createElement('iframe');frame.style.cssText='width:375px;height:750px';
+    let frame=document.createElement('iframe');frame.style.cssText='position:fixed;left:0;top:0;width:375px;height:750px';
     let loaded=new Promise(resolve=>frame.onload=resolve);frame.src='../index.html';document.body.append(frame);await loaded;
     const run=code=>frame.contentWindow.eval(code);
     const tick=()=>new Promise(resolve=>setTimeout(resolve,50));
@@ -20,7 +20,10 @@
       run(`document.getElementById('registerInitialPosition').click()`);
       assert(run(`document.getElementById('initialPositionConfirmation').open`),'confirmation opens');
       const closed=new Promise(resolve=>frame.contentDocument.getElementById('initialPositionConfirmation').addEventListener('close',resolve,{once:true}));
-      run(`document.querySelector('#initialPositionConfirmation button[value="${value}"]').click()`);await closed;await tick();
+      // Explicit close notification keeps the application event test independent
+      // of headless dialog rendering. A later native event has no pending save.
+      run(`const dialog=document.getElementById('initialPositionConfirmation');dialog.close('${value}');
+        dialog.dispatchEvent(new Event('close'));`);await closed;await tick();
     };
     equal(angles(),[0,0],'unregistered fresh startup is unchanged');
     rotate(11,22);await register('cancel');
@@ -65,7 +68,7 @@
     assert(run(`document.getElementById('initialPositionStatus').textContent.includes('保存できません')`),'save failure shown');
     run('appStorage.setItem=originalSetItem');
     run('balanceFlushState()');frame.remove();
-    frame=document.createElement('iframe');frame.style.cssText='width:375px;height:750px';
+    frame=document.createElement('iframe');frame.style.cssText='position:fixed;left:0;top:0;width:375px;height:750px';
     loaded=new Promise(resolve=>frame.onload=resolve);frame.src='../index.html';document.body.append(frame);await loaded;await tick();
     equal(angles(),[52,64],'new page instance starts at registered LINK position');
     run('showChartPage(1)');equal(angles(),[9,-63],'new page instance retains TAB registration');

@@ -30,7 +30,7 @@
     const ready = new Promise(resolve => frame.onload = resolve);
     frame.src = '../index.html'; document.body.append(frame); await ready;
     const run = code => frame.contentWindow.eval(code), policy = LinkRankingPolicy;
-    const production = frame.contentWindow.BalanceLinkRanking;
+    const production = LinkRankingBeforeTwoStage; // Frozen historical hybrid comparison.
     // Restricted experiment: only break exact HOV ties when BOTH Cruise endpoints
     // are missing and no HOV-safe candidate exists. Known endpoints always retain
     // the production priority. Geometry cannot confer qualification or certainty.

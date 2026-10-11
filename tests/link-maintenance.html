@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LINK HOV圏内維持・比較試験</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:20px;color:#182435}p{max-width:1000px;line-height:1.6}
+table{border-collapse:collapse;font-size:13px;margin:16px 0}th,td{border:1px solid #c4ccd5;padding:7px;text-align:left}
+th{background:#edf3fa}tr.focus{background:#fff4d9}svg{max-width:520px;width:100%;height:auto;background:#fafcff}
+label{display:inline-block;margin:8px}select{padding:6px}pre{white-space:pre-wrap;font-size:12px}
+.scroll{overflow-x:auto}iframe{display:none}button{padding:8px}
+</style>
+<body>
+<h1>LINK HOV圏内維持・比較試験</h1>
+<p>HOVが0.2以内なら、HOVの中心接近量を順位に使わず、予測上の圏内維持→巡航の中心向き→同方向区分の巡航予測終点で比較します。予測欠測で幾何学的に維持可能な候補は別区分です。比較候補は実調整の推奨・合格確定を意味しません。</p>
+<p>「両予測圏内保護」は、両終点が名目上0.2以内の候補を先に残し、その中で同じ方向優先方式を使う比較案です。どちらもHOV圏内候補の中心接近量は順位に使いません。</p>
+<p>「幾何重視」は、HOV維持予測の区分を守ったうえで、巡航が中心向きの候補を、方向線上で0.2へ到達可能→中心への方向角が小さい順に比較します。欠測終点を補完せず、最接近点を予測終点には使いません。「幾何重視＋両予測圏内保護」も併記します。</p>
+<p>追加案は両予測圏内保護と中心向き優先を守り、中心向き候補同士では行き過ぎも含む既知終点を方向角より先に比較します。「既知終点優先」は既知→欠測、「改善予測優先」は既知の改善・同距離→欠測→既知の悪化の順です。未測定・欠測は両達成予測に含めません。</p>
+<p>2段階案は、同じ指定量でNo.1～3それぞれのUP/DOWNを選んだ後、選んだ3候補だけを順位付けします。方向選択は両達成予測→HOV維持→既知の巡航改善→欠測だが幾何学的に改善可能→既知の同距離→既知の悪化→改善方向の根拠なしの順です。既知の悪化同士は行き過ぎを含む終点距離で比較します。第2段階は前回の既知終点優先を使用し、方向を選び直しません。同一基準を両段階に使う対照案も検証します。これは証拠に基づく比較順であり、欠測の悪化確定や合格確率を意味しません。</p>
+<p>画像条件は画素からの近似位置・回転角です。端末の履歴・量・学習モデルを復元したものではありません。幾何学的な移動距離範囲はIPSであり、調整量flatや達成確率ではありません。学習済み予測を含め実測精度は未検証です。</p>
+<label>条件 <select id="fixture"></select></label>
+<label>調整量(flat) <select id="amount"></select></label>
+<p id="selection"></p>
+<svg id="geometry" viewBox="0 0 520 520" role="img" aria-label="No.1のUP・DOWN方向線、現在点、予測終点、0.2境界"></svg>
+<p>赤＝HOV、青＝巡航。実線矢印＝UP、破線矢印＝DOWN。塗り丸＝現在点、四角＝UP予測終点、菱形＝DOWN予測終点。灰色の点＝幾何学的最接近点。外周の灰色円は0.6 IPS、内側が0.2 IPS。欠測終点は描画しません。</p>
+<div class="scroll"><table id="comparison"></table></div>
+<button id="download" disabled>数値結果JSONを保存</button>
+<pre id="results">RUNNING</pre>
+<script src="link-maintenance-policy.js"></script>
+<script src="link-two-stage-policy.js"></script>
+<script src="link-ranking-before-two-stage.js"></script>
+<script src="link-maintenance.test.js"></script>
+</body></html>

@@ -2,6 +2,12 @@
 (() => {
   if (!globalThis.linkTrialMemoryStorage || parent === window || !parent.linkTrialHost) throw Error('Isolated trial required');
   const legacy = LinkRankingLegacy, production = selectLinkGuideCandidate, render = renderDirectionLines, forecast = updateAdjustmentForecast;
+  // Historical single-stage experiment: keep its selector hook independent of
+  // the new production two-stage integration, without replacing production ranking.
+  const selectNumbers = selectGuideNumberCandidate;
+  selectGuideNumberCandidate = function(candidates, selectBest) {
+    return selectNumbers(candidates, selectBest === selectLinkGuideCandidate ? pool => selectBest(pool) : selectBest);
+  };
   const drawForecast = renderAdjustmentForecast;
   const uncertaintyNotice = document.createElement('p');
   uncertaintyNotice.id = 'trialPredictionUncertainty';

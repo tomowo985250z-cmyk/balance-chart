@@ -1231,7 +1231,8 @@ function getLinkRankingCandidates(candidates) {
         ? -(((start.x - CHART_CENTER_X) / CHART_RADIUS) * (unit.x / unitLength)
           + ((start.y - CHART_CENTER_Y) / CHART_RADIUS) * (unit.y / unitLength)) : null;
       return [{ color, start, position, currentDistance, predictedDistance,
-        inwardProjection,
+        inwardProjection, geometry: BalanceLinkRanking.geometry({x:(start.x-CHART_CENTER_X)/CHART_RADIUS,
+          y:(start.y-CHART_CENTER_Y)/CHART_RADIUS},unit),
         improvement: position ? currentDistance - predictedDistance : null,
         source: valid ? estimate.source : 'missing', uncertain: !valid || estimate.source !== 'learned' }];
     });
@@ -1285,6 +1286,12 @@ function selectRankedLinkGuideCandidate(candidates, rank = guideCandidateIndex) 
 function selectGuideNumberCandidate(candidates, selectBest) {
   let pool = [...candidates];
   const choices = [];
+  if (pitchAutoMode && currentChartPage === 0 && selectBest === selectLinkGuideCandidate) {
+    const target = dotSets.at(-1);
+    const result = BalanceLinkRanking.rank(getLinkRankingCandidates(candidates),target?.red?.radius,target?.blue?.radius);
+    choices.push(...result.ranked.map(candidate => ({blade:candidate.blade,candidate:candidate.original})));
+    if (choices.length) pool = [];
+  }
   while (pool.length) {
     const candidate = selectBest(pool);
     if (!candidate) break;

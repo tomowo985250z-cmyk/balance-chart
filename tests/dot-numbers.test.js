@@ -5,11 +5,14 @@
   try {
     if (new URLSearchParams(location.search).get('isolated') !== '1') throw Error('Use isolated profile');
     const frame = document.createElement('iframe');
-    frame.style.cssText = 'width:375px;height:750px';
+    frame.style.cssText = 'position:fixed;left:0;top:0;width:375px;height:750px';
     const loaded = new Promise(resolve => frame.onload = resolve);
     frame.src = '../index.html'; document.body.append(frame); await loaded;
     const run = code => frame.contentWindow.eval(code);
+    frame.scrollIntoView();run('chartWrap.scrollIntoView()');
     const tick = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
+    const flushLayoutFrame = () => run(`if(dotNumberLayoutFrame!==null){
+      cancelAnimationFrame(dotNumberLayoutFrame);dotNumberLayoutFrame=null;layoutDotNumbers();}`);
     await tick();
     run(`dotSets.splice(0);for(let i=0;i<14;i++)dotSets.push({red:{color:'red',radius:0,angle:0,clock:'0:00'}});renderDots()`);
     await tick(); run('balanceFlushState()');
@@ -59,10 +62,15 @@
     assert(run('Number(dotOverlay.viewBox.baseVal.width) < 300'), 'pinch updates chart scale');
     assert(positions() === initial, 'pause during pinch keeps number offsets');
     assert(run('window.numberLayoutCalls') === 0, 'no layout search during pinch, including pauses');
-    touch('touchend', []); await tick(); verify();
+    touch('touchend', []); await tick(); flushLayoutFrame(); verify();
     assert(positions() === initial, 'collision-free zoom end preserves positions');
     // 高倍率で密集配置した後に縮小し、終了後だけ衝突を解消する。
     run('renderDots()'); await tick();
+    // Seed an actual collision instead of assuming a fresh high-zoom layout
+    // must become overlapping after zooming out on every browser/font build.
+    run(`const labels=[...dotOverlay.querySelectorAll('text[data-dot-x]')];
+      labels.at(-1).setAttribute('x',labels[0].getAttribute('x'));
+      labels.at(-1).setAttribute('y',labels[0].getAttribute('y'));`);
     const compact = positions();
     run('window.numberLayoutCalls=0');
     touch('touchstart', pair(300));
@@ -72,14 +80,14 @@
     }
     await tick();
     assert(run('window.numberLayoutCalls') === 0, 'zoom out waits for gesture end');
-    touch('touchend', []); await tick(); verify();
+    touch('touchend', []); await tick(); flushLayoutFrame(); verify();
     assert(positions() !== compact, 'zoom end repairs collisions when needed');
     const repaired = positions();
     run('window.numberLayoutCalls=0');
     touch('touchstart', pair(100));
     touch('touchmove', pair(180)); await tick();
     assert(positions() === repaired, 'cancelled gesture keeps offsets while active');
-    touch('touchcancel', []); await tick(); verify();
+    touch('touchcancel', []); await tick(); flushLayoutFrame(); verify();
     assert(run('!dotNumberViewInteracting && window.numberLayoutCalls > 0'), 'touchcancel resumes collision checks');
     for (const view of ['265 375 265 374', '0 0 794 1123']) {
       run(`dotOverlay.setAttribute('viewBox','${view}')`); await tick(); verify();
