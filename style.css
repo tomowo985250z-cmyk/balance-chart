@@ -223,7 +223,7 @@ object {
 .forecast-learning-notice { margin: 2px 0; font-size: 12px; color: #596573; flex-basis: 100%; }
 .forecast-information { flex-basis: 100%; min-width: 0; }
 .forecast-results { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; line-height: 1.4; color: #30343b; }
-.forecast-result { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; margin: 0; }
+.forecast-result { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 3px; min-width: 0; margin: 0; }
 .forecast-label { font-size: 16px; font-weight: 700; white-space: nowrap; }
 .forecast-result[data-color="red"] .forecast-label { color: #bd3434; }
 .forecast-result[data-color="blue"] .forecast-label { color: #245faf; }
@@ -234,6 +234,12 @@ object {
 .forecast-value { font-size: clamp(16px, 5vw, 20px); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .forecast-limit { font-size: 11px; color: #707780; white-space: nowrap; }
 .forecast-result [hidden] { display: none; }
+/* No.切替で予測の有無が変わっても、チャート上方の行の高さを保つ。 */
+.forecast-value, .forecast-limit { min-height: 1lh; }
+.forecast-value[hidden], .forecast-limit[hidden] { display: block; visibility: hidden; }
+#forecastSelectionNotice { min-height: 2lh; }
+#forecastSelectionNotice > span { display: block; }
+#forecastSelectionNotice[hidden] { display: block; visibility: hidden; }
 .forecast-details { margin-top: 6px; color: #596573; font-size: 12px; }
 .forecast-details summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 44px; cursor: pointer; list-style: none; }
 .forecast-details summary::-webkit-details-marker { display: none; }

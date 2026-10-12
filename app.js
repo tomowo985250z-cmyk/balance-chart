@@ -606,11 +606,13 @@ function renderForecastInformation(context, state) {
   const noticeColors = [...new Set([...(forecast?.waiting ?? []),
     ...displayPoints.filter(point => point.savedValues).map(point => point.color)])];
   if (forecast?.phase !== 'comparison' && noticeColors.length) {
-    notice.textContent = noticeColors.map(color => {
+    notice.replaceChildren(...noticeColors.map(color => {
       const saved = displayPoints.find(point => point.color === color)?.savedValues;
       const label = color === 'red' ? 'HOV（赤）' : forecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）';
-      return saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
-    }).join(' ／ ');
+      const row = document.createElement('span');
+      row.textContent = saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
+      return row;
+    }));
     notice.hidden = false;
   }
   document.getElementById('forecastCaution').textContent = (forecast && state !== 'learned'
