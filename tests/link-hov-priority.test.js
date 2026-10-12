@@ -330,7 +330,7 @@
         memoValues.splice(0,4,'1','LINK','1/4','UP');
         dotSets.push({learningId:newLearningId(),red:{radius:${measuredHov},angle:${measuredHov===.32?100:112.5},color:'red',clock:'test'},
           blue:{radius:.33,angle:165,color:'blue',clock:'5:30'},adjustments:[]});
-        applyChartRotation(-41,-60);renderDots();
+        initialChartRotations[0]={hovAngle:-41,cruiseAngle:-60};applyChartRotation(-41,-60);renderDots();
         window.hovCurrentCandidates=[1,2,3].flatMap(blade=>['UP','DOWN'].map(direction=>{
           const line=getDirectionLine(dotSets.at(-1).red,'red',null,blade,direction);
           const blue=getDirectionLine(dotSets.at(-1).blue,'blue',null,blade,direction);
@@ -396,7 +396,7 @@
     for (const mode of ['one-sample','HOV-only-learned','both-learned']) {
       run(`learning.reset([]);dotSets.splice(0);adjustmentForecast=null;forecastDisplayCache.clear();
         selectedAdjustmentTarget=null;currentChartPage=0;guideCandidateIndex=0;pitchAutoMode=true;
-        applyChartRotation(0,0);
+        initialChartRotations[0]=null;applyChartRotation(0,0);
         const makeHovTestDot=(x,y,color)=>({color,clock:'test',radius:Math.hypot(x-397,y-520)/240,
           angle:Math.atan2(x-397,520-y)*180/Math.PI});
         const count='${mode}'==='one-sample'?2:4;

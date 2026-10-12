@@ -27,6 +27,7 @@ const BalanceState = (() => {
       && ['pitchAutoMode', 'trimAutoMode', 'rotationLocked', 'guidesVisible', 'actualAdjustment'].every(key => typeof data[key] === 'boolean')
       && [data.hovAngle, data.cruiseAngle, data.manualTrimCruiseAngle, data.autoTrimCruiseAngle].every(Number.isFinite)
       && angles(data.manualPitchAngles) && angles(data.autoPitchAngles)
+      && (data.manualPitchInitialized === undefined || typeof data.manualPitchInitialized === 'boolean')
       && Array.isArray(data.pageRotations) && data.pageRotations.length === 2 && data.pageRotations.every(angles)
       && (data.initialChartRotations === undefined || (Array.isArray(data.initialChartRotations)
         && data.initialChartRotations.length === 2 && data.initialChartRotations.every(value => value === null || angles(value))))

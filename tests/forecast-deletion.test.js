@@ -71,7 +71,7 @@
       const label=(page?'TAB':'LINK')+'/'+mode+'/'+phase;
       const target=run('dotSets.length-1');
       if (phase==='preview')run('dotSets.at(-1).adjustments.push([...memoValues]);saveDotSets();renderDots()');
-      else run('actualAdjustment.checked=false;adjustmentForm.requestSubmit()');
+      else run('adjustmentForm.requestSubmit()');
       if (phase==='comparison')measure();
       assert(run('adjustmentForecast.phase')===phase,label+': requested lifecycle phase');
       const actionIndex=run(`dotSets[${target}].adjustments.length-1`);
@@ -98,7 +98,7 @@
       // 未追加側閲覧中の削除でも、残る固定対象の古い予測を持ち越さない。
       setup(page,'manual');
       run(`dotSets[0].adjustments.push(['1','${page?'TAB':'LINK'}','3','UP']);
-        actualAdjustment.checked=false;adjustmentForm.requestSubmit();showChartPage(${1-page})`);
+        adjustmentForm.requestSubmit();showChartPage(${1-page})`);
       remove(0,0);
       assert(run('Boolean(adjustmentLock) && adjustmentForecast===null && forecastDisplayCache.size===0'), 'other chart deletion clears old forecast without releasing unrelated lock');
       await reload();run(`showChartPage(${page})`);
@@ -108,7 +108,7 @@
 
       // キャッシュに両色の古い座標があっても、現在計算できない色は復活させない。
       setup(page,'manual');
-      run(`actualAdjustment.checked=false;adjustmentForm.requestSubmit();
+      run(`adjustmentForm.requestSubmit();
         for(const entry of forecastDisplayCache.values())for(const point of entry.points.values()){point.x=999999;point.y=999999;}
         dotSets[0].blue=null;saveDotSets();`);
       remove(0,0);

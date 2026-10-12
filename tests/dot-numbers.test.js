@@ -19,6 +19,7 @@
     const state = () => run(`(()=>{
       const storage=JSON.parse(appStorage.exportText()).records;
       // 実際のピンチは既存の表示状態保存を行うため、viewBoxだけ比較から除く。
+      if(!storage[BalanceState.uiKey])throw Error('Missing UI state: '+appStorage.error);
       const ui=JSON.parse(storage[BalanceState.uiKey]);delete ui.viewBox;
       storage[BalanceState.uiKey]=JSON.stringify(ui);
       return JSON.stringify({dots:dotSets,learning:learning.inspect(),forecast:adjustmentForecast,storage});

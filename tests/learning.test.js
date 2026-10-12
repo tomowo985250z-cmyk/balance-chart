@@ -410,11 +410,11 @@
     const noHistoryReload=new Promise(resolve=>{frame.onload=resolve;});
     frame.contentWindow.location.reload(); await noHistoryReload;
     assert(run('pitchAutoMode && trimAutoMode && !pitchAutoReady.red && !pitchAutoReady.blue && !trimAutoReady'),'no learning retains AUTO waiting state');
-    near(run('hovAngle'),23,'no-learning HOV preserves existing saved initial rotation');
-    near(run('cruiseAngle'),-41,'no-learning Cruise preserves saved initial rotation');
+    near(run('hovAngle'),0,'no-learning automatic HOV returns to unregistered initial position');
+    near(run('cruiseAngle'),0,'no-learning automatic Cruise returns to unregistered initial position');
     run('showChartPage(1);');
     near(run('cruiseAngle'),67,'no-learning TAB preserves saved initial rotation rather than zero');
-    run('showChartPage(0); pitchModeToggle.click(); trimModeToggle.click();');
+    run('showChartPage(0); pitchModeToggle.click(); trimModeToggle.click();rotationLock.checked=false;updateRotationLock();');
     run(`
       window.testErrors = [];
       window.addEventListener('error', event => testErrors.push(event.message));
@@ -509,7 +509,7 @@
       window.dispatchEvent(new MessageEvent('message', {source:chartObject.contentWindow,
         data:{type:'balance-chart-rotation',hovAngle:hovAngle+10,cruiseAngle:cruiseAngle,finished:true}}));
     `);
-    assert(run('Number.isFinite(learning.inspect().manual["LINK:red"].manualFinalAngle)'), 'manual correction captured by existing rotation message');
+    assert(run('learning.inspect().manual["LINK:red"] === undefined'), 'manual rotation no longer adds learning outside historical UI');
     assert(run('learning.inspect().manual["LINK:blue"] === undefined'), 'unchanged cruise is not a manual correction');
     const dotsBeforeReset = run('appStorage.getItem(DOT_STORAGE_KEY)');
     const rotationBeforeReset = run('appStorage.getItem(ROTATION_STORAGE_KEY)');
@@ -621,8 +621,8 @@
     run('pitchAutoMode=true; showChartPage(0); renderDots();');
     assert(run('guidePredictionDebug.selected.predictions.every(p=>p.model.startsWith("LINK:"))'), 'page switch restores LINK models');
     await new Promise(resolve => setTimeout(resolve, 50));
-    assert(run('rotationLocked && rotationHandles.length >= 2 && rotationHandles.every(handle=>handle.style.pointerEvents === "none")'),
-      'automatic rotation remains locked: ' + run('JSON.stringify({locked:rotationLocked,handles:rotationHandles.map(h=>h.style.pointerEvents),svg:chartObject.contentDocument?.documentElement.tagName,auto:pitchAutoMode})'));
+    assert(run('rotationHandles.length >= 2 && rotationHandles.every(handle=>handle.style.pointerEvents === "none")'),
+      'automatic mode prevents manual rotation independently of the rotation lock: ' + run('JSON.stringify({locked:rotationLocked,handles:rotationHandles.map(h=>h.style.pointerEvents),svg:chartObject.contentDocument?.documentElement.tagName,auto:pitchAutoMode})'));
     // 補正済み終点だけを固定して、実際のLINK候補選択経路を検証する。
     // The following historical path/0.15 cases exercise the preserved manual
     // selector. Automatic two-stage selection has independent production tests.
@@ -925,19 +925,20 @@
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.8'];
       [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.8']; dotForm.requestSubmit();
-      showChartPage(1);memoValues.splice(0,4,'1','TAB','1','UP'); actualAdjustment.checked=true; adjustmentForm.requestSubmit();
+      showChartPage(1);memoValues.splice(0,4,'1','TAB','1','UP');adjustmentForm.requestSubmit();
     `);
-    assert(run('learning.isArmed(dotSets[0])'),'real adjustment checkbox arms latest measurement');
-    assert(run('actualAdjustment.checked && actualAdjustment.disabled'),'checkbox stays fixed after recording');
+    assert(run('!learning.isArmed(dotSets[0])'),'adjustment addition does not arm learning');
+    assert(run('!document.getElementById("actualAdjustment")'),'real-adjustment checkbox removed');
     run(`
       [redInputs[0].value,redInputs[1].value,redInputs[2].value]=['3','0','0.6'];
       [blueInputs[0].value,blueInputs[1].value,blueInputs[2].value]=['6','0','0.5']; dotForm.requestSubmit();
     `);
-    assert(run('learning.inspect().models["TAB:blue"].sampleCount')===1,'next measurement trains purple');
-    assert(!run('actualAdjustment.checked'),'checkbox resets after next measurement');
+    assert(run('learning.inspect().models["TAB:blue"]===undefined'),'next measurement does not train automatically');
+    run('document.querySelector(".historical-learning-row button").click()');
+    assert(run('learning.inspect().models["TAB:blue"].sampleCount')===1,'explicit historical learning trains purple');
     run("startResultEdit(dotSets[1]); blueInputs[2].value='0.3'; dotForm.requestSubmit();");
     assert(run('learning.inspect().models["TAB:blue"]===undefined'),'edited measurement is not learned again');
-    assert(run('learning.inspect().models["TAB:red"].sampleCount')===1,'editing cruise leaves confirmed HOV intact');
+    assert(run('learning.inspect().models["TAB:red"]===undefined'),'TAB historical learning does not add unrelated HOV');
 
     run(`
       learning.reset([]);

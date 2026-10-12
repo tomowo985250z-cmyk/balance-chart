@@ -38,6 +38,7 @@
         adjustmentSelections.forEach(v=>v.fill(''));memoValues.splice(0,4,'1','LINK','1/4','UP');updateMemoButtons();
         dotSets.push({learningId:newLearningId(),red:{radius:${hov},angle:${hov===.32?100:112.5},color:'red',clock:'test'},
           blue:{radius:.33,angle:165,color:'blue',clock:'5:30'},adjustments:[]});
+        initialChartRotations[0]={hovAngle:-41,cruiseAngle:-60};
         pitchAutoMode=true;applyChartRotation(-41,-60);setGuidesVisible(true);renderDots();
         window.consistencyBefore=JSON.stringify({learning:learning.inspect(),dots:dotSets,records:BalanceState.keys.map(key=>appStorage.getItem(key))});
         window.consistencyPool=[1,2,3].flatMap(blade=>['UP','DOWN'].map(direction=>({blade,direction,
@@ -75,8 +76,8 @@
           const x=node.x2.baseVal.value-node.x1.baseVal.value,y=node.y2.baseVal.value-node.y1.baseVal.value;
           return x*u.x+y*u.y>0&&Math.abs(x*u.y-y*u.x)<1e-4;})`), 'drawn arrow agrees with prediction movement vector for each No');
         if(candidate.blade===3) {
-          assert(run('document.getElementById("hovForecastResult").textContent.includes("悪化・0.2 IPS超")')
-            &&run('document.getElementById("cruiseForecastResult").textContent.includes("算出不能")')===(hov===.32),
+          assert(run('document.getElementById("hovForecastResult").dataset.trend==="worsened" && document.querySelector("#hovForecastResult .forecast-limit").textContent==="0.2 IPS超"')
+            &&run('document.getElementById("cruiseForecastResult").dataset.trend==="none"')===(hov===.32),
             'No.3 HOV worsening and actual Cruise missing status stay visible outside collapsed caution');
           assert(candidate.predictions[0].endpoint>hov, 'No.3 cannot improve HOV at this shared amount');
         }

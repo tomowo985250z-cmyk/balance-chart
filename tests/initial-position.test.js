@@ -32,14 +32,14 @@
     rotate(23,-41);await register('save');
     equal(stored(),[{hovAngle:23,cruiseAngle:-41},null],'register visible LINK page only');
     rotate(67,89);await reload();
-    equal(angles(),[23,-41],'empty startup uses registered LINK angles');
-    assert(run(`chartObject.contentDocument.getElementById('cruiseGroup').getAttribute('transform').includes('-41')`),'SVG uses registered LINK angle');
+    equal(angles(),[67,89],'empty manual startup preserves saved LINK angles');
+    assert(run(`chartObject.contentDocument.getElementById('cruiseGroup').getAttribute('transform').includes('89')`),'SVG uses saved manual LINK angle');
     run('showChartPage(1)');rotate(9,-63);await register('save');
     equal(stored(),[{hovAngle:23,cruiseAngle:-41},{hovAngle:9,cruiseAngle:-63}],'TAB registration preserves LINK registration');
     rotate(80,90);await reload();equal(angles(),[9,-63],'empty startup uses registered TAB angles');
-    run('showChartPage(0)');equal(angles(),[23,-41],'inactive page starts from registered angles too');
-    rotate(30,40);await register('cancel');await reload();equal(angles(),[23,-41],'cancel preserves previous registration');
-    rotate(31,42);await register('save');rotate(70,80);await reload();equal(angles(),[31,42],'confirmed replacement survives reload');
+    run('showChartPage(0)');equal(angles(),[67,89],'inactive LINK page preserves saved manual angles');
+    rotate(30,40);await register('cancel');await reload();equal(angles(),[30,40],'cancel leaves manual position intact');
+    rotate(31,42);await register('save');rotate(70,80);await reload();equal(angles(),[70,80],'registration does not reset saved manual position');
     // 登録していない最新位置から再開すべき、結果ありのケース。
     run(`redInputs.forEach((input,i)=>input.value=['2','0','0.5'][i]);
       blueInputs.forEach((input,i)=>input.value=['1','0','0.5'][i]);dotForm.requestSubmit();
@@ -54,7 +54,7 @@
     equal(stored()[0],{hovAngle:52,cruiseAngle:64},'registration retained while results exist');
     run('showChartPage(1)');rotate(61,72);await reload();equal(angles(),[61,72],'nonempty TAB startup also preserves latest angles');
     run('dotSets.splice(0);saveDotSets();renderDots()');await reload();equal(angles(),[9,-63],'after results removed empty startup uses registration');
-    run('showChartPage(0)');equal(angles(),[52,64],'both registrations survive results lifecycle');
+    run('showChartPage(0)');equal(angles(),[73,85],'manual LINK position survives deletion of all results');
     run('pitchModeToggle.click();trimAutoMode=true;balanceFlushState()');await reload();equal(angles(),[52,64],'automatic waiting mode starts at registered position');
     assert(run('pitchAutoMode && trimAutoMode'),'registration does not change saved modes');
     const exported=run('JSON.parse(appStorage.exportText()).records[BalanceState.uiKey]');

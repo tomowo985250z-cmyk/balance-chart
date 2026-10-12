@@ -101,6 +101,7 @@
         adjustmentSelections.forEach(v=>v.fill(''));memoValues.splice(0,4,'1','LINK','1/4','UP');updateMemoButtons();
         dotSets.push({learningId:newLearningId(),red:{radius:${hov},angle:${hov === .32 ? 100 : 112.5},color:'red',clock:'test'},
           blue:{radius:.33,angle:165,color:'blue',clock:'5:30'},adjustments:[]});
+        initialChartRotations[0]={hovAngle:-41,cruiseAngle:-60};
         pitchAutoMode=true;applyChartRotation(-41,-60);setGuidesVisible(true);renderDots();
         window.geometryStateBefore=JSON.stringify({learning:learning.inspect(),dots:dotSets,
           records:BalanceState.keys.map(key=>appStorage.getItem(key)),forecast:adjustmentForecast,

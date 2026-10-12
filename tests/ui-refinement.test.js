@@ -147,7 +147,7 @@
       assert(run('JSON.stringify([dotSets,learning.inspect(),adjustmentForecast,memoValues,guideNumberChoices])')===before,
         type + ': disclosure and presentation do not alter stored data or calculations');
       run('forecastDetails.open=false;guideToggle.click()');visible(type + '/guides off');
-      run('guideToggle.click();actualAdjustment.checked=false;adjustmentForm.requestSubmit()');visible(type + '/locked');
+      run('guideToggle.click();adjustmentForm.requestSubmit()');visible(type + '/locked');
       assert(run('memoButtons.every(button=>button.disabled && button.querySelector(".memo-value"))'), type + ': fixed inputs preserve structured labels');
       run(`dotList.children[1].querySelector('.dot-adjustment-row button').click();
         deleteConfirmation.close('delete');deleteConfirmation.dispatchEvent(new Event('close'));`);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20261012-ui-refinement" />
+    <link rel="stylesheet" href="style.css?v=20261012-compact-forecast" />
   </head>
   <body>
   <main class="app">
@@ -55,14 +55,23 @@ LINK</button>
         </span>
       </div>
       <button id="addAdjustmentButton" type="submit">調整量を追加</button>
-      <label class="actual-adjustment"><input id="actualAdjustment" type="checkbox" />実調整として記録（次の測定を学習）</label>
       <button id="cancelAdjustmentEdit" type="button" hidden>編集をキャンセル</button>
       <p id="adjustmentEditMessage" class="edit-message" aria-live="polite" hidden></p>
       <p id="adjustmentMessage" class="dot-message" aria-live="polite"></p>
       <div id="forecastLearningNotice" class="forecast-information" aria-live="polite">
         <div class="forecast-results">
-          <p id="hovForecastResult">HOV予測：算出不能</p>
-          <p id="cruiseForecastResult">巡航予測：算出不能</p>
+          <p id="hovForecastResult" class="forecast-result" data-color="red" data-trend="none">
+            <span class="forecast-label">HOV予測</span>
+            <span class="forecast-trend"><span class="forecast-trend-arrow" aria-hidden="true" hidden></span><span class="forecast-change">予測なし</span></span>
+            <span class="forecast-value" hidden></span>
+            <span class="forecast-limit" hidden></span>
+          </p>
+          <p id="cruiseForecastResult" class="forecast-result" data-color="blue" data-trend="none">
+            <span class="forecast-label">巡航予測</span>
+            <span class="forecast-trend"><span class="forecast-trend-arrow" aria-hidden="true" hidden></span><span class="forecast-change">予測なし</span></span>
+            <span class="forecast-value" hidden></span>
+            <span class="forecast-limit" hidden></span>
+          </p>
         </div>
         <p id="forecastSelectionNotice" class="forecast-learning-notice" hidden></p>
         <details id="forecastDetails" class="forecast-details">
@@ -73,12 +82,14 @@ LINK</button>
     </form>
 
     <details class="historical-learning">
-      <summary>過去の実調整を学習
+      <summary>学習
         <button id="openNotices" class="notices-trigger" type="button" aria-haspopup="dialog" aria-controls="noticesDialog">注意事項</button>
       </summary>
+      <h3>過去の実調整を学習</h3>
       <p>前後の測定と調整内容を確認し、実際に行った調整だけを指定してください。</p>
       <div id="historicalLearningCandidates"></div>
       <p id="historicalLearningMessage" aria-live="polite"></p>
+      <button id="resetLearning" class="learning-reset" type="button">自動補正の学習値をリセット</button>
     </details>
     <h2 id="resultsHeading" class="results-heading">結果</h2>
     <ul id="dotList" class="dot-list" aria-labelledby="resultsHeading"></ul>
@@ -89,7 +100,6 @@ LINK</button>
         <button type="button" class="chart-page is-active" data-page="0" aria-label="ピッチリンク用を表示" aria-current="page"></button>
         <button type="button" class="chart-page" data-page="1" aria-label="トリムタブ用を表示"></button>
       </div>
-      <button id="resetLearning" class="learning-reset" type="button">自動補正の学習値をリセット</button>
     </div>
     <div class="chart-wrap">
       <object data="chart.svg?v=20261010-stable-dot-numbers" type="image/svg+xml" aria-label="バランスチャート"></object>
@@ -181,11 +191,11 @@ LINK</button>
     </form>
   </dialog>
   <script src="notices.js?v=20261002-notices"></script>
-  <script src="state-storage.js?v=20261012-adjustment-lock"></script>
+  <script src="state-storage.js?v=20261012-rotation-modes"></script>
   <script src="learning.js?v=20260920-distance-prior"></script>
   <script src="distance-prior.js?v=20260921-tab-monotonic-distance"></script>
   <script src="link-ranking.js?v=20261012-link-two-stage"></script>
-  <script src="app.js?v=20261012-ui-refinement"></script>
-  <script src="app-state.js?v=20261012-delete-forecast-refresh"></script>
+  <script src="app.js?v=20261012-historical-learning-only"></script>
+  <script src="app-state.js?v=20261012-historical-learning-only"></script>
 </body>
 </html>

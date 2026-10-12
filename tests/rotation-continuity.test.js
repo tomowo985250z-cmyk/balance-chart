@@ -52,21 +52,25 @@
         saveDotSets(); renderDots();`);
       run(`showChartPage(${page});
         if(${page}===0 ? pitchAutoMode : trimAutoMode) (${page}===0 ? pitchModeToggle : trimModeToggle).click();
+        rotationLock.checked=false;updateRotationLock();
         window.dispatchEvent(new MessageEvent('message',{source:chartObject.contentWindow,
           data:{type:'balance-chart-rotation',hovAngle:37,cruiseAngle:-58,finished:true}}));`);
       assert(run('hovAngle===37 && cruiseAngle===-58'), 'manual angles applied on page '+page);
       const models = run('JSON.stringify(learning.inspect())');
+      const expectedAuto = page === 0 ? run(`[getLearnedRotation('LINK','red') ?? getLatestLinkSyncAngle('red') ?? 0,
+        getLearnedRotation('LINK','blue') ?? getLatestLinkSyncAngle('blue') ?? 0]`) : [37,-58];
+      const automaticAngles = () => run('JSON.stringify([hovAngle,cruiseAngle])') === JSON.stringify(expectedAuto);
       run(`(${page}===0 ? pitchModeToggle : trimModeToggle).click()`);
-      assert(run('hovAngle===37 && cruiseAngle===-58'), 'AUTO starts from latest angles on page '+page);
+      assert(automaticAngles(), 'AUTO uses calculated LINK / existing TAB angles on page '+page);
       if (learned) assert(run(`${page}===0 ? pitchAutoReady.blue : trimAutoReady`), 'AUTO model is ready');
       run('renderDots()');
-      assert(run('hovAngle===37 && cruiseAngle===-58'), 'same model redraw retains angles on page '+page);
+      assert(automaticAngles(), 'same model redraw retains automatic angles on page '+page);
       assert(run('JSON.stringify(learning.inspect())') === models, 'mode switch leaves learning unchanged on page '+page);
       run(`showChartPage(${1-page}); showChartPage(${page})`);
-      assert(run('hovAngle===37 && cruiseAngle===-58'), 'page round trip retains angles on page '+page);
+      assert(automaticAngles(), 'page round trip retains automatic angles on page '+page);
       await reload();
-      assert(run('hovAngle===37 && cruiseAngle===-58'), 'AUTO reload retains angles on page '+page);
-      assert(run(`chartObject.contentDocument.getElementById('cruiseGroup').getAttribute('transform').includes('-58')`), 'SVG uses restored angle on page '+page);
+      assert(automaticAngles(), 'AUTO reload restores calculated angles on page '+page);
+      assert(run(`chartObject.contentDocument.getElementById('cruiseGroup').getAttribute('transform').includes(String(cruiseAngle))`), 'SVG uses restored angle on page '+page);
       run(`(${page}===0 ? pitchModeToggle : trimModeToggle).click()`);
       assert(run('hovAngle===37 && cruiseAngle===-58'), 'return to manual retains angles on page '+page);
     }

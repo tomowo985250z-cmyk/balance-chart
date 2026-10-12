@@ -1,7 +1,6 @@
 /* 保存・復元と端末内ファイル移行のみを担当する。計算エンジンには触れない。 */
 (() => {
   let ready = false, queued = false;
-  let initialChartRotations = [null, null];
   const status = document.getElementById('storageStatus');
   const transferStatus = document.getElementById('transferStatus');
   const profileSelect = document.getElementById('stateProfile');
@@ -14,10 +13,10 @@
     memoValues: [...memoValues], adjustmentSelections: adjustmentSelections.map(values => [...values]),
     adjustmentLock,
     currentChartPage, guideCandidateIndex, guideCandidateIndices: guideCandidateIndices.map((rank, page) => page === currentChartPage ? guideCandidateIndex : rank), pitchAutoMode, trimAutoMode,
-    hovAngle, cruiseAngle, pageRotations, manualPitchAngles, autoPitchAngles, initialChartRotations,
+    hovAngle, cruiseAngle, pageRotations, manualPitchAngles, manualPitchInitialized, autoPitchAngles, initialChartRotations,
     manualTrimCruiseAngle, autoTrimCruiseAngle, manualLearningReference,
     rotationLocked: rotationLock.checked, guidesVisible: dotOverlay.classList.contains('guides-visible'),
-    actualAdjustment: actualAdjustment.checked,
+    actualAdjustment: legacyActualAdjustment,
     selectedTarget: selectedAdjustmentTarget?.learningId ?? null,
     forecast: adjustmentForecast,
     forecastCache: [...forecastDisplayCache].map(([key, entry]) => [key, { ...entry, points: [...entry.points] }]),
@@ -59,12 +58,13 @@
   const restore = state => {
     BalanceState.validateUI(state);
     initialChartRotations = (state.initialChartRotations ?? [null, null]).map(value => value ? { ...value } : null);
-    if (!dotSets.length && initialChartRotations.some(Boolean)) {
-      const pages = state.pageRotations.map((value, index) => ({ ...(initialChartRotations[index] ?? value) }));
-      const active = initialChartRotations[state.currentChartPage];
+    // 紫六角形の空履歴での初期位置復元は従来どおり。
+    if (!dotSets.length && initialChartRotations[1]) {
+      const pages = state.pageRotations.map(value => ({ ...value }));
+      pages[1] = { ...initialChartRotations[1] };
+      const active = state.currentChartPage === 1 ? initialChartRotations[1] : null;
       state = { ...state, pageRotations: pages,
         ...(active ?? {}),
-        ...(initialChartRotations[0] ? { manualPitchAngles: { ...pages[0] }, autoPitchAngles: { ...pages[0] } } : {}),
         ...(initialChartRotations[1] ? { manualTrimCruiseAngle: pages[1].cruiseAngle, autoTrimCruiseAngle: pages[1].cruiseAngle } : {}) };
     }
     const setFor = id => dotSets.find(set => set.learningId === id) ?? null;
@@ -78,6 +78,8 @@
       for (const key of ['hovAngle', 'cruiseAngle']) {
         manualPitchAngles[key] = state.manualPitchAngles[key]; autoPitchAngles[key] = state.autoPitchAngles[key];
       }
+      // 旧形式の手動位置も保持する。新形式では初回だけ登録済み初期位置を使う。
+      manualPitchInitialized = state.manualPitchInitialized ?? true;
       manualTrimCruiseAngle = state.manualTrimCruiseAngle; autoTrimCruiseAngle = state.autoTrimCruiseAngle;
       for (const type of ['LINK', 'TAB']) manualLearningReference[type] = { ...state.manualLearningReference[type] };
       memoValues.splice(0, 4, ...state.memoValues);
@@ -91,7 +93,7 @@
       redInputs.forEach((input, index) => { input.value = state.redInputs[index]; });
       blueInputs.forEach((input, index) => { input.value = state.blueInputs[index]; });
       selectedAdjustmentTarget = setFor(state.selectedTarget);
-      rotationLock.checked = state.rotationLocked; actualAdjustment.checked = state.actualAdjustment;
+      rotationLock.checked = state.rotationLocked; legacyActualAdjustment = state.actualAdjustment;
       if (adjustmentLock) {
         guideCandidateIndices[adjustmentLock.page] = adjustmentLock.rank;
         if (currentChartPage === adjustmentLock.page) guideCandidateIndex = adjustmentLock.rank;
@@ -129,6 +131,11 @@
         restoreView(); chartObject.addEventListener('load', restoreView, { once: true });
       }
     } finally { restoringAppState = false; }
+    if (pitchAutoMode) syncAutoPitchRotation();
+    else restoreManualPitchRotation();
+    // 位置に合わせてガイドだけ描き直し、復元済みの予測・入力は保持する。
+    restoringAppState = true;
+    try { renderDirectionLines(); } finally { restoringAppState = false; }
     if (adjustmentLock && !adjustmentForecast) refreshAdjustmentForecastAfterDeletion();
   };
   try {

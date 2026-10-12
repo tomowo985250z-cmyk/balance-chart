@@ -56,6 +56,7 @@
       selectedAdjustmentTarget=null;currentChartPage=0;guideCandidateIndex=0;pitchAutoMode=true;
       adjustmentSelections.forEach(values=>values.fill(''));
       memoValues.splice(0,4,'1','LINK','1/4','UP'); updateMemoButtons();
+      initialChartRotations[0]={hovAngle:${count>1?0:-41},cruiseAngle:${count>1?0:-60}};
       applyChartRotation(${count>1?0:-41},${count>1?0:-60});
       const makeTrialDot=(x,y,color)=>({color,clock:'synthetic',radius:Math.hypot(x-397,y-520)/240,
         angle:Math.atan2(x-397,520-y)*180/Math.PI});

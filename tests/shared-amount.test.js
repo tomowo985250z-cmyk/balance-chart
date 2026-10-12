@@ -74,7 +74,7 @@
 
       // 追加時の量を固定し、次の新規測定の登録後に両種別の量を初期化する。
       run(`window.beforeSubmit=[...memoValues];window.beforeForecast=JSON.stringify(adjustmentForecast);
-        actualAdjustment.checked=false;adjustmentForm.requestSubmit()`);
+        adjustmentForm.requestSubmit()`);
       assert(run('JSON.stringify(dotSets.at(-1).adjustments.at(-1))===JSON.stringify(beforeSubmit)'), type+'/'+mode+': add records chosen amount');
       assert(run(`JSON.stringify(adjustmentForecast)===JSON.stringify({...JSON.parse(beforeForecast),phase:'fixed'})`), 'add preserves generated forecast at recorded amount');
       assert(run(`['models','samples'].every(key=>JSON.stringify(learning.inspect()[key])===JSON.stringify(JSON.parse(sharedLearning)[key]))`), 'practice add leaves learned models and samples unchanged');
@@ -95,11 +95,9 @@
       run(`window.rejectedValues=[...memoValues];memoValues[0]='';updateMemoButtons();window.rejectedRecords=JSON.stringify(dotSets);adjustmentForm.requestSubmit()`);
       checkAmount(page ? '2' : '1/2', 'incomplete submission preserves selected amount');
       assert(run('JSON.stringify(dotSets)===rejectedRecords && Boolean(adjustmentMessage.textContent)'), 'incomplete submission preserves records');
-      run('memoValues.splice(0,4,...rejectedValues);updateMemoButtons();selectedAdjustmentTarget=dotSets.at(-2);actualAdjustment.checked=true;adjustmentForm.requestSubmit()');
-      checkAmount(page ? '2' : '1/2', 'rejected learning designation preserves selected amount');
-      assert(run('JSON.stringify(dotSets)===rejectedRecords && Boolean(adjustmentMessage.textContent)'), 'rejected learning designation preserves records');
-      run('selectedAdjustmentTarget=null;actualAdjustment.checked=false;adjustmentForm.requestSubmit()');
-      checkAmount(page ? '2' : '1/2', 'next successful add retains newly selected amount');
+      run('memoValues.splice(0,4,...rejectedValues);updateMemoButtons();selectedAdjustmentTarget=dotSets.at(-2);adjustmentForm.requestSubmit()');
+      checkAmount(page ? '2' : '1/2', 'historical adjustment addition preserves selected amount');
+      assert(run('dotSets.at(-2).adjustments.at(-1)[2]===memoValues[2] && Boolean(adjustmentLock)'), 'historical adjustment addition records amount without a learning designation');
       run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach((input,i)=>input.value=['5','0','0.3'][i]);dotForm.requestSubmit()`);
       checkAmount(initial, 'next new measurement resets shared amount');
     }
@@ -135,7 +133,7 @@
 
     // 編集・結果削除では共有量を維持し、空の状態も起動時に初期化する。
     run(`showChartPage(0);pitchAutoMode=false;trimAutoMode=false;setGuidesVisible(true);renderDots();applySelectedGuideAdjustment();
-      memoValues[2]='2/3';updateMemoButtons();window.beforeSubmit=[...memoValues];window.sharedRecordedSet=dotSets.at(-1);actualAdjustment.checked=false;adjustmentForm.requestSubmit();`);
+      memoValues[2]='2/3';updateMemoButtons();window.beforeSubmit=[...memoValues];window.sharedRecordedSet=dotSets.at(-1);adjustmentForm.requestSubmit();`);
     assert(run('JSON.stringify(dotSets.at(-1).adjustments.at(-1))===JSON.stringify(beforeSubmit)'), 'submit records the selected shared amount');
     checkAmount('2/3', 'submit retains shared LINK amount');
     run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');dotForm.requestSubmit()`);

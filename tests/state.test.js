@@ -84,12 +84,13 @@
     assert(run('learning.inspect().samples.length')===6,'real app restores existing learned samples');
     for(const [key,raw] of Object.entries(originals)) equal(localStorage.getItem(key),raw,'app startup preserves original '+key);
     run(`pitchAutoMode=false; trimAutoMode=false; applyChartRotation(23,-41);
+      Object.assign(manualPitchAngles,{hovAngle,cruiseAngle});saveRotation();
       memoValues.splice(0,4,'1','LINK','1/4','UP'); updateMemoButtons(); updateAdjustmentForecast();
       redInputs.forEach((input,index)=>{input.value=['7','13','0.42'][index]; input.dispatchEvent(new Event('input',{bubbles:true}));});
       blueInputs.forEach((input,index)=>input.value=['9','5','0.37'][index]);
       rotationLock.checked=false; updateRotationLock(); setGuidesVisible(false);
       chartNote.value='再起動テストのメモ'; chartNote.dispatchEvent(new Event('input',{bubbles:true}));
-      actualAdjustment.checked=true; dotOverlay.setAttribute('viewBox','100 100 397 561.5'); balanceFlushState();`);
+      legacyActualAdjustment=true; dotOverlay.setAttribute('viewBox','100 100 397 561.5'); balanceFlushState();`);
     // 実際のズームと同様、SVGにも反映して通知が落ち着いてから保存する。
     run(`chartObject.contentWindow.postMessage({type:'balance-chart-restore-view',viewBox:[100,100,397,561.5]},'*')`);
     await new Promise(resolve=>setTimeout(resolve,100));
@@ -102,11 +103,11 @@
     await new Promise(resolve=>setTimeout(resolve,0));
     equal(run('redInputs.map(input=>input.value)'),['7','13','0.42'],'red draft restored');
     equal(run('blueInputs.map(input=>input.value)'),['9','5','0.37'],'blue draft restored');
-    assert(run('!pitchAutoMode && !trimAutoMode && !rotationLock.checked && !dotOverlay.classList.contains("guides-visible") && actualAdjustment.checked'),'mode, lock, guide visibility and checkbox restored');
+    assert(run('!pitchAutoMode && !trimAutoMode && !rotationLock.checked && !dotOverlay.classList.contains("guides-visible") && legacyActualAdjustment && !document.getElementById("actualAdjustment")'),'mode, lock, guide visibility and legacy metadata restored without removed checkbox');
     equal(run('chartNote.value'),'再起動テストのメモ','note restored');
     run(`Object.defineProperty(navigator,'standalone',{configurable:true,value:true}); window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));`);
     assert(run('document.getElementById("storageStatus").textContent.includes("ホーム画面")'),'standalone launch identified');
-    assert(run('!dotOverlay.classList.contains("guides-visible") && actualAdjustment.checked'),'pageshow does not reset restored settings');
+    assert(run('!dotOverlay.classList.contains("guides-visible") && legacyActualAdjustment'),'pageshow does not reset restored settings');
     equal(run('JSON.stringify(adjustmentForecast)'),forecastBefore,'generated forecast restored without regeneration');
     equal(run('[hovAngle,cruiseAngle]'),[23,-41],'initial SVG snapshot does not overwrite restored angles');
     equal(run('dotOverlay.getAttribute("viewBox")'),'100 100 397 561.5','zoom viewport restored');

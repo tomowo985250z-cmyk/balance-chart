@@ -26,13 +26,15 @@ const pitchModeToggle = document.getElementById('pitchModeToggle');
 let pitchAutoMode = true;
 const pitchAutoReady = { red: false, blue: false };
 const manualPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
+let manualPitchInitialized = false;
+let initialChartRotations = [null, null];
 const autoPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
 let trimAutoMode = true;
 let trimAutoReady = false;
 let manualTrimCruiseAngle = 0;
 let autoTrimCruiseAngle = 0;
-// 同じ自動算出角度の再適用で、引き継いだ最新の表示角度を巻き戻さない。
-const lastAutoRotation = { LINK: {}, TAB: {} };
+// 紫六角形は従来どおり、同じ自動角度で表示位置を巻き戻さない。
+const lastAutoRotation = { TAB: {} };
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
@@ -96,8 +98,8 @@ function updateGuideCandidateToggle() {
 setGuidesVisible(true);
 const dotForm = document.getElementById('dotForm');
 const adjustmentForm = document.getElementById('adjustmentForm');
-const actualAdjustment = document.getElementById('actualAdjustment');
-actualAdjustment.checked = false;
+// 旧バックアップの設定値は保持するが、自動学習の指定としては使わない。
+let legacyActualAdjustment = false;
 const redInputs = ['redHourInput', 'redMinuteInput', 'redValueInput'].map((id) => document.getElementById(id));
 const blueInputs = ['blueHourInput', 'blueMinuteInput', 'blueValueInput'].map((id) => document.getElementById(id));
 const addDotButton = document.getElementById('addDotButton');
@@ -198,7 +200,6 @@ const learning = BalanceLearning.create({
   coordinates: getDotCoordinates, nominalAngle: getNominalAdjustmentAngle, radius: CHART_RADIUS
 });
 const manualLearningReference = { LINK: {}, TAB: {} };
-let manualMessageChanges = { red: false, blue: false };
 let guidePredictionDebug = { fallback: true };
 window.balanceChartLearning = { inspect: () => ({ ...learning.inspect(), guides: structuredClone(guidePredictionDebug) }) };
 
@@ -212,11 +213,6 @@ function getLearnedRotation(type, color) {
   return learning.rotation(type, color, action?.blade ?? 1, action?.direction ?? 'UP');
 }
 
-function recordManualLearning(color, angle) {
-  const type = currentChartPage === 0 ? 'LINK' : 'TAB';
-  const reference = manualLearningReference[type][color];
-  if (Number.isFinite(reference)) learning.recordManual(type, color, reference, angle);
-}
 const DOT_STORAGE_KEY = 'balance-chart-dot-sets-v1';
 const ROTATION_STORAGE_KEY = 'balance-chart-rotation-v1';
 const MAX_DOTS = 14;
@@ -579,23 +575,30 @@ function renderForecastStatus(context = getCurrentForecastContext()) {
 function renderForecastInformation(context, state) {
   const forecast = context?.forecast, target = context?.target;
   const displayPoints = forecast ? getForecastDisplayPoints(forecast) : [];
-  for (const [color, id, label] of [['red', 'hovForecastResult', 'HOV'], ['blue', 'cruiseForecastResult', '巡航']]) {
+  for (const [color, id] of [['red', 'hovForecastResult'], ['blue', 'cruiseForecastResult']]) {
+    const result = document.getElementById(id);
+    const arrow = result.querySelector('.forecast-trend-arrow');
+    const change = result.querySelector('.forecast-change');
+    const value = result.querySelector('.forecast-value');
+    const limit = result.querySelector('.forecast-limit');
     const point = displayPoints.find(point => point.color === color && [point.x, point.y].every(Number.isFinite));
-    let result = target && !target[color] ? '欠測' : '算出不能';
-    if (color === 'red' && forecast?.type === 'TAB' && target.red) result = '対象外（TAB）';
-    if (point) {
-      // 生成済みの予測終点を表示単位へ変換するだけ。予測・学習・順位の再計算はしない。
+    // 表示だけで現在IPSと生成済み予測IPSを比較する。判定は丸める前の値を使う。
+    const current = target?.[color]?.radius;
+    const available = point && Number.isFinite(current);
+    result.dataset.trend = 'none';
+    change.textContent = '予測なし';
+    arrow.textContent = value.textContent = limit.textContent = '';
+    arrow.hidden = value.hidden = limit.hidden = !available;
+    result.title = target && !target[color] ? '欠測' : color === 'red' && forecast?.type === 'TAB' ? '対象外（TAB）' : '';
+    if (available) {
       const endpoint = Math.hypot(point.x - CHART_CENTER_X, point.y - CHART_CENTER_Y) / CHART_RADIUS;
-      result = `${endpoint.toFixed(2)} IPS`;
-      if (point.savedValues) result += '（保存済み予測）';
-      if (color === 'red' && forecast.type === 'LINK' && pitchAutoMode && target.red) {
-        const start = getDotCoordinates(target.red);
-        if (endpoint > Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS) {
-          result += `（悪化・${endpoint > BalanceLinkRanking.limit ? '0.2 IPS超' : '0.2 IPS以内'}）`;
-        }
-      }
+      const trend = endpoint < current ? ['improved', '↓', '改善']
+        : endpoint > current ? ['worsened', '↑', '悪化'] : ['unchanged', '→', '変化なし'];
+      result.dataset.trend = trend[0]; arrow.textContent = trend[1]; change.textContent = trend[2];
+      value.textContent = `${endpoint.toFixed(2)} IPS`;
+      // 0.2以内かどうかは増減と別の行に表示し、改善と合格を混同しない。
+      limit.textContent = endpoint <= BalanceLinkRanking.limit ? '0.2 IPS以内' : '0.2 IPS超';
     }
-    document.getElementById(id).textContent = `${label}予測：${result}`;
   }
   const notice = document.getElementById('forecastSelectionNotice');
   notice.hidden = true;
@@ -686,6 +689,7 @@ function loadRotation() {
 }
 
 function saveRotation() {
+  if (currentChartPage === 0 && !pitchAutoMode) manualPitchInitialized = true;
   pageRotations[currentChartPage] = currentChartPage === 0
     ? { ...manualPitchAngles }
     : { hovAngle, cruiseAngle: manualTrimCruiseAngle };
@@ -694,13 +698,24 @@ function saveRotation() {
   } catch {
     // 保存領域を利用できない場合は、この表示中だけ回転角を保持する。
   }
+  globalThis.balanceSaveState?.();
 }
 
 loadRotation();
 Object.assign(manualPitchAngles, pageRotations[0]);
+manualPitchInitialized = appStorage.getItem(ROTATION_STORAGE_KEY) !== null;
 manualTrimCruiseAngle = pageRotations[1].cruiseAngle;
 Object.assign(autoPitchAngles, manualPitchAngles);
 autoTrimCruiseAngle = manualTrimCruiseAngle;
+
+function restoreManualPitchRotation() {
+  if (!manualPitchInitialized) {
+    Object.assign(manualPitchAngles, initialChartRotations[0] ?? { hovAngle: 0, cruiseAngle: 0 });
+    manualPitchInitialized = true;
+  }
+  pageRotations[0] = { ...manualPitchAngles };
+  if (currentChartPage === 0) applyChartRotation(manualPitchAngles.hovAngle, manualPitchAngles.cruiseAngle);
+}
 
 function updatePitchModeUI() {
   pitchModeToggle.disabled = adjustmentLock?.page === 0;
@@ -715,15 +730,9 @@ function updatePitchModeUI() {
 
 pitchModeToggle.addEventListener('click', () => {
   if (adjustmentLock?.page === 0) return;
-  manualMessageChanges = { red: false, blue: false };
-  Object.assign(manualPitchAngles, { hovAngle, cruiseAngle });
-  Object.assign(autoPitchAngles, { hovAngle, cruiseAngle });
-  for (const color of ['red', 'blue']) lastAutoRotation.LINK[color] = getLearnedRotation('LINK', color) ?? getLatestLinkSyncAngle(color);
-  if (pitchAutoMode) Object.assign(manualLearningReference.LINK, { red: hovAngle, blue: cruiseAngle });
-  else manualLearningReference.LINK = {};
   pitchAutoMode = !pitchAutoMode;
   if (pitchAutoMode) syncAutoPitchRotation();
-  else applyChartRotation(manualPitchAngles.hovAngle, manualPitchAngles.cruiseAngle);
+  else restoreManualPitchRotation();
   updatePitchModeUI();
   renderDirectionLines();
 });
@@ -738,10 +747,8 @@ function updateTrimModeUI() {
 
 trimModeToggle.addEventListener('click', () => {
   if (adjustmentLock?.page === 1) return;
-  manualMessageChanges = { red: false, blue: false };
   manualTrimCruiseAngle = autoTrimCruiseAngle = cruiseAngle;
   lastAutoRotation.TAB.blue = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
-  manualLearningReference.TAB = trimAutoMode ? { blue: cruiseAngle } : {};
   trimAutoMode = !trimAutoMode;
   if (trimAutoMode) syncAutoTrimRotation();
   else applyCruiseRotation(manualTrimCruiseAngle);
@@ -754,13 +761,13 @@ function showChartPage(page) {
   saveAdjustmentSelection();
   guideCandidateIndices[currentChartPage] = guideCandidateIndex;
   saveRotation();
-  manualMessageChanges = { red: false, blue: false };
   currentChartPage = page;
   guideCandidateIndex = guideCandidateIndices[page];
   restoreAdjustmentSelection();
   dotOverlay.classList.toggle('trim-tab', page === 1);
   ({ hovAngle, cruiseAngle } = pageRotations[page]);
   if (page === 0 && pitchAutoMode) syncAutoPitchRotation();
+  if (page === 0 && !pitchAutoMode) restoreManualPitchRotation();
   if (page === 1 && trimAutoMode) syncAutoTrimRotation();
   const svgDocument = chartObject.contentDocument;
   if (svgDocument) {
@@ -1082,18 +1089,14 @@ function applyChartRotation(redAngle, blueAngle) {
 
 function syncAutoPitchRotation() {
   if (!pitchAutoMode) return;
-  const nextAngles = currentChartPage === 0 ? { hovAngle, cruiseAngle } : { ...pageRotations[0] };
+  const nextAngles = { ...(initialChartRotations[0] ?? { hovAngle: 0, cruiseAngle: 0 }) };
   for (const [color, key] of [['red', 'hovAngle'], ['blue', 'cruiseAngle']]) {
     const angle = getLearnedRotation('LINK', color) ?? getLatestLinkSyncAngle(color);
     pitchAutoReady[color] = angle !== null;
-    if (!restoringAppState && angle !== null && angle !== lastAutoRotation.LINK[color]) {
-      autoPitchAngles[key] = angle;
-      nextAngles[key] = autoPitchAngles[key];
-    }
-    lastAutoRotation.LINK[color] = angle;
+    if (Number.isFinite(angle)) nextAngles[key] = angle;
   }
   if (restoringAppState) return;
-  Object.assign(manualPitchAngles, nextAngles);
+  Object.assign(autoPitchAngles, nextAngles);
   pageRotations[0] = { ...nextAngles };
   if (currentChartPage === 0) applyChartRotation(nextAngles.hovAngle, nextAngles.cruiseAngle);
   updatePitchModeUI();
@@ -1759,7 +1762,6 @@ function restoreInputs(inputs, values) {
 
 function cancelEditing() {
   if (adjustmentForecast?.phase === 'preview') { adjustmentForecast = null; renderAdjustmentForecast(); }
-  actualAdjustment.checked = adjustmentLock?.actualAdjustment ?? false;
   if (resultEdit) restoreInputs([...redInputs, ...blueInputs], resultEdit.draft);
   if (adjustmentEdit) {
     memoValues.splice(0, 4, ...adjustmentEdit.draft);
@@ -1784,15 +1786,13 @@ function updateEditingUI() {
   resultEditMessage.textContent = resultEdit ? `結果${dotSets.indexOf(resultEdit.set) + 1}を編集中` : '';
   adjustmentEditMessage.textContent = adjustmentEdit ? `結果${dotSets.indexOf(adjustmentEdit.set) + 1}の調整量を編集中` : '';
   addAdjustmentButton.textContent = adjustmentEdit ? '調整量を更新' : '調整量を追加';
-  addAdjustmentButton.disabled = actualAdjustment.disabled = Boolean(adjustmentLock);
-  if (adjustmentLock) actualAdjustment.checked = adjustmentLock.actualAdjustment;
+  addAdjustmentButton.disabled = Boolean(adjustmentLock);
   rotationLock.disabled = adjustmentLock?.page === currentChartPage;
 }
 
 function releaseAdjustmentLock() {
   if (!adjustmentLock) return;
   adjustmentLock = null;
-  actualAdjustment.checked = false;
   resetSharedAdjustmentAmounts();
   restoreAdjustmentSelection();
   adjustmentMessage.textContent = '';
@@ -2185,7 +2185,6 @@ dotForm.addEventListener('submit', (event) => {
       return;
     }
     target.blue = blue;
-    learning.acceptMeasurement(dotSets, target.learningId, ['blue']);
     compareAdjustmentForecast(target);
     saveDotSets();
     finishCruiseAddition();
@@ -2210,7 +2209,6 @@ dotForm.addEventListener('submit', (event) => {
   }
 
   dotSets.push({ learningId: newLearningId(), red, blue, adjustments: [] });
-  learning.acceptMeasurement(dotSets, dotSets.at(-1).learningId);
   compareAdjustmentForecast(dotSets.at(-1));
   releaseAdjustmentLock();
   selectedAdjustmentTarget = null;
@@ -2241,11 +2239,6 @@ adjustmentForm.addEventListener('submit', (event) => {
     return;
   }
   const targetSet = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
-  if (actualAdjustment.checked && (targetSet !== dotSets.at(-1)
-    || (targetSet.adjustments?.length ?? 0) - Number(adjustmentEdit?.set === targetSet) !== 0)) {
-    adjustmentMessage.textContent = '実調整の学習指定は、最新の結果に対する単一の調整だけに設定できます。';
-    return;
-  }
   if (adjustmentEdit) {
     const { set, adjustment } = adjustmentEdit;
     const index = set.adjustments?.indexOf(adjustment) ?? -1;
@@ -2257,8 +2250,6 @@ adjustmentForm.addEventListener('submit', (event) => {
       targetSet.adjustments ??= [];
       targetSet.adjustments.push([...memoValues]);
     }
-    if (actualAdjustment.checked) learning.arm(dotSets, targetSet.learningId);
-    else learning.disarm(targetSet.learningId);
     saveDotSets();
     cancelEditing();
     renderDots();
@@ -2267,12 +2258,10 @@ adjustmentForm.addEventListener('submit', (event) => {
   updateAdjustmentForecast(memoValues, true);
   targetSet.adjustments ??= [];
   targetSet.adjustments.push([...memoValues]);
-  if (actualAdjustment.checked) learning.arm(dotSets, targetSet.learningId);
-  else learning.disarm(targetSet.learningId);
   saveAdjustmentSelection();
   adjustmentLock = { page: currentChartPage, values: [...memoValues], rank: guideCandidateIndex,
     guideBlade: String(guideNumberChoices[guideCandidateIndex]?.blade ?? '—'),
-    targetId: targetSet.learningId, actualAdjustment: actualAdjustment.checked };
+    targetId: targetSet.learningId, actualAdjustment: false };
   memoPicker.hidden = true;
   activeMemoIndex = null;
   saveDotSets();
@@ -2326,6 +2315,11 @@ function setupRotationControls() {
     if (rotationFrame !== null) cancelAnimationFrame(rotationFrame);
     rotationFrame = null;
     if (!activeRotation || !pendingPointer) return;
+    if (rotationLocked || rotationLock.checked || (currentChartPage === 0 && pitchAutoMode)
+      || (currentChartPage === 1 && trimAutoMode && activeRotation.name === 'cruise')) {
+      pendingPointer = null;
+      return;
+    }
     const angle = activeRotation.startGroupAngle + getPointerAngle(pendingPointer) - activeRotation.startPointerAngle;
     pendingPointer = null;
     if (activeRotation.name === 'hov') {
@@ -2361,7 +2355,6 @@ function setupRotationControls() {
     if (!activeRotation || event.pointerId !== activeRotation.pointerId) return;
     flushRotation();
     activeRotation.handle.style.cursor = 'grab';
-    if (rotationChanged) recordManualLearning(activeRotation.name === 'hov' ? 'red' : 'blue', activeRotation.name === 'hov' ? hovAngle : cruiseAngle);
     activeRotation = null;
     if (rotationChanged) saveRotation();
     rotationChanged = false;
@@ -2429,14 +2422,8 @@ window.addEventListener('message', (event) => {
   }
   if (message?.type === 'balance-chart-rotation'
     && Number.isFinite(message.hovAngle) && Number.isFinite(message.cruiseAngle)) {
-    if (adjustmentLock?.page === currentChartPage || (currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
-    manualMessageChanges.red ||= hovAngle !== message.hovAngle;
-    manualMessageChanges.blue ||= cruiseAngle !== message.cruiseAngle;
-    if (message.finished) {
-      if (manualMessageChanges.red) recordManualLearning('red', message.hovAngle);
-      if (manualMessageChanges.blue) recordManualLearning('blue', message.cruiseAngle);
-      manualMessageChanges = { red: false, blue: false };
-    }
+    if (rotationLocked || rotationLock.checked || adjustmentLock?.page === currentChartPage
+      || (currentChartPage === 0 && pitchAutoMode) || (currentChartPage === 1 && trimAutoMode)) return;
     hovAngle = message.hovAngle;
     cruiseAngle = message.cruiseAngle;
     if (currentChartPage === 1) manualTrimCruiseAngle = cruiseAngle;

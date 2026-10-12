@@ -20,13 +20,13 @@
       dotList.children[${resultIndex}].querySelectorAll('${adjustmentIndex === null ? '.dot-result-row button' : '.dot-adjustment-row button'}')[${adjustmentIndex ?? 0}].click();
       deleteConfirmation.close('${confirm}');deleteConfirmation.dispatchEvent(new Event('close'));`);
     const snapshot = () => run(`JSON.stringify({lock:adjustmentLock,values:memoValues,
-      selections:adjustmentSelections,checked:actualAdjustment.checked,forecast:adjustmentForecast,
+      selections:adjustmentSelections,forecast:adjustmentForecast,
       dots:dotSets,models:learning.inspect().models,samples:learning.inspect().samples})`);
     const locked = (values, label) => {
       assert(run('Boolean(adjustmentLock)'), label + ': lock active');
       assert(run('JSON.stringify(memoValues)') === JSON.stringify(values), label + ': exact input retained');
       assert(run(`memoButtons.every(button=>button.disabled) && addAdjustmentButton.disabled
-        && actualAdjustment.disabled && adjustmentTarget.disabled`), label + ': both adjustment forms disabled');
+        && adjustmentTarget.disabled`), label + ': both adjustment forms disabled');
       assert(run(`currentChartPage===adjustmentLock.page
         ? guideCandidateToggle.disabled && (currentChartPage===0?pitchModeToggle:trimModeToggle).disabled && rotationLocked
         : !guideCandidateToggle.disabled && !(currentChartPage===0?pitchModeToggle:trimModeToggle).disabled && !rotationLock.disabled`), label + ': chart operations follow added side');
@@ -58,7 +58,7 @@
       const values = run('[...memoValues]');
       const rank = run('guideCandidateIndex');
       const buttonLabel = run('guideCandidateToggle.textContent');
-      run(`actualAdjustment.checked=${mode === 'learned'};adjustmentForm.requestSubmit()`);
+      run('adjustmentForm.requestSubmit()');
       locked(values, type + '/' + mode + ' add');
       assert(run('guideCandidateToggle.textContent') === buttonLabel, 'No label stays as it was at add');
       assert(run('guideCandidateIndex') === rank, 'rank stays as it was at add');
@@ -104,6 +104,7 @@
       run(`showChartPage(${1-page});
         if(currentChartPage===0?pitchAutoMode:trimAutoMode)(currentChartPage===0?pitchModeToggle:trimModeToggle).click();
         window.otherAngles=[hovAngle+7,cruiseAngle+11];
+        rotationLock.checked=false;updateRotationLock();
         window.dispatchEvent(new MessageEvent('message',{source:chartObject.contentWindow,
           data:{type:'balance-chart-rotation',hovAngle:otherAngles[0],cruiseAngle:otherAngles[1],finished:true}}));`);
       assert(run('hovAngle===otherAngles[0] && cruiseAngle===otherAngles[1]'), 'other chart manual rotation works normally');
@@ -115,7 +116,7 @@
       const originalAction = run('JSON.stringify(dotSets.at(-1).adjustments.at(-1))');
       measure();
       assert(run(`!adjustmentLock && !addAdjustmentButton.disabled && !memoButtons[2].disabled
-        && !actualAdjustment.disabled && !guideCandidateToggle.disabled && !rotationLock.disabled`), 'new measurement unlocks both types');
+        && !guideCandidateToggle.disabled && !rotationLock.disabled`), 'new measurement unlocks both types');
       assert(run(`getSharedAdjustmentAmount(0)==='1/4' && getSharedAdjustmentAmount(1)==='1'`), 'defaults reset only after next measurement');
       assert(run('JSON.stringify(dotSets.at(-2).adjustments.at(-1))') === originalAction, 'unlock leaves adjustment history intact');
       assert(run('JSON.parse(appStorage.getItem(BalanceState.uiKey)).adjustmentLock===null'), 'unlock is saved immediately');
@@ -130,7 +131,7 @@
       select(2, page ? '2' : '1/2');select(0, '2');select(3, 'DOWN');
       const recordsBeforeDelete = run('JSON.stringify(dotSets)');
       const learningBeforeDelete = run('JSON.stringify([learning.inspect().models,learning.inspect().samples])');
-      run(`actualAdjustment.checked=${mode === 'learned'};adjustmentForm.requestSubmit()`);
+      run('adjustmentForm.requestSubmit()');
       assert(run('Boolean(adjustmentLock)'), 'add before deletion locks');
       await reload();
       const deletionSnapshot = snapshot();
@@ -139,7 +140,7 @@
       assert(snapshot() === deletionSnapshot, 'deletion cancellation preserves lock and data');
       run(`showChartPage(${1-page})`);
       remove(targetIndex, 0);
-      assert(run(`!adjustmentLock && !addAdjustmentButton.disabled && !actualAdjustment.disabled
+      assert(run(`!adjustmentLock && !addAdjustmentButton.disabled
         && !adjustmentTarget.disabled && !rotationLock.disabled && !memoButtons[0].disabled
         && !memoButtons[2].disabled && !memoButtons[3].disabled && !guideCandidateToggle.disabled`), 'confirmed deletion immediately unlocks both types');
       assert(run('JSON.parse(appStorage.getItem(BalanceState.uiKey)).adjustmentLock===null'), 'deletion saves unlocked state immediately');
@@ -163,7 +164,7 @@
     // 既存結果への巡航追加入力では固定し続け、対象削除では解除する。
     run(`learning.reset([]);dotSets.splice(0);selectedAdjustmentTarget=null;showChartPage(0);
       redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');
-      dotForm.requestSubmit();actualAdjustment.checked=false;adjustmentForm.requestSubmit();`);
+      dotForm.requestSubmit();adjustmentForm.requestSubmit();`);
     assert(run('Boolean(adjustmentLock)'), 'HOV-only result locks');
     run(`startCruiseAddition(dotSets.at(-1));blueInputs.forEach((input,i)=>input.value=['5','0','0.3'][i]);dotForm.requestSubmit()`);
     assert(run('Boolean(adjustmentLock) && dotSets.length===1 && Boolean(dotSets[0].blue)'), 'adding Cruise to existing result keeps lock');
@@ -181,7 +182,7 @@
     measure();
     run(`adjustmentTarget.value='0';adjustmentTarget.dispatchEvent(new Event('change',{bubbles:true}));
       dotSets[0].adjustments.push([...memoValues]);dotSets[1].adjustments.push(['3','TAB','1','UP']);
-      actualAdjustment.checked=false;adjustmentForm.requestSubmit();showChartPage(1);adjustmentForm.requestSubmit()`);
+      adjustmentForm.requestSubmit();showChartPage(1);adjustmentForm.requestSubmit()`);
     assert(run('adjustmentLock?.targetId===dotSets[0].learningId && dotSets[0].adjustments.length===2 && dotSets[1].adjustments.length===1'), 'historical target cannot bypass mutual exclusion');
     remove(1, 0);
     assert(run('Boolean(adjustmentLock) && dotSets[0].adjustments.length===2'), 'deleting unrelated adjustment keeps lock');

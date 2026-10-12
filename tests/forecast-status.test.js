@@ -86,7 +86,7 @@
       }
 
       setup(page, true);
-      run('actualAdjustment.checked=false;adjustmentForm.requestSubmit()');
+      run('adjustmentForm.requestSubmit()');
       expect('learned', type + ': added adjustment');
       assert(run('Boolean(adjustmentLock)'), type + ': addition remains locked');
       const learningBefore = run('JSON.stringify([learning.inspect().models,learning.inspect().samples])');
