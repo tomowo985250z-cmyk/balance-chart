@@ -284,6 +284,9 @@ object {
 .guide-candidate-toggle, .trim-mode-toggle { height: 44px; bottom: 66px; font-family: inherit; }
 .guide-candidate-toggle { left: 14px; right: auto; }
 .guide-candidate-toggle { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
+.trim-mode-toggle { flex-direction: column; justify-content: center; gap: 0; padding-block: 2px; line-height: 20px; }
+.trim-mode-toggle > span { white-space: nowrap; }
+.rotation-mode-status { font-size: 13px; line-height: 16px; }
 .trim-mode-toggle[hidden] { display: none; }
 .trim-mode-toggle[aria-pressed='true'] { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
 .pitch-mode-toggle[aria-pressed='true'] { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
@@ -458,7 +461,8 @@ object {
 .dot-list .add-cruise-button { color: #1259a8; background: #edf5ff; border-color: #92b4dc; }
 .dot-memo { color: #24733e; font-weight: 700; }
 .dot-list .dot-adjustment-row button { font-size: 14px; }
-.rotation-lock { min-height: 44px; border-radius: 8px; border-color: #8b9bb0; font-weight: 700; }
+.rotation-lock { min-height: 44px; border-radius: 8px; border-color: #8b9bb0; font-size: 16px; font-weight: 800; white-space: nowrap; }
+.trim-mode-toggle { font-size: 15px; }
 .guide-toggle[aria-pressed='true'], .rotation-lock:has(input:checked) { background: #eaf3ff; border-color: #1f5faa; }
 .time-picker-title { font-size: 18px; font-weight: 800; color: #172b42; }
 .time-wheel-option { font-family: inherit; font-weight: 600; }
@@ -525,14 +529,14 @@ object {
     justify-content: center;
     gap: 6px;
     padding: 6px 8px;
-    font-size: 13px;
+    font-size: 16px;
     width: calc(50% - 15px);
   }
 
   .guide-toggle { left: 10px; right: auto; }
   .guide-candidate-toggle { left: 10px; right: auto; width: 100px; }
   .guide-candidate-toggle, .trim-mode-toggle { bottom: 64px; }
-  .trim-mode-toggle { width: calc(100% - 130px); padding: 2px 6px; font-size: 12px; line-height: 20px; }
+  .trim-mode-toggle { width: calc(100% - 130px); gap: 0; padding: 2px 6px; font-size: 15px; line-height: 20px; }
 
   .dot-form {
     gap: 8px;

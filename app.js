@@ -719,13 +719,24 @@ function restoreManualPitchRotation() {
   if (currentChartPage === 0) applyChartRotation(manualPitchAngles.hovAngle, manualPitchAngles.cruiseAngle);
 }
 
+function setRotationModeLabel(button, label, waiting = '') {
+  const main = document.createElement('span');
+  main.textContent = label;
+  button.replaceChildren(main);
+  if (waiting) {
+    const status = document.createElement('span');
+    status.className = 'rotation-mode-status';
+    status.textContent = `（${waiting}）`;
+    button.append(status);
+  }
+}
+
 function updatePitchModeUI() {
   pitchModeToggle.disabled = adjustmentLock?.page === 0;
   pitchModeToggle.hidden = currentChartPage !== 0;
   const waiting = [!pitchAutoReady.red && 'HOV', !pitchAutoReady.blue && '巡航'].filter(Boolean);
-  pitchModeToggle.textContent = pitchAutoMode
-    ? `赤・青六角形：自動${waiting.length ? `（${waiting.join('・')}待ち）` : ''}`
-    : '赤・青六角形：手動';
+  setRotationModeLabel(pitchModeToggle, `赤・青六角形：${pitchAutoMode ? '自動' : '手動'}`,
+    pitchAutoMode && waiting.length ? `${waiting.join('・')}待ち` : '');
   pitchModeToggle.setAttribute('aria-pressed', String(pitchAutoMode));
   updateRotationLock();
 }
@@ -742,7 +753,8 @@ pitchModeToggle.addEventListener('click', () => {
 function updateTrimModeUI() {
   trimModeToggle.disabled = adjustmentLock?.page === 1;
   trimModeToggle.hidden = currentChartPage !== 1;
-  trimModeToggle.textContent = `紫六角形：${trimAutoMode ? (trimAutoReady ? '自動' : '自動（条件待ち）') : '手動'}`;
+  setRotationModeLabel(trimModeToggle, `紫六角形：${trimAutoMode ? '自動' : '手動'}`,
+    trimAutoMode && !trimAutoReady ? '条件待ち' : '');
   trimModeToggle.setAttribute('aria-pressed', String(trimAutoMode));
   updateRotationLock();
 }
