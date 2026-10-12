@@ -67,7 +67,13 @@ body {
 .dot-set-blue label { color: #0057c8; }
 .memo-set { display: flex; gap: 7px; color: #30343b; }
 .memo-set legend { padding: 0 4px; font-weight: 700; }
-.memo-wheel-trigger { display: flex; align-items: flex-start; justify-content: center; white-space: pre-line; min-width: 58px; background: #fff; color: #30343b; }
+.memo-wheel-trigger { display: grid; grid-template-rows: 14px 1fr; align-items: center; justify-items: center; gap: 4px; min-width: 58px; background: #fff; color: #30343b; }
+.memo-number { font-size: 11px; line-height: 14px; font-weight: 600; white-space: nowrap; }
+.memo-selection { display: grid; grid-template-rows: 24px 14px; justify-items: center; min-width: 0; }
+.memo-value { font-size: 20px; line-height: 24px; font-weight: 800; white-space: nowrap; }
+#memoFour .memo-value { font-size: clamp(16px, 4.8vw, 20px); }
+.memo-unit { font-size: 11px; line-height: 14px; white-space: nowrap; }
+.memo-set .memo-wheel-trigger { padding: 6px 4px; }
 .memo-wheel-trigger:disabled { color: #77808d; border-color: #c8cdd5; background: #f1f3f6; }
 
 .dot-form input,
@@ -95,9 +101,9 @@ body {
 .adjustment-form > button { min-height: 36px; background: #1f5faa; color: #fff; border-color: #1f5faa; font-weight: 700; cursor: pointer; }
 .dot-message { margin: 0; color: #b00020; font-size: 13px; }
 
-.dot-list { display: flex; flex-direction: column; flex-wrap: nowrap; min-width: 0; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.dot-list { display: flex; flex-direction: column; flex-wrap: nowrap; min-width: 0; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .dot-list:empty { display: none; }
-.dot-list li { display: flex; flex-direction: column; align-items: stretch; min-width: 0; max-width: 100%; gap: 4px; padding: 0; font-size: 14px; }
+.dot-list li { display: flex; flex-direction: column; align-items: stretch; min-width: 0; max-width: 100%; gap: 2px; padding: 0; font-size: 14px; }
 .dot-result-row, .dot-adjustment-row { display: flex; align-items: center; gap: 7px; }
 .dot-result-row { min-width: 0; flex-flow: row nowrap; gap: 3px; white-space: nowrap; overflow-x: auto; }
 .dot-result-row > span { flex: 1 0 auto; width: auto; white-space: nowrap; }
@@ -113,6 +119,7 @@ body {
 #cancelCruiseAddition[hidden], #cruiseAdditionMessage[hidden] { display: none; }
 .dot-label-red { color: #b00000; font-weight: 700; }
 .dot-label-blue { color: #0057c8; font-weight: 700; }
+.dot-clock-angle { margin-inline-start: 3px; }
 
 .chart-wrap {
   position: relative;
@@ -216,6 +223,14 @@ object {
 #dotOverlay.trim-tab .latest-ring-blue { stroke: #7b2cbf; }
 .forecast-body { fill: currentColor; stroke: white; stroke-width: 2; }
 .forecast-learning-notice { margin: 2px 0; font-size: 12px; color: #596573; flex-basis: 100%; }
+.forecast-information { flex-basis: 100%; min-width: 0; }
+.forecast-results { display: grid; gap: 4px; font-size: 13px; line-height: 1.5; color: #30343b; }
+.forecast-results p { margin: 0; }
+.forecast-details { margin-top: 6px; color: #596573; font-size: 12px; }
+.forecast-details summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 44px; cursor: pointer; list-style: none; }
+.forecast-details summary::-webkit-details-marker { display: none; }
+.forecast-details[open] summary span { transform: rotate(90deg); }
+.forecast-details summary:focus-visible { outline: 2px solid #336da7; outline-offset: 2px; }
 .historical-learning { margin: 10px 0; font-size: 13px; }
 .historical-learning summary { position: relative; cursor: pointer; }
 .historical-learning-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #ccd3dc; }
@@ -419,7 +434,7 @@ object {
 .results-heading { margin: 0; padding: 9px 12px; border-left: 5px solid #45414f; border-radius: 6px; background: #e2e0e7; color: #292631; font-size: 18px; font-weight: 800; }
 .results-heading:has(+ .dot-list:empty) { display: none; }
 .dot-list li { color: #172b42; }
-.dot-result-row { padding: 4px 6px; box-shadow: inset 0 0 0 2px #aaa6b4; border-radius: 8px; background: #f8f7fa; }
+.dot-result-row { padding: 2px 6px; box-shadow: inset 0 0 0 2px #aaa6b4; border-radius: 8px; background: #f8f7fa; }
 .dot-result-row > span { font-weight: 700; }
 .dot-list li.result-within-limit > .dot-result-row { box-shadow: inset 0 0 0 4px #e07818, 0 0 9px rgb(224 120 24 / 32%); }
 .dot-list li.result-hov-within-limit > .dot-result-row { box-shadow: inset 0 0 0 2px #e07818, 0 0 6px rgb(224 120 24 / 12%); }
@@ -492,14 +507,21 @@ object {
     right: 10px;
     bottom: 10px;
     min-height: 44px;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    width: calc(50% - 15px);
   }
 
   .guide-toggle { left: 10px; right: auto; }
-  .guide-candidate-toggle { left: 10px; right: auto; }
+  .guide-candidate-toggle { left: 10px; right: auto; width: 100px; }
   .guide-candidate-toggle, .trim-mode-toggle { bottom: 64px; }
+  .trim-mode-toggle { width: calc(100% - 130px); padding: 2px 6px; font-size: 12px; line-height: 20px; }
 
   .dot-form {
     gap: 8px;
+    padding-block: 10px;
     border-radius: 0;
     box-shadow: none;
   }
@@ -511,10 +533,11 @@ object {
 
   .dot-set {
     flex: 1 1 100%;
+    padding-block: 5px;
   }
 
   .memo-set { flex: 1 1 100%; }
-  .memo-wheel-trigger { flex: 1 1 0; min-height: 44px; }
+  .memo-set .memo-wheel-trigger { flex: 1 1 0; min-width: 0; min-height: 72px; }
 
   .dot-set label, .clock-angle {
     flex: 1 1 0;
@@ -541,17 +564,18 @@ object {
     padding: 0 6px;
   }
   .dot-list li { font-size: 14px; }
-  .dot-result-row { padding: 4px; }
+  .dot-result-row { padding: 2px 4px; }
   .dot-adjustment-row { padding-inline: 4px; }
   .dot-list .dot-result-row button { font-size: 14px; }
 }
 
 @media (max-width: 382px) {
-  .guide-candidate-toggle { left: 4px; }
-  .trim-mode-toggle { right: 4px; max-width: calc(100% - 100px); }
+  .guide-candidate-toggle { left: 10px; }
+  .trim-mode-toggle { right: 10px; max-width: calc(100% - 130px); }
 }
 
 @media (max-width: 360px) {
+  .dot-clock-angle { margin-inline-start: 1px; }
   .trim-mode-toggle { padding-block: 1px; line-height: 20px; }
   .dot-list li, .dot-list .dot-result-row button, .dot-list .dot-adjustment-row button { font-size: 13px; }
 }

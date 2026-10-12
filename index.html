@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20261012-forecast-status" />
+    <link rel="stylesheet" href="style.css?v=20261012-ui-refinement" />
   </head>
   <body>
   <main class="app">
@@ -59,7 +59,17 @@ LINK</button>
       <button id="cancelAdjustmentEdit" type="button" hidden>編集をキャンセル</button>
       <p id="adjustmentEditMessage" class="edit-message" aria-live="polite" hidden></p>
       <p id="adjustmentMessage" class="dot-message" aria-live="polite"></p>
-      <p id="forecastLearningNotice" class="forecast-learning-notice" aria-live="polite" hidden></p>
+      <div id="forecastLearningNotice" class="forecast-information" aria-live="polite">
+        <div class="forecast-results">
+          <p id="hovForecastResult">HOV予測：算出不能</p>
+          <p id="cruiseForecastResult">巡航予測：算出不能</p>
+        </div>
+        <p id="forecastSelectionNotice" class="forecast-learning-notice" hidden></p>
+        <details id="forecastDetails" class="forecast-details">
+          <summary>予測について <span aria-hidden="true">▸</span></summary>
+          <p id="forecastCaution" class="forecast-learning-notice">予測の実測精度は未検証です。</p>
+        </details>
+      </div>
     </form>
 
     <details class="historical-learning">
@@ -175,7 +185,7 @@ LINK</button>
   <script src="learning.js?v=20260920-distance-prior"></script>
   <script src="distance-prior.js?v=20260921-tab-monotonic-distance"></script>
   <script src="link-ranking.js?v=20261012-link-two-stage"></script>
-  <script src="app.js?v=20261012-forecast-status"></script>
+  <script src="app.js?v=20261012-ui-refinement"></script>
   <script src="app-state.js?v=20261012-delete-forecast-refresh"></script>
 </body>
 </html>

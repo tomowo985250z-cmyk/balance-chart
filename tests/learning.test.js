@@ -1071,7 +1071,7 @@
     assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===1,'available color keeps its forecast');
     assert(run('adjustmentForecast.points[0].source==="learned"'),'available learned distance takes precedence over reference estimate');
     run('learning.predict=()=>({distance:24,position:{x:450,y:520}}); renderDots();');
-    assert(run('document.getElementById("forecastLearningNotice").hidden && dotOverlay.querySelectorAll(".forecast-body").length===1'),'ready preview automatically replaces notice for available guide');
+    assert(run('!document.getElementById("forecastLearningNotice").hidden && !document.getElementById("forecastDetails").open && dotOverlay.querySelectorAll(".forecast-body").length===1'),'ready preview keeps results visible with caution initially collapsed');
     run('currentChartPage=0; memoValues[1]="LINK"; renderDots(); updateAdjustmentForecast();');
     assert(run('adjustmentForecast.points.length===2'),'LINK restores independent red and blue guides');
     run('learning.predict=(type,color)=>color==="red"?null:{distance:24}; updateAdjustmentForecast();');

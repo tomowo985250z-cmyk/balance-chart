@@ -271,11 +271,30 @@ function restoreAdjustmentSelection() {
   updateMemoButtons();
 }
 
+function renderMemoButton(button, index) {
+  const number = document.createElement('span');
+  number.className = 'memo-number';
+  number.textContent = `${index + 1}：\n`;
+  const selection = document.createElement('span');
+  selection.className = 'memo-selection';
+  const value = document.createElement('span');
+  value.className = 'memo-value';
+  const unit = document.createElement('span');
+  unit.className = 'memo-unit';
+  value.textContent = formatMemoInputValue(memoValues[index], index);
+  if (index === 2 && memoValues[index]) {
+    value.textContent = memoValues[index];
+    unit.textContent = memoValues[1] === 'TAB' ? '度' : 'フラット';
+  }
+  selection.append(value, ...(unit.textContent ? [document.createTextNode(' ')] : []), unit);
+  button.replaceChildren(number, selection);
+}
+
 function updateMemoButtons() {
   if (adjustmentLock) {
     memoValues.splice(0, 4, ...adjustmentLock.values);
     memoButtons.forEach((button, index) => {
-      button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
+      renderMemoButton(button, index);
       button.disabled = true;
     });
     return;
@@ -286,14 +305,14 @@ function updateMemoButtons() {
   }
   memoValues[1] = currentChartPage === 0 ? 'LINK' : 'TAB';
   memoButtons.forEach((button, index) => {
-    button.textContent = `${index + 1}：\n${formatMemoInputValue(memoValues[index], index)}`;
+    renderMemoButton(button, index);
   });
   memoButtons[1].disabled = true;
   memoButtons[0].disabled = memoButtons[3].disabled = false;
   const thirdOptions = getThirdMemoOptions();
   memoButtons[2].disabled = false;
   if (!thirdOptions.includes(memoValues[2])) memoValues[2] = getSharedAdjustmentAmount();
-  memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
+  renderMemoButton(memoButtons[2], 2);
   saveAdjustmentSelection();
 }
 
@@ -315,11 +334,11 @@ function applySelectedGuideAdjustment(preserveFixed = false) {
   [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
     const index = [0, 1, 3][position];
     memoValues[index] = value;
-    memoButtons[index].textContent = `${index + 1}：\n${formatMemoInputValue(value, index)}`;
+    renderMemoButton(memoButtons[index], index);
   });
   const retainedForecast = preserveFixed && ['fixed', 'comparison'].includes(adjustmentForecast?.phase) && !selectingGuideNumber;
   memoValues[2] ||= getSharedAdjustmentAmount();
-  memoButtons[2].textContent = `3：\n${formatMemoInputValue(memoValues[2], 2)}`;
+  renderMemoButton(memoButtons[2], 2);
   saveAdjustmentSelection();
   if (retainedForecast) return;
   updateAdjustmentForecast(memoValues, false, false, false);
@@ -466,6 +485,7 @@ function invalidateAdjustmentForecast() {
   forecastDisplayCache.clear();
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
   renderForecastStatus();
+  renderForecastInformation(null, 'none');
 }
 
 function compareAdjustmentForecast(result) {
@@ -517,20 +537,27 @@ function getForecastDisplayPoints(forecast) {
   return points;
 }
 
-function renderForecastStatus() {
-  const status = document.getElementById('forecastStatus');
+function getCurrentForecastContext() {
   const forecast = adjustmentForecast;
+  if (!forecast) return null;
+  const values = [...memoValues];
+  if (!memoPicker.hidden && activeMemoIndex !== null) values[activeMemoIndex] = selectedMemoValue;
+  const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  if (target?.learningId !== forecast.targetId
+    || !values.every((value, index) => value && value === forecast.values[index])
+    || forecast.manualBlade || forecast.manualDirection
+    || (!adjustmentLock && guideNumberChoices.length && !guideNumberChoices[guideCandidateIndex]?.candidate)) return null;
+  return { forecast, target };
+}
+
+function renderForecastStatus(context = getCurrentForecastContext()) {
+  const status = document.getElementById('forecastStatus');
   let state = 'none';
-  if (forecast) {
-    const values = [...memoValues];
-    if (!memoPicker.hidden && activeMemoIndex !== null) values[activeMemoIndex] = selectedMemoValue;
-    const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  if (context) {
+    const { forecast, target } = context;
     const colors = forecast.type === 'TAB' ? ['blue'] : ['red', 'blue'];
     // 描画キャッシュではなく、現在の選択に対する算出結果と既存の学習済み判定だけを使う。
-    const available = target?.learningId === forecast.targetId && target.red && target.blue
-      && values.every((value, index) => value && value === forecast.values[index])
-      && !forecast.manualBlade && !forecast.manualDirection
-      && (adjustmentLock || !guideNumberChoices.length || guideNumberChoices[guideCandidateIndex]?.candidate)
+    const available = target.red && target.blue
       && ['red', 'blue'].every(color => {
         const point = getDotCoordinates(target[color]);
         return [point.x, point.y].every(Number.isFinite);
@@ -542,52 +569,64 @@ function renderForecastStatus() {
   }
   const [icon, label] = state === 'learned' ? ['●', '予測あり']
     : state === 'reference' ? ['▲', '参考推定'] : ['—', '予測なし'];
-  if (status.dataset.state === state) return;
+  if (status.dataset.state === state) return state;
   status.dataset.state = state;
   status.querySelector('.forecast-status-icon').textContent = icon;
   status.querySelector('.forecast-status-label').textContent = label;
+  return state;
+}
+
+function renderForecastInformation(context, state) {
+  const forecast = context?.forecast, target = context?.target;
+  const displayPoints = forecast ? getForecastDisplayPoints(forecast) : [];
+  for (const [color, id, label] of [['red', 'hovForecastResult', 'HOV'], ['blue', 'cruiseForecastResult', '巡航']]) {
+    const point = displayPoints.find(point => point.color === color && [point.x, point.y].every(Number.isFinite));
+    let result = target && !target[color] ? '欠測' : '算出不能';
+    if (color === 'red' && forecast?.type === 'TAB' && target.red) result = '対象外（TAB）';
+    if (point) {
+      // 生成済みの予測終点を表示単位へ変換するだけ。予測・学習・順位の再計算はしない。
+      const endpoint = Math.hypot(point.x - CHART_CENTER_X, point.y - CHART_CENTER_Y) / CHART_RADIUS;
+      result = `${endpoint.toFixed(2)} IPS`;
+      if (point.savedValues) result += '（保存済み予測）';
+      if (color === 'red' && forecast.type === 'LINK' && pitchAutoMode && target.red) {
+        const start = getDotCoordinates(target.red);
+        if (endpoint > Math.hypot(start.x - CHART_CENTER_X, start.y - CHART_CENTER_Y) / CHART_RADIUS) {
+          result += `（悪化・${endpoint > BalanceLinkRanking.limit ? '0.2 IPS超' : '0.2 IPS以内'}）`;
+        }
+      }
+    }
+    document.getElementById(id).textContent = `${label}予測：${result}`;
+  }
+  const notice = document.getElementById('forecastSelectionNotice');
+  notice.hidden = true;
+  notice.textContent = '';
+  const noticeColors = [...new Set([...(forecast?.waiting ?? []),
+    ...displayPoints.filter(point => point.savedValues).map(point => point.color)])];
+  if (forecast?.phase !== 'comparison' && noticeColors.length) {
+    notice.textContent = noticeColors.map(color => {
+      const saved = displayPoints.find(point => point.color === color)?.savedValues;
+      const label = color === 'red' ? 'HOV（赤）' : forecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）';
+      return saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
+    }).join(' ／ ');
+    notice.hidden = false;
+  }
+  document.getElementById('forecastCaution').textContent = (forecast && state !== 'learned'
+    ? '予測不確実（学習不足・参考推定または欠測）。' : '')
+    + '予測の実測精度は未検証です。'
+    + (currentChartPage === 0 && pitchAutoMode ? '0.18 IPSは参考目標です。' : '');
 }
 
 function renderAdjustmentForecast() {
-  renderForecastStatus();
+  const context = getCurrentForecastContext();
+  const state = renderForecastStatus(context);
+  renderForecastInformation(context, state);
   globalThis.balanceSaveState?.();
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
-  const notice = document.getElementById('forecastLearningNotice');
-  notice.hidden = true;
-  notice.textContent = '';
   if (guideNumberChoices.length && !guideNumberChoices[guideCandidateIndex]?.candidate) return;
   if (!adjustmentForecast) return;
   if (adjustmentForecast.manualBlade) return;
   if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
   const displayPoints = getForecastDisplayPoints(adjustmentForecast);
-  const noticeColors = [...new Set([...(adjustmentForecast.waiting ?? []),
-    ...displayPoints.filter(point => point.savedValues).map(point => point.color)])];
-  if (adjustmentForecast.phase !== 'comparison' && noticeColors.length) {
-    notice.textContent = noticeColors.map(color => {
-      const saved = displayPoints.find(point => point.color === color)?.savedValues;
-      const label = color === 'red' ? 'HOV（赤）' : adjustmentForecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）';
-      return saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
-    }).join(' ／ ');
-    notice.hidden = false;
-  }
-  if (currentChartPage === 0 && pitchAutoMode && adjustmentForecast.type === 'LINK') {
-    const target = dotSets.find(set => set.learningId === adjustmentForecast.targetId);
-    const uncertain = ['red', 'blue'].some(color => target?.[color]
-      && !adjustmentForecast.points.some(point => point.color === color && point.source === 'learned'));
-    const hov = adjustmentForecast.points.find(point => point.color === 'red');
-    const hovEndpoint = hov ? Math.hypot(hov.x - CHART_CENTER_X, hov.y - CHART_CENTER_Y) / CHART_RADIUS : null;
-    const hovStart = target.red ? getDotCoordinates(target.red) : null;
-    const currentHov = hovStart ? Math.hypot(hovStart.x - CHART_CENTER_X, hovStart.y - CHART_CENTER_Y) / CHART_RADIUS : null;
-    const details = [];
-    if (hovEndpoint !== null && currentHov !== null && hovEndpoint > currentHov) {
-      details.push(`HOV予測：悪化${hovEndpoint > BalanceLinkRanking.limit ? '（0.2 IPS超）' : '（0.2 IPS以内）'}`);
-    }
-    if (target.blue && !adjustmentForecast.points.some(point => point.color === 'blue')) details.push('巡航：予測欠測');
-    if (details.length) notice.textContent += `${notice.textContent ? ' ／ ' : ''}${details.join(' ／ ')}`;
-    const status = uncertain ? '予測不確実（学習不足・参考推定または欠測）。' : '';
-    notice.textContent += `${notice.textContent ? ' ／ ' : ''}${status}予測の実測精度は未検証です。0.18 IPSは参考目標です。`;
-    notice.hidden = false;
-  }
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
   if (!dotOverlay.classList.contains('guides-visible')) return;
   if (adjustmentForecast.manualDirection) return;
@@ -1889,7 +1928,10 @@ function renderDots() {
       if (dotIndex) label.append(' ／ ');
       const dotLabel = document.createElement('span');
       dotLabel.className = `dot-label-${dot.color}`;
-      dotLabel.textContent = `${dot.color === 'red' ? 'HOV' : '巡航'} ${dot.radius.toFixed(2)} ${dot.clock}`;
+      const clock = document.createElement('span');
+      clock.className = 'dot-clock-angle';
+      clock.textContent = dot.clock;
+      dotLabel.append(`${dot.color === 'red' ? 'HOV' : '巡航'} ${dot.radius.toFixed(2)} `, clock);
       label.append(dotLabel);
     });
     const remove = document.createElement('button');
