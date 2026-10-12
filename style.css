@@ -373,6 +373,17 @@ object {
   border-bottom: 1px solid #1f5faa;
   pointer-events: none;
 }
+/* 調整量の選択中は、背後の予測2列を明るいままホイールの上に見せる。 */
+.memo-amount-picker { background: transparent; }
+.memo-amount-picker .time-picker-panel { padding: 12px; }
+.memo-amount-picker .memo-wheel-window { height: 186px; }
+.memo-amount-picker .memo-wheel-window::after { top: 69px; }
+.memo-amount-picker .time-wheel { padding-block: 69px; }
+@media (max-height: 500px) {
+  .memo-amount-picker .memo-wheel-window { height: 140px; }
+  .memo-amount-picker .memo-wheel-window::after { top: 46px; }
+  .memo-amount-picker .time-wheel { padding-block: 46px; }
+}
 .time-wheel-window::after {
   content: '';
   position: absolute;

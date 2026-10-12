@@ -175,6 +175,7 @@ let activeMemoIndex = null;
 let selectedMemoValue = '';
 let memoPickerManualDirection = false;
 let memoPickerDirectionChanged = false;
+let memoPickerScrollY = null;
 const memoValues = ['', '', '', ''];
 const adjustmentSelections = Array.from({ length: 6 }, () => ['', '', '', '']);
 let selectedHour = 0;
@@ -357,6 +358,18 @@ function updateGuideSelectionVisibility(values) {
   layer.style.opacity = bladeChanged || directionChanged ? '0' : '';
 }
 
+function centerMemoOption(option, behavior = 'auto') {
+  const wheel = memoWheel.getBoundingClientRect(), bounds = option.getBoundingClientRect();
+  memoWheel.scrollTo({ top: memoWheel.scrollTop + bounds.top - wheel.top
+    - (memoWheel.clientHeight - bounds.height) / 2, behavior });
+}
+
+function selectMemoOption(option) {
+  selectedMemoValue = option.dataset.value;
+  previewMemoSelection();
+  memoWheel.querySelectorAll('.time-wheel-option').forEach(item => item.setAttribute('aria-selected', String(item === option)));
+}
+
 function renderMemoWheel(options, selected, index) {
   memoWheel.replaceChildren();
   options.forEach((value) => {
@@ -367,28 +380,26 @@ function renderMemoWheel(options, selected, index) {
     option.setAttribute('role', 'option');
     option.setAttribute('aria-selected', String(value === selected));
     option.textContent = formatMemoInputValue(value, index);
-    option.addEventListener('click', () => option.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    option.addEventListener('click', () => {
+      if (index === 2) selectMemoOption(option);
+      centerMemoOption(option, index === 2 ? 'instant' : 'smooth');
+    });
     memoWheel.append(option);
-    if (value === selected) requestAnimationFrame(() => option.scrollIntoView({ block: 'center' }));
+    if (value === selected) requestAnimationFrame(() => {
+      if (!memoPicker.hidden && activeMemoIndex === index && selectedMemoValue === selected) centerMemoOption(option);
+    });
   });
   memoWheel.onscroll = () => {
     if (memoPicker.hidden) return;
-    cancelAnimationFrame(memoWheel.selectionFrame);
-    memoWheel.selectionFrame = requestAnimationFrame(() => {
-      if (memoPicker.hidden) return;
-      const center = memoWheel.getBoundingClientRect().top + memoWheel.clientHeight / 2;
-      let closest = null;
-      let distance = Infinity;
-      memoWheel.querySelectorAll('.time-wheel-option').forEach((option) => {
-        const rect = option.getBoundingClientRect();
-        const optionDistance = Math.abs(rect.top + rect.height / 2 - center);
-        if (optionDistance < distance) { closest = option; distance = optionDistance; }
-      });
-      if (!closest) return;
-      selectedMemoValue = closest.dataset.value;
-      previewMemoSelection();
-      memoWheel.querySelectorAll('.time-wheel-option').forEach((option) => option.setAttribute('aria-selected', String(option === closest)));
+    const center = memoWheel.getBoundingClientRect().top + memoWheel.clientHeight / 2;
+    let closest = null;
+    let distance = Infinity;
+    memoWheel.querySelectorAll('.time-wheel-option').forEach((option) => {
+      const rect = option.getBoundingClientRect();
+      const optionDistance = Math.abs(rect.top + rect.height / 2 - center);
+      if (optionDistance < distance) { closest = option; distance = optionDistance; }
     });
+    if (closest && closest.dataset.value !== selectedMemoValue) selectMemoOption(closest);
   };
 }
 
@@ -405,9 +416,22 @@ function openMemoPicker(index) {
     : options.includes(String(guideValue)) ? String(guideValue) : options[0];
   selectedMemoValue = memoValues[index] || initialValue;
   memoPickerTitle.textContent = `調整量 ${index + 1} を選択`;
+  memoPicker.classList.toggle('memo-amount-picker', index === 2);
+  memoPickerScrollY = index === 2 ? window.scrollY : null;
   renderMemoWheel(options, selectedMemoValue, index);
   memoPicker.hidden = false;
   previewMemoSelection();
+  if (index === 2) {
+    // 予測は既存の2列表示を使い、ホイールの上で見比べられる位置へ移す。
+    const bounds = document.querySelector('.forecast-results').getBoundingClientRect();
+    window.scrollTo({ top: window.scrollY + bounds.top - 16, behavior: 'instant' });
+  }
+}
+
+function hideMemoPicker() {
+  memoPicker.hidden = true;
+  if (memoPickerScrollY !== null) window.scrollTo({ top: memoPickerScrollY, behavior: 'instant' });
+  memoPickerScrollY = null;
 }
 
 function previewMemoSelection() {
@@ -662,17 +686,17 @@ function renderAdjustmentForecast() {
 }
 
 memoButtons.forEach((button, index) => button.addEventListener('click', () => openMemoPicker(index)));
-closeMemoPicker.addEventListener('click', () => { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); });
+closeMemoPicker.addEventListener('click', () => { hideMemoPicker(); updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); });
 confirmMemoPicker.addEventListener('click', () => {
   if (adjustmentLock || activeMemoIndex === null) return;
   const manualDirection = memoPickerManualDirection || memoPickerDirectionChanged || (activeMemoIndex === 3 && selectedMemoValue !== memoValues[3]);
   memoValues[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1) memoValues[2] = '';
   updateMemoButtons();
-  memoPicker.hidden = true;
+  hideMemoPicker();
   updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), manualDirection);
 });
-memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { memoPicker.hidden = true; updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); } });
+memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { hideMemoPicker(); updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); } });
 updateMemoButtons();
 
 function loadRotation() {
