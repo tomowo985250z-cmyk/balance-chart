@@ -42,8 +42,29 @@
     for (const page of [0,1]) {
       const type=page?'TAB':'LINK';setup(page);visible(type);
       assert(run('!forecastDetails.open && !forecastCaution.checkVisibility()'), type + ': initial caution closed');
-      for (const width of [320,375,390,1000]) {
+      for (const width of [320,375,390,430,1000]) {
         frame.style.width=width+'px';await tick();
+        const closedHeight=run('adjustmentForm.offsetHeight');
+        assert(run(`(() => {
+          const target=adjustmentTarget.getBoundingClientRect(),badge=forecastStatus.getBoundingClientRect();
+          const summary=forecastDetails.querySelector('summary').getBoundingClientRect();
+          return target.right<=badge.left && badge.right<=summary.left && summary.right<=innerWidth
+            && Math.abs((summary.top+summary.bottom-target.top-target.bottom)/2)<1
+            && summary.width>=44 && summary.height>=44
+            && document.querySelector('.forecast-details-icon').checkVisibility()===${width<=400};
+        })()`), type+'/'+width+': disclosure beside status, icon at narrow widths, with a full tap area');
+        run('forecastDetails.querySelector("summary").click()');await tick();
+        assert(run(`(() => {
+          const caution=forecastCaution.getBoundingClientRect(),button=addAdjustmentButton.getBoundingClientRect();
+          const summary=forecastDetails.querySelector('summary').getBoundingClientRect();
+          return forecastDetails.open && forecastCaution.checkVisibility() && caution.top>=summary.bottom
+            && caution.left>=0 && caution.right<=innerWidth
+            && (button.top>=caution.bottom || button.left>=caution.right)
+            && document.documentElement.scrollWidth<=innerWidth;
+        })()`), type+'/'+width+': tap expands details in flow without covering controls or overflowing');
+        run('forecastDetails.querySelector("summary").click()');await tick();
+        assert(run('!forecastDetails.open && !forecastCaution.checkVisibility() && adjustmentForm.offsetHeight')===closedHeight,
+          type+'/'+width+': second tap closes details and restores compact height');
         for (const value of page?['1','2','3']:['1/8','1/4','1/3','1/2','2/3','3/4','1','2','3']) {
           amount(value);
           assert(run(`memoButtons.every((button,index)=>{

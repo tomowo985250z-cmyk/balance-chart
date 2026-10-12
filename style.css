@@ -240,10 +240,13 @@ object {
 #forecastSelectionNotice { min-height: 2lh; }
 #forecastSelectionNotice > span { display: block; }
 #forecastSelectionNotice[hidden] { display: block; visibility: hidden; }
-.forecast-details { margin-top: 6px; color: #596573; font-size: 12px; }
-.forecast-details summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 44px; cursor: pointer; list-style: none; }
+.forecast-details { grid-column: 1 / -1; color: #596573; font-size: 12px; }
+/* 操作領域だけを状態表示の横へ置き、詳細本文は行全体で高さを確保する。 */
+.forecast-details summary { position: absolute; top: 2px; right: 0; display: flex; align-items: center; justify-content: center; gap: 6px; width: var(--forecast-details-width); min-height: 44px; cursor: pointer; list-style: none; touch-action: manipulation; white-space: nowrap; }
 .forecast-details summary::-webkit-details-marker { display: none; }
-.forecast-details[open] summary span { transform: rotate(90deg); }
+.forecast-details[open] .forecast-details-arrow { transform: rotate(90deg); }
+.forecast-details-icon { display: none; }
+.forecast-details .forecast-learning-notice { margin: 4px 0 0; }
 .forecast-details summary:focus-visible { outline: 2px solid #336da7; outline-offset: 2px; }
 .historical-learning { margin: 10px 0; font-size: 13px; }
 .historical-learning summary { position: relative; cursor: pointer; }
@@ -636,7 +639,7 @@ object {
   font: inherit; font-size: 16px; font-weight: 700; touch-action: manipulation;
 }
 .delete-confirmation .confirm-delete-button { background: #45414f; border-color: #34303e; color: #fff; }
-.adjustment-target-row { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.adjustment-target-row { --forecast-details-width: 100px; position: relative; display: grid; grid-template-columns: minmax(150px, 1fr) auto var(--forecast-details-width); align-items: center; column-gap: 8px; min-width: 0; max-width: 100%; }
 .forecast-status {
   display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
   color: #737b85; font: 12px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; white-space: nowrap;
@@ -651,6 +654,14 @@ object {
   background: #fff; color: #292631;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 16px; font-weight: 700;
+}
+@media (max-width: 600px) {
+  .adjustment-target-row { width: 100%; }
+}
+@media (max-width: 400px) {
+  .adjustment-target-row { --forecast-details-width: 44px; }
+  .forecast-details-label, .forecast-details-arrow { display: none; }
+  .forecast-details-icon { display: inline; font-size: 18px; }
 }
 .delete-confirmation button:focus-visible { outline: 3px solid #71849b; outline-offset: 2px; }
 .edit-message { flex-basis: 100%; margin: 0; color: #45414f; font-size: 16px; font-weight: 800; }

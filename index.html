@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Balance Chart</title>
-    <link rel="stylesheet" href="style.css?v=20261012-readable-controls" />
+    <link rel="stylesheet" href="style.css?v=20261012-forecast-disclosure" />
   </head>
   <body>
   <main class="app">
@@ -53,6 +53,10 @@ LINK</button>
           title="予測根拠の充足状況です。実測精度を保証するものではありません。">
           <span class="forecast-status-icon" aria-hidden="true">—</span><span class="forecast-status-label">予測なし</span>
         </span>
+        <details id="forecastDetails" class="forecast-details">
+          <summary aria-label="予測について" title="予測について"><span class="forecast-details-label">予測について</span><span class="forecast-details-arrow" aria-hidden="true">▸</span><span class="forecast-details-icon" aria-hidden="true">ⓘ</span></summary>
+          <p id="forecastCaution" class="forecast-learning-notice">予測の実測精度は未検証です。</p>
+        </details>
       </div>
       <button id="addAdjustmentButton" type="submit">調整量を追加</button>
       <button id="cancelAdjustmentEdit" type="button" hidden>編集をキャンセル</button>
@@ -74,10 +78,6 @@ LINK</button>
           </p>
         </div>
         <p id="forecastSelectionNotice" class="forecast-learning-notice" hidden></p>
-        <details id="forecastDetails" class="forecast-details">
-          <summary>予測について <span aria-hidden="true">▸</span></summary>
-          <p id="forecastCaution" class="forecast-learning-notice">予測の実測精度は未検証です。</p>
-        </details>
       </div>
     </form>
 

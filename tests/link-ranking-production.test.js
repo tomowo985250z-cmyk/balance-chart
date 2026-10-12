@@ -161,8 +161,8 @@
             assert(expected===null?p.inwardProjection===null:near(p.inwardProjection,expected),
               'ranking direction metadata equals displayed guide, independent of travel');
           }
-          assert(run('document.getElementById("forecastLearningNotice").textContent.includes("実測精度は未検証")'), 'unverified real precision shown in existing notice');
-          if(normalized.predictions.some(p=>p.uncertain)) assert(run('document.getElementById("forecastLearningNotice").textContent.includes("予測不確実")'), 'uncertain estimate visible');
+          assert(run('document.getElementById("forecastCaution").textContent.includes("実測精度は未検証")'), 'unverified real precision shown in existing notice');
+          if(normalized.predictions.some(p=>p.uncertain)) assert(run('document.getElementById("forecastCaution").textContent.includes("予測不確実")'), 'uncertain estimate visible');
         }
       }
       run('updateAdjustmentForecast(memoValues,true);window.fixedProduction=JSON.stringify(adjustmentForecast);renderDirectionLines()');
