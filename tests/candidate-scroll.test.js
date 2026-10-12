@@ -55,7 +55,9 @@
           assert(run(`guideCandidateIndex===${(rank+1)%3}`),'candidate advances');
           for (const key of ['scroll','chart','button','height','document','focus']) {
             const stable=typeof before[key]==='number'?Math.abs(before[key]-after[key])<1:before[key]===after[key];
-            if (!stable) shifts.push({width,page,mode,position,i,key,before,after});
+            const compactDelta=Math.abs(before.height-after.height);
+            if (!stable && (typeof before[key]!=='number' || compactDelta<1
+              || Math.abs(before[key]-after[key])>compactDelta+1)) shifts.push({width,page,mode,position,i,key,before,after});
             checks++;
           }
           assert(run('guideCandidateToggle.textContent.endsWith(String(guideNumberChoices[guideCandidateIndex].blade))'), 'button shows selected No');
@@ -66,7 +68,7 @@
         }
       }
     }
-    // Missing predictions and the longest saved-point notices must occupy the same rows.
+    // Outside the picker, missing predictions and hidden notices must collapse without blank rows.
     for (const width of [320,375,390,1000]) {
       frame.style.width=width+'px'; await tick();
       run(`showChartPage(0);document.getElementById('forecastDetails').open=false;`);
@@ -86,10 +88,17 @@
             }));
         })()`),'equal forecast columns remain centered');
         assert(run(`(() => {const note=document.getElementById('forecastSelectionNotice');
-          return [...note.children].every(row=>row.offsetHeight<=parseFloat(getComputedStyle(note).minHeight)/2+1);
-        })()`),'longest saved notice fits one reserved line per color');
+          return note.hidden ? note.offsetHeight===0 : getComputedStyle(note).minHeight==='0px'
+            && Math.abs(note.offsetHeight-[...note.children].reduce((height,row)=>height+row.offsetHeight,0))<=1;
+        })()`),'only visible notice text occupies space');
+        assert(run(`(() => {
+          const info=forecastLearningNotice.getBoundingClientRect(),results=document.querySelector('.forecast-results').getBoundingClientRect();
+          return forecastSelectionNotice.hidden ? Math.abs(info.bottom-results.bottom)<1
+            : info.bottom-forecastSelectionNotice.getBoundingClientRect().bottom<=2;
+        })()`),'forecast area ends immediately after visible content');
       }
-      assert(heights.every(height=>height===heights[0]),'missing and saved forecasts keep equal form heights');
+      assert(heights[0]<Math.min(heights[1],heights[2]) && Math.max(heights[1],heights[2])<heights[3],
+        'missing and shorter forecast notices use only the height they need');
     }
     assert(!shifts.length,JSON.stringify(shifts.slice(0,3),null,2));
     output.textContent=`PASS: ${checks} checks`;document.title='PASS';frame.remove();

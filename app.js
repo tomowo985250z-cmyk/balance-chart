@@ -176,6 +176,8 @@ let selectedMemoValue = '';
 let memoPickerManualDirection = false;
 let memoPickerDirectionChanged = false;
 let memoPickerScrollY = null;
+let memoPickerBackground = null;
+let memoPickerTouchY = 0;
 const memoValues = ['', '', '', ''];
 const adjustmentSelections = Array.from({ length: 6 }, () => ['', '', '', '']);
 let selectedHour = 0;
@@ -407,6 +409,7 @@ function openMemoPicker(index) {
   if (adjustmentLock || index === 1) return;
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
+  if (memoPickerBackground) hideMemoPicker();
   activeMemoIndex = index;
   memoPickerManualDirection = Boolean(adjustmentForecast?.manualDirection);
   memoPickerDirectionChanged = false;
@@ -423,14 +426,28 @@ function openMemoPicker(index) {
   previewMemoSelection();
   if (index === 2) {
     // 予測は既存の2列表示を使い、ホイールの上で見比べられる位置へ移す。
+    const body = document.body;
+    memoPickerBackground = { style: body.getAttribute('style'), x: window.scrollX };
+    body.style.width = `${document.documentElement.clientWidth}px`;
+    document.documentElement.classList.add('amount-selection-open');
     const bounds = document.querySelector('.forecast-results').getBoundingClientRect();
     window.scrollTo({ top: window.scrollY + bounds.top - 16, behavior: 'instant' });
+    // iOSでも背景をスクロールさせず、元の横幅・見た目を保持する。
+    Object.assign(body.style, { position: 'fixed', top: `${-window.scrollY}px`,
+      left: `${-window.scrollX}px`, overflow: 'hidden' });
   }
 }
 
 function hideMemoPicker() {
   memoPicker.hidden = true;
-  if (memoPickerScrollY !== null) window.scrollTo({ top: memoPickerScrollY, behavior: 'instant' });
+  if (memoPickerBackground) {
+    if (memoPickerBackground.style === null) document.body.removeAttribute('style');
+    else document.body.setAttribute('style', memoPickerBackground.style);
+    document.documentElement.classList.remove('amount-selection-open');
+  }
+  if (memoPickerScrollY !== null) window.scrollTo({ left: memoPickerBackground?.x ?? window.scrollX,
+    top: memoPickerScrollY, behavior: 'instant' });
+  memoPickerBackground = null;
   memoPickerScrollY = null;
 }
 
@@ -697,6 +714,23 @@ confirmMemoPicker.addEventListener('click', () => {
   updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), manualDirection);
 });
 memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { hideMemoPicker(); updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); } });
+memoPicker.addEventListener('touchstart', event => {
+  if (event.touches.length === 1) memoPickerTouchY = event.touches[0].clientY;
+}, { passive: true });
+memoPicker.addEventListener('touchmove', event => {
+  if (memoPicker.hidden || activeMemoIndex !== 2 || event.touches.length !== 1) return;
+  const delta = event.touches[0].clientY - memoPickerTouchY;
+  memoPickerTouchY = event.touches[0].clientY;
+  if (!memoWheel.contains(event.target)
+    || (delta > 0 && memoWheel.scrollTop <= 0)
+    || (delta < 0 && memoWheel.scrollTop + memoWheel.clientHeight >= memoWheel.scrollHeight - 1)) event.preventDefault();
+}, { passive: false });
+memoPicker.addEventListener('wheel', event => {
+  if (!memoPicker.hidden && activeMemoIndex === 2 && !memoWheel.contains(event.target)) event.preventDefault();
+}, { passive: false });
+new MutationObserver(() => {
+  if (memoPicker.hidden && memoPickerBackground) hideMemoPicker();
+}).observe(memoPicker, { attributes: true, attributeFilter: ['hidden'] });
 updateMemoButtons();
 
 function loadRotation() {
@@ -2300,7 +2334,7 @@ adjustmentForm.addEventListener('submit', (event) => {
   adjustmentLock = { page: currentChartPage, values: [...memoValues], rank: guideCandidateIndex,
     guideBlade: String(guideNumberChoices[guideCandidateIndex]?.blade ?? '—'),
     targetId: targetSet.learningId, actualAdjustment: false };
-  memoPicker.hidden = true;
+  hideMemoPicker();
   activeMemoIndex = null;
   saveDotSets();
   updateMemoButtons();

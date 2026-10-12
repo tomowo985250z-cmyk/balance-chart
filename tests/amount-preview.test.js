@@ -29,6 +29,15 @@
     const stable=()=>run(`JSON.stringify([dotSets,learning.inspect(),memoValues,adjustmentSelections,
       guideNumberChoices,guideCandidateIndex,forecastGuides,
       BalanceState.keys.filter(key=>key!==ROTATION_STORAGE_KEY).map(key=>appStorage.getItem(key))])`);
+    const placement=()=>run(`JSON.stringify({scroll:scrollY,bodyTop:document.body.style.top,
+      boxes:[adjustmentForm,chartWrap,...document.querySelectorAll('.forecast-result > span')].map(node=>{
+        const rect=node.getBoundingClientRect();return [rect.x+rect.width/2,rect.y,rect.height];
+      })})`);
+    const samePlacement=(before,after=placement())=>{
+      const a=JSON.parse(before),b=JSON.parse(after);
+      return a.scroll===b.scroll && a.bodyTop===b.bodyTop
+        && a.boxes.every((box,index)=>box.every((value,axis)=>Math.abs(value-b.boxes[index][axis])<.1));
+    };
     const visible=label=>assert(run(`(() => {
       const results=document.querySelector('.forecast-results').getBoundingClientRect();
       const panel=memoPicker.querySelector('.time-picker-panel').getBoundingClientRect();
@@ -59,6 +68,15 @@
       const label=`${page?'TAB':'LINK'}/${learned?'learned':'reference'}/${width}x${height}`;
       const before=stable(),forecast=run('JSON.stringify(adjustmentForecast)'),scroll=run('scrollY');
       run('memoThree.click()');await tick();visible(label);matches(label);
+      const fixed=placement();
+      run('renderForecastInformation(null,"none")');
+      assert(samePlacement(fixed),label+': missing forecast keeps row positions while picker is open '+JSON.stringify({before:JSON.parse(fixed),after:JSON.parse(placement())}));
+      run('previewMemoSelection()');
+      assert(run('getComputedStyle(document.body).position==="fixed" && document.documentElement.classList.contains("amount-selection-open")'),label+': background fixed during amount selection');
+      run('window.scrollBy(0,200)');await tick();
+      assert(samePlacement(fixed),label+': background stays fixed on attempted page scroll');
+      assert(run(`(() => {const event=new WheelEvent('wheel',{deltaY:150,bubbles:true,cancelable:true});
+        memoPicker.dispatchEvent(event);return event.defaultPrevented;})()`),label+': backdrop wheel prevented');
       const values=page?['1','2','3']:['1/8','1/2','3'];
       const displays=[];
       for(const value of values) {
@@ -71,6 +89,7 @@
             selected:selectedMemoValue,forecast:adjustmentForecast?.values,aria:memoWheel.querySelector('[aria-selected="true"]')?.dataset.value,
             scroll:memoWheel.scrollTop,wheel:memoWheel.getBoundingClientRect(),options:[...memoWheel.children].map(node=>[node.dataset.value,node.getBoundingClientRect().top])})`));
         visible(label);matches(label);displays.push(run('cruiseForecastResult.textContent'));
+        assert(samePlacement(fixed),label+': forecast rows and background do not move as amount changes '+JSON.stringify({before:JSON.parse(fixed),after:JSON.parse(placement()),notice:run('forecastSelectionNotice.textContent')}));
         assert(stable()===before,label+': preview preserves committed selection, ranking, learning and records');
       }
       assert(new Set(displays).size>1,label+': amount changes produce different forecasts while picker is open');
@@ -80,9 +99,21 @@
       run('closeMemoPicker.click()');await tick();
       assert(stable()===before && run('JSON.stringify(adjustmentForecast)')===forecast,label+': cancel restores original forecast without committing amount');
       assert(Math.abs(run('scrollY')-scroll)<1,label+': close restores original page position');
+      assert(run('getComputedStyle(document.body).position!=="fixed" && !document.documentElement.classList.contains("amount-selection-open")'),label+': closing releases scroll lock');
+      assert(run(`(() => {
+        const result=document.querySelector('.forecast-results').getBoundingClientRect();
+        const info=forecastLearningNotice.getBoundingClientRect();
+        return !forecastSelectionNotice.hidden || Math.abs(info.bottom-result.bottom)<1;
+      })()`),label+': closed forecast area has no blank notice rows');
+      const restored=run('scrollY');run('scrollBy(0,40)');await tick();
+      assert(run('scrollY')!==restored,label+': page scroll works after close');
+      run(`scrollTo(0,${scroll})`);
       run(`memoThree.click();memoWheel.querySelector('[data-value="${values[1]}"]').click();confirmMemoPicker.click()`);await tick();
       assert(run(`memoPicker.hidden && memoValues[2]==='${values[1]}'
         && adjustmentSelections.slice(currentChartPage*3,currentChartPage*3+3).every(values=>values[2]==='${values[1]}')`),label+': confirm retains existing shared-amount behavior');
+      assert(run('!document.documentElement.classList.contains("amount-selection-open")'),label+': confirm releases background lock');
+      run('memoThree.click();memoPicker.click()');
+      assert(run('memoPicker.hidden && !document.documentElement.classList.contains("amount-selection-open")'),label+': backdrop dismissal releases background lock');
       run('openMemoPicker(3)');await tick();
       assert(run('!memoPicker.classList.contains("memo-amount-picker") && memoWheel.parentElement.getBoundingClientRect().height===240'),label+': other pickers retain their existing height and backdrop');
       run('closeMemoPicker.click()');
@@ -95,5 +126,5 @@
     } else frame.remove();
     output.textContent=`PASS: ${checks} checks — live amount preview, real scroll/tap, iPhone SE visibility, cancel/confirm and unchanged ranking/learning/storage`;
     document.title='PASS';
-  } catch(error) {output.textContent=`FAIL after ${checks} checks\n${error.stack}`;document.title='FAIL';}
+  } catch(error) {output.textContent=`FAIL after ${checks} checks\n${error.message}\n${error.stack}`;document.title='FAIL';}
 })();

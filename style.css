@@ -36,6 +36,7 @@ body {
   flex-wrap: wrap;
   gap: 10px;
   padding: 12px;
+  padding-bottom: 6px;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 3px 12px rgb(0 0 0 / 10%);
@@ -234,12 +235,13 @@ object {
 .forecast-value { font-size: clamp(16px, 5vw, 20px); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .forecast-limit { font-size: 11px; color: #707780; white-space: nowrap; }
 .forecast-result [hidden] { display: none; }
-/* No.切替で予測の有無が変わっても、チャート上方の行の高さを保つ。 */
+/* 通常時は非表示行を畳み、量の選択中だけ予測の行位置を保つ。 */
 .forecast-value, .forecast-limit { min-height: 1lh; }
-.forecast-value[hidden], .forecast-limit[hidden] { display: block; visibility: hidden; }
-#forecastSelectionNotice { min-height: 2lh; }
+.amount-selection-open .forecast-value[hidden], .amount-selection-open .forecast-limit[hidden] { display: block; visibility: hidden; }
 #forecastSelectionNotice > span { display: block; }
-#forecastSelectionNotice[hidden] { display: block; visibility: hidden; }
+#forecastSelectionNotice[hidden] { display: none; }
+html.amount-selection-open { overflow: hidden; overscroll-behavior: none; }
+.amount-selection-open body { overflow-anchor: none; overscroll-behavior: none; }
 .forecast-details { grid-column: 1 / -1; color: #596573; font-size: 12px; }
 /* 操作領域だけを状態表示の横へ置き、詳細本文は行全体で高さを確保する。 */
 .forecast-details summary { position: absolute; top: 2px; right: 0; display: flex; align-items: center; justify-content: center; gap: 6px; width: var(--forecast-details-width); min-height: 44px; cursor: pointer; list-style: none; touch-action: manipulation; white-space: nowrap; }
@@ -374,7 +376,7 @@ object {
   pointer-events: none;
 }
 /* 調整量の選択中は、背後の予測2列を明るいままホイールの上に見せる。 */
-.memo-amount-picker { background: transparent; }
+.memo-amount-picker { background: transparent; overscroll-behavior: none; }
 .memo-amount-picker .time-picker-panel { padding: 12px; }
 .memo-amount-picker .memo-wheel-window { height: 186px; }
 .memo-amount-picker .memo-wheel-window::after { top: 69px; }
@@ -660,7 +662,7 @@ object {
 .forecast-status-icon { font-size: 10px; }
 #adjustmentTarget {
   min-width: 0; flex: 0 1 auto;
-  min-height: 48px; max-width: 100%; padding: 10px 8px;
+  height: 48px; min-height: 48px; max-width: 100%; padding: 10px 8px;
   border: 1px solid #8b9bb0; border-radius: 8px;
   background: #fff; color: #292631;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;

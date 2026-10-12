@@ -52,7 +52,10 @@
             && Math.abs((summary.top+summary.bottom-target.top-target.bottom)/2)<1
             && summary.width>=44 && summary.height>=44
             && document.querySelector('.forecast-details-icon').checkVisibility()===${width<=400};
-        })()`), type+'/'+width+': disclosure beside status, icon at narrow widths, with a full tap area');
+        })()`), type+'/'+width+': disclosure beside status, icon at narrow widths, with a full tap area '+run(`JSON.stringify({
+          target:adjustmentTarget.getBoundingClientRect(),badge:forecastStatus.getBoundingClientRect(),
+          summary:forecastDetails.querySelector('summary').getBoundingClientRect(),
+          icon:document.querySelector('.forecast-details-icon').checkVisibility(),innerWidth})`));
         run('forecastDetails.querySelector("summary").click()');await tick();
         assert(run(`(() => {
           const caution=forecastCaution.getBoundingClientRect(),button=addAdjustmentButton.getBoundingClientRect();
@@ -189,5 +192,5 @@
     }
     output.textContent=`PASS: ${checks} checks — adjustment labels, forecast disclosure, input tap areas, chart controls and compact history with preserved text and delete buttons`;
     document.title='PASS';
-  } catch(error) { output.textContent=`FAIL after ${checks} checks\n${error.stack}`;document.title='FAIL'; }
+  } catch(error) { output.textContent=`FAIL after ${checks} checks\n${error.message}\n${error.stack}`;document.title='FAIL'; }
 })();
