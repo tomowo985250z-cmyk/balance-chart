@@ -40,6 +40,8 @@ const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
 let guideCandidateIndex = 0;
 const guideCandidateIndices = [0, 0];
+// 調整量の操作後は、順位ではなく現在のNoを次のNo操作まで追跡する。
+const retainedGuideNumbers = [null, null];
 let guideNumberChoices = [];
 let selectingGuideNumber = false;
 let adjustmentForecast = null; // 表示専用。学習・測定履歴には保存しない。
@@ -78,6 +80,8 @@ guideToggle.addEventListener('click', () => {
 });
 guideCandidateToggle.addEventListener('click', () => {
   if (adjustmentLock?.page === currentChartPage) return;
+  if (adjustmentEdit) adjustmentEdit.retainedGuideNumber = null;
+  else retainedGuideNumbers[currentChartPage] = null;
   saveAdjustmentSelection();
   guideCandidateIndex = (guideCandidateIndex + 1) % 3;
   guideCandidateIndices[currentChartPage] = guideCandidateIndex;
@@ -332,6 +336,7 @@ function applySelectedGuideAdjustment(preserveFixed = false) {
   if (!guide) return;
   [String(guide.blade), guide.type, guide.direction].forEach((value, position) => {
     const index = [0, 1, 3][position];
+    if (index === 0 && getRetainedGuideNumber()) return;
     memoValues[index] = value;
     renderMemoButton(memoButtons[index], index);
   });
@@ -340,7 +345,13 @@ function applySelectedGuideAdjustment(preserveFixed = false) {
   renderMemoButton(memoButtons[2], 2);
   saveAdjustmentSelection();
   if (retainedForecast) return;
-  updateAdjustmentForecast(memoValues, false, false, false);
+  updateAdjustmentForecast(memoValues, false, getRetainedGuideNumber() ? isManualBladeSelection(memoValues) : false, false);
+}
+
+function getRetainedGuideNumber() {
+  if (adjustmentEdit) return adjustmentEdit.retainedGuideNumber;
+  const retained = retainedGuideNumbers[currentChartPage];
+  return retained?.targetId === dotSets.at(-1)?.learningId ? retained : null;
 }
 
 function isManualBladeSelection(values) {
@@ -409,6 +420,14 @@ function openMemoPicker(index) {
   if (adjustmentLock || index === 1) return;
   const options = index === 2 ? getThirdMemoOptions() : MEMO_OPTIONS[index];
   if (!options.length) return;
+  if (index === 2 && dotSets.length && !getRetainedGuideNumber()) {
+    const retained = {
+      targetId: dotSets.at(-1).learningId,
+      blade: guideNumberChoices[guideCandidateIndex]?.blade
+    };
+    if (adjustmentEdit) adjustmentEdit.retainedGuideNumber = retained;
+    else retainedGuideNumbers[currentChartPage] = retained;
+  }
   if (memoPickerBackground) hideMemoPicker();
   activeMemoIndex = index;
   memoPickerManualDirection = Boolean(adjustmentForecast?.manualDirection);
@@ -706,6 +725,10 @@ memoButtons.forEach((button, index) => button.addEventListener('click', () => op
 closeMemoPicker.addEventListener('click', () => { hideMemoPicker(); updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); });
 confirmMemoPicker.addEventListener('click', () => {
   if (adjustmentLock || activeMemoIndex === null) return;
+  if (activeMemoIndex === 0) {
+    if (adjustmentEdit) adjustmentEdit.retainedGuideNumber = null;
+    else retainedGuideNumbers[currentChartPage] = null;
+  }
   const manualDirection = memoPickerManualDirection || memoPickerDirectionChanged || (activeMemoIndex === 3 && selectedMemoValue !== memoValues[3]);
   memoValues[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1) memoValues[2] = '';
@@ -1486,6 +1509,13 @@ function selectGuideNumberCandidate(candidates, selectBest) {
     if (!choices.some(choice => choice.blade === blade)) choices.push({ blade, candidate: null });
   }
   guideNumberChoices = candidates.length ? choices : [];
+  const retained = getRetainedGuideNumber();
+  const retainedIndex = retained ? guideNumberChoices.findIndex(choice => choice.blade === retained.blade) : -1;
+  if (retainedIndex >= 0) {
+    guideCandidateIndex = retainedIndex;
+    guideCandidateIndices[currentChartPage] = retainedIndex;
+    if (!restoringAppState) saveAdjustmentSelection();
+  }
   updateGuideCandidateToggle();
   return choices[guideCandidateIndex]?.candidate;
 }

@@ -44,8 +44,10 @@
         run('guideCandidateToggle.click()');
       }
       for (const amount of page ? ['2', '3', '1'] : ['1/2', '2/3', '1/8']) {
-        const rank = run('guideCandidateIndex');
+        const blade = run('memoValues[0]');
         selectAmount(amount);
+        assert(run('memoValues[0]') === blade, type+'/'+mode+': amount confirmation preserves selected No');
+        const rank = run('guideCandidateIndex');
         for (let cycle = 0; cycle < 3; cycle++) {
           run('guideCandidateToggle.click()');
           checkAmount(amount, type+'/'+mode+': changed amount follows every No');

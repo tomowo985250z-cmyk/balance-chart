@@ -1,5 +1,11 @@
 # 学習・既存操作の回帰テスト
 
+## 調整量変更時のNo.維持（2026-10-14）
+
+`amount-number.html?isolated=1` は、LINK/TAB・自動/手動/学習済み・全3順位・320/375/1000px幅で、調整量のプレビュー・確定・取消後も現在のNo.を維持することを検証する。順位の再計算と選択No.の追跡を分離し、再描画、ガイド切替、チャート往復、手動No.、履歴編集、HOV/巡航の予測計算、学習・保存済み履歴の不変性も確認する。既存の追加後固定・保存形式・起動時の量初期化は維持する。
+
+Edgeの全31群が通過。WebKitのiPhone SE環境では `amount-number,amount-preview,shared-amount,adjustment-lock,guide-numbers,guide-selection,state,link-ranking-production` の8群・5,096チェックが通過。追加テストは変更前の `app.js` では失敗することも確認した。既存 `learning` のiOS入力フォーカス検証（`learning.test.js:903`）は変更前・変更後とも失敗し、Edgeでは通過した。
+
 ## LINK 2段階順位の本番反映（2026-10-12）
 
 `link-ranking.js` に検証済みの改善証拠を区別する2段階方式を反映。各No.のUP/DOWNを選んでから、その3候補だけを順位付けする。両予測0.2以内を最優先し、HOV圏内では中心距離より巡航の改善予測・幾何学的可能性を評価する。巡航欠測と既知悪化を区別し、欠測を両達成扱いしない。HOV圏外は従来の回復基準を各段階に使用する。
