@@ -58,8 +58,8 @@
         const blade=adjustmentLock?.page===currentChartPage?Number(adjustmentLock.guideBlade):guideNumberChoices[guideCandidateIndex]?.blade;
         const expected=currentChartPage===1&&!!tabIntersectionHighlight?.winner&&tabIntersectionHighlight.winner.blade===blade;
         return (guideCandidateToggle.dataset.intersectionBest==='true')===expected
-          && parseFloat(getComputedStyle(guideCandidateToggle).borderTopWidth)===(expected?2:1);
-      })()`), label + ': exactly 2px only when displayed TAB No. matches nearest valid intersection');
+          && parseFloat(getComputedStyle(guideCandidateToggle).borderTopWidth)===(expected?4:1);
+      })()`), label + ': exactly 4px only when displayed TAB No. matches nearest valid intersection');
       assert(run(`(()=>{const b=guideCandidateToggle.getBoundingClientRect(),m=(currentChartPage?trimModeToggle:pitchModeToggle).getBoundingClientRect();return b.height===44&&m.height===44&&b.left>=0&&m.right<=innerWidth&&b.right<=m.left&&Math.abs(b.top-m.top)<.5&&guideCandidateToggle.scrollWidth<=guideCandidateToggle.clientWidth&&document.documentElement.scrollWidth<=innerWidth;})()`), label + ': original controls and mobile geometry unchanged');
       if (run('currentChartPage===1')) assert(run(`(()=>{
         const expected=[];
@@ -142,7 +142,7 @@
     }
     run('balanceFlushState()');loaded=new Promise(resolve=>frame.onload=resolve);frame.contentWindow.location.reload();await loaded;await tick();check('reload');
     assert(run('(()=>{BalanceState.validateRecords(JSON.parse(appStorage.exportText()).records);return true})()'), 'backup format unchanged');
-    output.textContent = `PASS: ${checks} checks — display-only intersection, independent legacy rank parity, original single-button cycling, 1px/2px border, manual/learned, origins/history/locks, no synthetic learning, reload and four mobile widths; ${valid} valid/${different} different in 160 generated fixtures`;
+    output.textContent = `PASS: ${checks} checks — display-only intersection, independent legacy rank parity, original single-button cycling, 1px/4px border, manual/learned, origins/history/locks, no synthetic learning, reload and four mobile widths; ${valid} valid/${different} different in 160 generated fixtures`;
     document.title='PASS';frame.remove();
   } catch (error) { output.textContent=`FAIL after ${checks} checks\n${error.stack}`;document.title='FAIL'; }
 })();

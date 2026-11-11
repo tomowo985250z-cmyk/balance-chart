@@ -294,7 +294,7 @@ html.amount-selection-open { overflow: hidden; overscroll-behavior: none; }
 .guide-candidate-toggle, .trim-mode-toggle { height: 44px; bottom: 66px; font-family: inherit; }
 .guide-candidate-toggle { left: 14px; right: auto; }
 .guide-candidate-toggle { background: #eaf3ff; border-color: #1f5faa; color: #184b83; }
-.guide-candidate-toggle[data-intersection-best='true'] { border-width: 2px; }
+.guide-candidate-toggle[data-intersection-best='true'] { border-width: 4px; }
 .trim-mode-toggle { flex-direction: column; justify-content: center; gap: 0; padding-block: 2px; line-height: 20px; }
 .trim-mode-toggle > span { white-space: nowrap; }
 .rotation-mode-status { font-size: 13px; line-height: 16px; }
