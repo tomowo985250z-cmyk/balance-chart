@@ -33,9 +33,9 @@
         window.savedDisplayGuides={...forecastGuides};
       `);
       assert(run('adjustmentForecast.points.some(p=>p.color==="blue")'), type + ' real calculation generates Cruise');
-      if (type === 'LINK') assert(run('adjustmentForecast.points.some(p=>p.color==="red")'), 'real calculation generates HOV');
+      assert(run('adjustmentForecast.points.some(p=>p.color==="red")'), type + ' real calculation generates HOV');
       for (const phase of ['preview', 'fixed', 'comparison']) {
-        for (const color of type === 'LINK' ? ['blue', 'red'] : ['blue']) {
+        for (const color of ['blue', 'red']) {
           for (const condition of ['direction', 'blade', 'missing', 'hidden', 'transparent', 'removed', 'matching-rotated']) {
             run(`
               adjustmentForecast.phase='${phase}';
@@ -57,9 +57,11 @@
               }
               renderAdjustmentForecast();
             `);
-            assert(run('dotOverlay.querySelectorAll(".forecast-body").length===adjustmentForecast.points.length'), `${type}/${phase}/${color}/${condition}: all generated dots rendered`);
+            const hidden = ['hidden','transparent','removed'].includes(condition);
+            assert(run('dotOverlay.querySelectorAll(".forecast-body").length')===run('adjustmentForecast.points.length')-(hidden?1:0), `${type}/${phase}/${color}/${condition}: dots follow guide visibility`);
             assert(run(`(()=>{const p=adjustmentForecast.points.find(p=>p.color==='${color}');
               const node=dotOverlay.querySelector('.adjustment-forecast [data-color=${color}]');
+              if (${hidden}) return !node;
               const matrix=node.transform.baseVal.getItem(0).matrix;
               return Math.abs(matrix.e-p.x)<0.0001 && Math.abs(matrix.f-p.y)<0.0001;
             })()`), 'fallback preserves generated coordinates');
@@ -69,22 +71,23 @@
         }
       }
       assert(run('JSON.stringify(learning.inspect())===learningSnapshot && JSON.stringify({...localStorage})===storageSnapshot'), 'render never changes learning or storage');
-      run(`memoValues.splice(0,4,...adjustmentForecast.values); updateMemoButtons(); applySelectedGuideAdjustment();
+      run(`forecastGuides={...savedDisplayGuides};
+        memoValues.splice(0,4,...adjustmentForecast.values); updateMemoButtons(); applySelectedGuideAdjustment();
         window.directionLearning=JSON.stringify(learning.inspect());
         window.directionPoints=JSON.stringify(adjustmentForecast.points); memoFour.click();`);
       assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' opening direction picker keeps automatic dots');
       run(`selectedMemoValue=memoValues[3]==='UP'?'DOWN':'UP'; previewMemoSelection();`);
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), type + ' manual direction preview hides dots');
+      assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' manual direction preview shows recalculated dots');
       run('selectedMemoValue=memoValues[3]; previewMemoSelection();');
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), type + ' returning direction within picker stays hidden');
+      assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' returning direction within picker restores visible dots');
       run('closeMemoPicker.click();');
       assert(run('Boolean(dotOverlay.querySelector(".forecast-body")) && JSON.stringify(adjustmentForecast.points)===directionPoints'), type + ' cancel restores original dots and coordinates');
       run(`memoFour.click(); selectedMemoValue=memoValues[3]==='UP'?'DOWN':'UP'; confirmMemoPicker.click();`);
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), type + ' confirmed manual direction hides dots');
+      assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' confirmed manual direction shows recalculated dots');
       run('renderAdjustmentForecast();');
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), type + ' redraw keeps manually changed dots hidden');
+      assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' redraw keeps manually changed dots visible');
       run(`memoFour.click(); selectedMemoValue=memoValues[3]==='UP'?'DOWN':'UP'; confirmMemoPicker.click();`);
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), type + ' manually returning to original direction stays hidden');
+      assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' manually returning to original direction restores dots');
       run('applySelectedGuideAdjustment();');
       assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), type + ' recalculation restores dots');
       assert(run('JSON.stringify(learning.inspect())===directionLearning'), type + ' manual direction does not change learning');

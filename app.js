@@ -31,9 +31,10 @@ let initialChartRotations = [null, null];
 const autoPitchAngles = { hovAngle: 0, cruiseAngle: 0 };
 let trimAutoMode = true;
 let trimAutoReady = false;
+let trimHovAutoReady = false;
 let manualTrimCruiseAngle = 0;
 let autoTrimCruiseAngle = 0;
-// 紫六角形は従来どおり、同じ自動角度で表示位置を巻き戻さない。
+// TABの両六角形は、同じ自動角度で表示位置を巻き戻さない。
 const lastAutoRotation = { TAB: {} };
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
@@ -49,8 +50,224 @@ const forecastDisplayCache = new Map(); // 候補切替で失われない表示�
 let forecastGuides = {}; // 描画済みの選択線だけを予想ドット表示へ渡す。
 let renderingDirectionLines = false;
 let evaluatedLinkAmount = null;
-// 次の新規測定が登録されるまで、両種別で共有する追加待ちロック。
+// 実測結果の登録まで、確定した画面だけを重複追加から保護する。
 let adjustmentLock = null;
+let adjustmentSequence = null;
+// 表示・次回計算専用。実測履歴や学習用の測定には書き込まない。
+let confirmedCarry = null;
+
+function colorMeasurementSignature(dot) {
+  return dot ? JSON.stringify([dot.clock, dot.angle, dot.radius]) : null;
+}
+
+function latestActualFor(color, target) {
+  const index = dotSets.indexOf(target);
+  const set = dotSets.slice(0, index + 1).findLast(item => item[color]);
+  return set ? { id: set.learningId, dot: set[color], signature: colorMeasurementSignature(set[color]) } : null;
+}
+
+function saveConfirmedCarry(stage) {
+  const target = dotSets.find(set => set.learningId === stage.targetId);
+  confirmedCarry = { targetId: stage.targetId, actionIndex: stage.actionIndex, values: [...stage.values],
+    points: structuredClone(stage.forecast.points), observed: {} };
+  for (const color of ['red', 'blue']) {
+    const actual = latestActualFor(color, target);
+    confirmedCarry.observed[color] = actual ? { id: actual.id, signature: actual.signature } : null;
+  }
+  if (stage.observed) confirmedCarry.observed = structuredClone(stage.observed);
+  else stage.observed = structuredClone(confirmedCarry.observed);
+}
+
+function restoreConfirmedCarry() {
+  if (!confirmedCarry && adjustmentSequence?.stages.length) saveConfirmedCarry(adjustmentSequence.stages.at(-1));
+}
+
+function carriedStartSet(target) {
+  if (!target || !confirmedCarry || dotSets.indexOf(target) < dotSets.findIndex(set => set.learningId === confirmedCarry.targetId)) return target;
+  const result = { ...target, originSources: {} };
+  for (const color of ['red', 'blue']) {
+    const actual = latestActualFor(color, target), previous = confirmedCarry.observed[color];
+    const sourceIndex = dotSets.findIndex(set => set.learningId === confirmedCarry.targetId);
+    const fresh = actual && (actual.id === previous?.id ? actual.signature !== previous.signature
+      : dotSets.findIndex(set => set.learningId === actual.id) >= sourceIndex);
+    if (fresh) {
+      result[color] = actual.dot;
+      result.originSources[color] = { kind: 'actual', measurementId: actual.id };
+    } else {
+      const point = confirmedCarry.points.find(item => item.color === color);
+      result[color] = point ? { clock: target[color]?.clock ?? '12:00', color,
+        angle: Math.atan2(point.x - CHART_CENTER_X, CHART_CENTER_Y - point.y) * 180 / Math.PI,
+        radius: Math.hypot(point.x - CHART_CENTER_X, point.y - CHART_CENTER_Y) / CHART_RADIUS } : null;
+      if (point) result.originSources[color] = { kind: 'confirmed', measurementId: confirmedCarry.targetId };
+    }
+  }
+  return result;
+}
+
+function getOriginSnapshot(start) {
+  return Object.fromEntries(['red', 'blue'].filter(color => start?.[color]).map(color => [color, {
+    kind: start.originSources?.[color]?.kind ?? 'actual',
+    measurementId: start.originSources?.[color]?.measurementId ?? start.learningId,
+    dot: structuredClone(start[color])
+  }]));
+}
+
+function getSequenceTargetId() {
+  return getSequenceStage()?.targetId ?? adjustmentSequence?.currentTargetId ?? adjustmentSequence?.targetId;
+}
+
+function renderAdjustmentOrigins() {
+  const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  const start = getAdjustmentStartSet(target), origins = getOriginSnapshot(start);
+  const status = document.getElementById('adjustmentOriginStatus');
+  status.hidden = !Object.values(origins).some(origin => origin.kind === 'confirmed');
+  status.textContent = status.hidden ? '' : '調整起点：' + ['red', 'blue'].map(color =>
+    `${color === 'red' ? 'HOV' : '巡航'} ${origins[color]?.kind === 'confirmed' ? '確定予測を引継ぎ' : origins[color] ? '実測' : '未取得'}`).join(' ／ ');
+  dotOverlay.querySelector('.inherited-origins')?.remove();
+  if (status.hidden || !dotOverlay.classList.contains('guides-visible')) return;
+  const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  layer.setAttribute('class', 'inherited-origins');
+  for (const [color, origin] of Object.entries(origins)) {
+    if (origin.kind !== 'confirmed') continue;
+    const point = getDotCoordinates(origin.dot);
+    if (adjustmentSequence?.stages.some(stage => stage.forecast.points.some(saved => saved.color === color
+      && Math.hypot(saved.x - point.x, saved.y - point.y) < 1e-8))) continue;
+    const group = document.createElementNS(layer.namespaceURI, 'g');
+    group.dataset.color = color; group.dataset.source = 'confirmed';
+    group.setAttribute('transform', `translate(${point.x} ${point.y})`);
+    group.style.color = DOT_COLORS[color];
+    const title = document.createElementNS(layer.namespaceURI, 'title');
+    title.textContent = `${color === 'red' ? 'HOV' : '巡航'}：確定予測から引き継いだ調整起点`;
+    const body = document.createElementNS(layer.namespaceURI, 'path');
+    body.setAttribute('d', 'M 0 -7 L 7 0 L 0 7 L -7 0 Z');body.setAttribute('class', 'first-stage-forecast-body');
+    const ring = document.createElementNS(layer.namespaceURI, 'circle');
+    ring.setAttribute('r', '12');ring.setAttribute('class', 'forecast-glow');
+    group.append(title, ring, body);layer.append(group);
+  }
+  dotOverlay.append(layer);
+}
+
+function getSequenceStage(page = currentChartPage) {
+  const index = adjustmentSequence?.active?.[page];
+  return Number.isInteger(index) ? adjustmentSequence.stages[index] ?? null : null;
+}
+
+function restoreLegacyAdjustmentSequence() {
+  if (adjustmentSequence) {
+    if (!adjustmentSequence.flow) {
+      adjustmentSequence.active = {};
+      adjustmentSequence.stages.forEach((stage, index) => { adjustmentSequence.active[stage.page] = index; });
+      adjustmentSequence.flow = true;
+    }
+    adjustmentLock = getSequenceStage();
+    return;
+  }
+  if (!adjustmentLock) return;
+  const target = dotSets.find(set => set.learningId === adjustmentLock.targetId);
+  const actionIndex = target?.adjustments?.findLastIndex(values =>
+    JSON.stringify(values) === JSON.stringify(adjustmentLock.values)) ?? -1;
+  if (actionIndex < 0) return;
+  const saved = adjustmentLock.forecast ?? adjustmentForecast;
+  const forecast = saved?.targetId === target.learningId
+    && JSON.stringify(saved.values) === JSON.stringify(adjustmentLock.values)
+    ? { ...structuredClone(saved), phase: 'fixed' }
+    : { targetId: target.learningId, type: adjustmentLock.values[1], values: [...adjustmentLock.values],
+      phase: 'fixed', points: [], waiting: ['red', 'blue'] };
+  adjustmentSequence = { targetId: target.learningId, measurements: getMeasurementSignature(target),
+    stages: [{ ...adjustmentLock, actionIndex, forecast }], active: { [adjustmentLock.page]: 0 }, flow: true, draft: null };
+  adjustmentLock = getSequenceStage();
+  if (!adjustmentLock) {
+    adjustmentForecast = null;
+    restoreAdjustmentSelection();
+  }
+  updateEditingUI();
+  updateSequenceMessage();
+}
+
+function getAdjustmentStartSet(target = dotSets.at(-1)) {
+  const stage = getSequenceStage();
+  if (stage) target = dotSets.find(set => set.learningId === stage.targetId) ?? target;
+  if (stage?.origins) return { ...target, red: stage.origins.red?.dot ?? null, blue: stage.origins.blue?.dot ?? null,
+    originSources: Object.fromEntries(Object.entries(stage.origins).map(([color, origin]) => [color, { kind: origin.kind, measurementId: origin.measurementId }])) };
+  return stage ? target : carriedStartSet(target);
+}
+
+function saveSequenceDraft() {
+  if (adjustmentSequence && !adjustmentLock && !restoringAppState) {
+    adjustmentSequence.draft = { page: currentChartPage, forecast: structuredClone(adjustmentForecast) };
+  }
+}
+
+function updateSequenceMessage() {
+  if (!adjustmentSequence) return;
+  const pages = Object.keys(adjustmentSequence.active ?? {});
+  adjustmentMessage.textContent = pages.length === 2
+    ? 'LINK・TABの調整を確定しました。次の実測結果を入力すると、新しい調整を開始できます。'
+    : pages.length === 1
+      ? `${pages[0] === '0' ? 'LINK' : 'TAB'}の調整を確定しました。必要なら${pages[0] === '0' ? 'TAB' : 'LINK'}も続けて調整できます。そのまま次の実測結果を入力してもかまいません。`
+      : '新しい実測結果を起点に調整できます。未取得の項目は直前の確定予測を引き継ぎます。';
+}
+
+function getMeasurementSignature(set) {
+  return JSON.stringify(['red', 'blue'].map(color => set?.[color]
+    ? [set[color].clock, set[color].angle, set[color].radius] : null));
+}
+
+function renderFirstStageForecast() {
+  dotOverlay.querySelector('.first-stage-forecast')?.remove();
+  const stages = adjustmentSequence?.stages;
+  if (!stages?.length) return;
+  const ns = 'http://www.w3.org/2000/svg', layer = document.createElementNS(ns, 'g');
+  layer.setAttribute('class', 'first-stage-forecast confirmed-forecast-history');
+  layer.dataset.state = 'confirmed-history';
+  stages.forEach((stage, index) => stage.forecast.points.forEach(({ color, x, y }) => {
+    if (stage === adjustmentLock) return;
+    const group = document.createElementNS(ns, 'g');
+    group.setAttribute('transform', `translate(${x} ${y})`);
+    group.style.color = DOT_COLORS[color]; group.dataset.color = color;
+    group.dataset.adjustment = String(index + 1);
+    group.style.opacity = index === stages.length - 1 ? '1' : '.5';
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = `${stage.values[1]}の確定予測（調整${index + 1}／${color === 'red' ? 'HOV' : '巡航'}）`;
+    const body = document.createElementNS(ns, 'path');
+    body.setAttribute('d', 'M 0 -7 L 7 0 L 0 7 L -7 0 Z');
+    body.setAttribute('class', 'first-stage-forecast-body');
+    group.append(title);
+    if (index === stages.length - 1) {
+      const ring = document.createElementNS(ns, 'circle');
+      ring.setAttribute('r', '12');
+      ring.setAttribute('class', 'forecast-glow');
+      group.append(ring);
+    }
+    group.append(body); layer.append(group);
+  }));
+  dotOverlay.append(layer);
+}
+
+function confirmSelectedForecast() {
+  const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  const startSet = getAdjustmentStartSet(target), action = BalanceLearning.adjustment(memoValues);
+  const savedGuides = forecastGuides;
+  const previousForecast = adjustmentForecast;
+  // 手動変更時の非表示は維持し、確定座標だけは確定したNo.・方向で求める。
+  forecastGuides = { ...savedGuides };
+  for (const color of ['red', 'blue']) {
+    if (!startSet?.[color] || !action) continue;
+    const guide = savedGuides[color];
+    if (guide?.targetId === target.learningId && guide.blade === action.blade && guide.direction === action.direction) continue;
+    const line = getDirectionLine(startSet[color], color, null, action.blade, action.direction);
+    if (line) forecastGuides[color] = { targetId: target.learningId, type: action.type,
+      blade: action.blade, direction: action.direction, unit: getGuideMovementUnit(line) };
+  }
+  try {
+    // 手動変更直後の非表示プレビューを流用せず、確定条件で再計算する。
+    adjustmentForecast = null;
+    updateAdjustmentForecast(memoValues, true, Boolean(previousForecast?.manualBlade),
+      Boolean(previousForecast?.manualDirection));
+  }
+  finally { forecastGuides = savedGuides; }
+  return adjustmentForecast && structuredClone(adjustmentForecast);
+}
 
 try {
   chartNote.value = appStorage.getItem(CHART_NOTE_STORAGE_KEY) || '';
@@ -321,7 +538,7 @@ function updateMemoButtons() {
 
 function getVisibleGuideAdjustment() {
   if (!dotOverlay.classList.contains('guides-visible')) return null;
-  const line = [...dotOverlay.querySelectorAll('.guide-direction-line')].find((candidate) => {
+  const line = [...dotOverlay.querySelectorAll('.guide-direction-line:not([data-selection-excluded])')].find((candidate) => {
     const style = getComputedStyle(candidate);
     return style.display !== 'none' && style.visibility !== 'hidden'
       && style.visibility !== 'collapse' && Number(style.opacity) !== 0;
@@ -345,7 +562,8 @@ function applySelectedGuideAdjustment(preserveFixed = false) {
   renderMemoButton(memoButtons[2], 2);
   saveAdjustmentSelection();
   if (retainedForecast) return;
-  updateAdjustmentForecast(memoValues, false, getRetainedGuideNumber() ? isManualBladeSelection(memoValues) : false, false);
+  updateAdjustmentForecast(memoValues, false, getRetainedGuideNumber() ? isManualBladeSelection(memoValues) : false,
+    Boolean(adjustmentForecast?.manualDirection && !selectingGuideNumber));
 }
 
 function getRetainedGuideNumber() {
@@ -356,12 +574,12 @@ function getRetainedGuideNumber() {
 
 function isManualBladeSelection(values) {
   const guide = getVisibleGuideAdjustment();
-  return Boolean(guide && String(guide.blade) !== values[0]);
+  return Boolean(guide && !guide.manual && String(guide.blade) !== values[0]);
 }
 
 function updateGuideSelectionVisibility(values) {
   const layer = dotOverlay.querySelector('.direction-lines');
-  const line = layer?.querySelector('.guide-direction-line');
+  const line = layer?.querySelector('.guide-direction-line:not([data-selection-excluded])');
   if (!line) return;
   const guide = forecastGuides[line.getAttribute('marker-end') === 'url(#redDirectionLineArrow)' ? 'red' : 'blue'];
   // 自動表示の番号・方向と個別に比較する。予測計算や手動方向の履歴には使わない。
@@ -394,8 +612,9 @@ function renderMemoWheel(options, selected, index) {
     option.setAttribute('aria-selected', String(value === selected));
     option.textContent = formatMemoInputValue(value, index);
     option.addEventListener('click', () => {
-      if (index === 2) selectMemoOption(option);
-      centerMemoOption(option, index === 2 ? 'instant' : 'smooth');
+      const immediate = index === 2 || index === 3;
+      if (immediate) selectMemoOption(option);
+      centerMemoOption(option, immediate ? 'instant' : 'smooth');
     });
     memoWheel.append(option);
     if (value === selected) requestAnimationFrame(() => {
@@ -480,29 +699,77 @@ function previewMemoSelection() {
     memoPickerManualDirection || memoPickerDirectionChanged);
 }
 
+function syncManualDirectionGuides(values, restoreFixed = false) {
+  if (adjustmentLock && !restoreFixed) return;
+  const action = BalanceLearning.adjustment(values);
+  const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  const startSet = getAdjustmentStartSet(target);
+  if (!action || !startSet) return;
+  for (const color of ['red', 'blue']) {
+    const guide = forecastGuides[color];
+    // HOV欠測のLINKは自動候補を作らず、明示的に選択した調整だけ表示する。
+    const manual = action.type === 'LINK' && !startSet.red && color === 'blue';
+    if (!startSet[color] || (!manual && (guide?.targetId !== target.learningId || guide.type !== action.type
+      || guide.blade !== action.blade))) continue;
+    let node = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
+    if (!node && !manual) continue;
+    // 自動候補と同じ既存処理で、選んだ方向の学習ベクトルまたは六角形の線を求める。
+    const start = getDotCoordinates(startSet[color]);
+    const usesLearned = !guidePredictionDebug.fallback
+      && (action.type === 'LINK' || color === 'blue' || !startSet.blue);
+    const prediction = usesLearned
+      ? learning.predict(action.type, color, action.blade, action.direction, action.amount, start) : null;
+    const line = prediction ? getPredictionGuideLine({ start, ...prediction })
+      : getDirectionLine(startSet[color], color, null, action.blade, action.direction);
+    if (!line) continue;
+    if (!node) {
+      const layer = dotOverlay.querySelector('.direction-lines');
+      if (!layer) continue;
+      if (!layer.querySelector('#blueDirectionLineArrow')) appendDirectionArrowMarkers(layer);
+      node = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      for (const [name, value] of Object.entries({ class: 'guide-direction-line', stroke: DOT_COLORS.blue,
+        'stroke-width': '1.8', 'stroke-dasharray': '9 7', 'stroke-linecap': 'round', opacity: '0.9',
+        'marker-end': 'url(#blueDirectionLineArrow)' })) node.setAttribute(name, value);
+      node.style.pointerEvents = 'none';
+      layer.append(node);
+    }
+    const from = Math.hypot(line.base.x - CHART_CENTER_X, line.base.y - CHART_CENTER_Y) > CHART_RADIUS
+      ? line.base : line.start;
+    const end = line.displayEnd ?? line.end;
+    node.setAttribute('x1', String(from.x)); node.setAttribute('y1', String(from.y));
+    node.setAttribute('x2', String(end.x)); node.setAttribute('y2', String(end.y));
+    guideDisplayGeometry.set(node, line);
+    forecastGuides[color] = { ...guide, targetId: target.learningId, type: action.type, blade: action.blade,
+      direction: action.direction, unit: getGuideMovementUnit(line), ...(manual ? { manual: true } : {}) };
+  }
+  updateGuideViewportEnds();
+}
+
 function updateAdjustmentForecast(values = memoValues, fixed = false,
   manualBlade = Boolean(adjustmentForecast?.manualBlade && values[0] === adjustmentForecast.values[0]),
   manualDirection = Boolean(adjustmentForecast?.manualDirection && values[3] === adjustmentForecast.values[3]),
   refresh = false) {
   if (adjustmentLock && !refresh) { renderAdjustmentForecast(); return; }
+  if (manualDirection || adjustmentForecast?.manualDirection) syncManualDirectionGuides(values);
   updateGuideSelectionVisibility(values);
   if (restoringAppState) { renderAdjustmentForecast(); return; }
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
+  const startSet = getAdjustmentStartSet(target);
   const action = BalanceLearning.adjustment(values);
   if (!target || !action) {
     if (!['fixed', 'comparison'].includes(adjustmentForecast?.phase)) adjustmentForecast = null;
   } else {
-    const key = JSON.stringify([target.learningId, target.red, target.blue, values]);
+    const key = JSON.stringify([target.learningId, startSet.red, startSet.blue, values]);
     if (!fixed || adjustmentForecast?.phase !== 'preview' || adjustmentForecast.key !== key) {
       const waiting = [];
       const points = ['red', 'blue'].flatMap(color => {
-        if (!target[color]) return [];
-        const prediction = learning.predict(action.type, color, action.blade, action.direction, action.amount, getDotCoordinates(target[color]));
-        const estimate = BalanceDistancePrior.resolve(action, color, prediction,
+        if (!startSet[color]) return [];
+        const prediction = learning.predict(action.type, color, action.blade, action.direction, action.amount, getDotCoordinates(startSet[color]));
+        const estimate = resolveDisplayDistance(action, color, prediction,
           prediction ? [] : learning.inspect().samples, CHART_RADIUS);
         if (!estimate) waiting.push(color);
         const guide = forecastGuides[color];
-        const start = getDotCoordinates(target[color]);
+        const start = getDotCoordinates(startSet[color]);
         if (!estimate || !Number.isFinite(estimate.distance) || estimate.distance < 0
           || !guide || guide.type !== action.type || guide.targetId !== target.learningId
           || ![start.x, start.y].every(Number.isFinite)) return [];
@@ -511,7 +778,9 @@ function updateAdjustmentForecast(values = memoValues, fixed = false,
         const y = start.y + guide.unit.y * estimate.distance;
         return [x, y].every(Number.isFinite) ? [{ color, x, y, distance: estimate.distance,
           source: estimate.source, sampleCount: estimate.sampleCount, medianDistance: estimate.medianDistance,
-          baseAmount: estimate.baseAmount, ratio: estimate.ratio }] : [];
+          baseAmount: estimate.baseAmount, ratio: estimate.ratio,
+          ...(estimate.source === 'reference-coefficient' ? { coefficient: estimate.coefficient,
+            referenceConditions: estimate.referenceConditions } : {}) }] : [];
       });
       if (points.length || !['fixed', 'comparison'].includes(adjustmentForecast?.phase)) {
         // 表示可否だけを保持する。予測座標・距離・学習用データは変更しない。
@@ -529,7 +798,28 @@ function updateAdjustmentForecast(values = memoValues, fixed = false,
   }
 }
 
+// 表示・確定予測だけの不足時補完。候補順位と既存の学習式には渡さない。
+function resolveDisplayDistance(action, color, prediction, samples = [], radius = CHART_RADIUS) {
+  const estimate = BalanceDistancePrior.resolve(action, color, prediction, samples, radius);
+  if (estimate) return estimate;
+  // 同じ方式・色・No.の移動距離のみを使う。方向は距離係数に含めず、既存ガイドで決める。
+  const references = BalanceDistancePrior.samples.filter(sample => sample.type === action.type
+    && sample.color === color && sample.blade === action.blade && sample.amount > 0
+    && Number.isFinite(sample.distance) && sample.distance >= 0);
+  if (!references.length) return null;
+  const rates = references.map(sample => sample.distance / sample.amount).sort((a, b) => a - b);
+  const middle = Math.floor(rates.length / 2);
+  const coefficient = rates.length % 2 ? rates[middle] : (rates[middle - 1] + rates[middle]) / 2;
+  return { distance: coefficient * action.amount * radius, source: 'reference-coefficient',
+    coefficient, sampleCount: references.length,
+    referenceConditions: references.map(({ id, direction, amount }) => ({ id, direction, amount })) };
+}
+
 function refreshAdjustmentForecastAfterDeletion() {
+  if (adjustmentSequence && adjustmentLock) {
+    adjustmentForecast = structuredClone(adjustmentLock.forecast);
+    renderAdjustmentForecast(); return;
+  }
   if (restoringAppState || memoValues[1] !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
   const guide = forecastGuides.red ?? forecastGuides.blue;
   updateAdjustmentForecast(memoValues, Boolean(adjustmentLock), isManualBladeSelection(memoValues),
@@ -563,7 +853,10 @@ function getForecastDisplayEntry(forecast, create = false) {
   }
   const target = dotSets.find(set => set.learningId === forecast.targetId);
   if (!target) return null;
-  const key = JSON.stringify([forecast.targetId, forecast.type, forecast.values[0], forecast.values[3], forecast.values[2]]);
+  const start = getAdjustmentStartSet(target);
+  const originKey = JSON.stringify([start?.red, start?.blue]);
+  const key = JSON.stringify([forecast.targetId, forecast.type, forecast.values[0], forecast.values[3], forecast.values[2],
+    ...(originKey === JSON.stringify([target.red, target.blue]) ? [] : [originKey])]);
   if (create && !forecastDisplayCache.has(key)) {
     forecastDisplayCache.set(key, { targetId: forecast.targetId,
       measurements: JSON.stringify([target.red, target.blue]), points: new Map() });
@@ -593,6 +886,14 @@ function getForecastDisplayPoints(forecast) {
   return points;
 }
 
+function hasVisibleForecastGuide(color) {
+  const line = dotOverlay.querySelector(`.guide-direction-line[marker-end="url(#${color}DirectionLineArrow)"]`);
+  if (!line || !dotOverlay.classList.contains('guides-visible')) return false;
+  const style = getComputedStyle(line);
+  return style.display !== 'none' && !['hidden', 'collapse'].includes(style.visibility)
+    && Number(style.opacity) !== 0;
+}
+
 function getCurrentForecastContext() {
   const forecast = adjustmentForecast;
   if (!forecast) return null;
@@ -601,9 +902,13 @@ function getCurrentForecastContext() {
   const target = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   if (target?.learningId !== forecast.targetId
     || !values.every((value, index) => value && value === forecast.values[index])
-    || forecast.manualBlade || forecast.manualDirection
+    || (forecast.manualBlade && !isConfirmedSequenceForecast(forecast))
     || (!adjustmentLock && guideNumberChoices.length && !guideNumberChoices[guideCandidateIndex]?.candidate)) return null;
-  return { forecast, target };
+  return { forecast, target: getAdjustmentStartSet(target) };
+}
+
+function isConfirmedSequenceForecast(forecast = adjustmentForecast) {
+  return Boolean(adjustmentLock?.forecast && getSequenceStage() === adjustmentLock && forecast?.phase === 'fixed');
 }
 
 function renderForecastStatus(context = getCurrentForecastContext()) {
@@ -611,7 +916,7 @@ function renderForecastStatus(context = getCurrentForecastContext()) {
   let state = 'none';
   if (context) {
     const { forecast, target } = context;
-    const colors = forecast.type === 'TAB' ? ['blue'] : ['red', 'blue'];
+    const colors = ['red', 'blue'];
     // 描画キャッシュではなく、現在の選択に対する算出結果と既存の学習済み判定だけを使う。
     const available = target.red && target.blue
       && ['red', 'blue'].every(color => {
@@ -649,7 +954,7 @@ function renderForecastInformation(context, state) {
     change.textContent = '予測なし';
     arrow.textContent = value.textContent = limit.textContent = '';
     arrow.hidden = value.hidden = limit.hidden = !available;
-    result.title = target && !target[color] ? '欠測' : color === 'red' && forecast?.type === 'TAB' ? '対象外（TAB）' : '';
+    result.title = target && !target[color] ? '欠測' : '';
     if (available) {
       const endpoint = Math.hypot(point.x - CHART_CENTER_X, point.y - CHART_CENTER_Y) / CHART_RADIUS;
       const trend = endpoint < current ? ['improved', '↓', '改善']
@@ -668,9 +973,9 @@ function renderForecastInformation(context, state) {
   if (forecast?.phase !== 'comparison' && noticeColors.length) {
     notice.replaceChildren(...noticeColors.map(color => {
       const saved = displayPoints.find(point => point.color === color)?.savedValues;
-      const label = color === 'red' ? 'HOV（赤）' : forecast.type === 'TAB' ? '巡航（紫）' : '巡航（青）';
+      const label = color === 'red' ? 'HOV（赤）' : '巡航（青）';
       const row = document.createElement('span');
-      row.textContent = saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：予測学習中`;
+      row.textContent = saved ? `${label}：No.${saved[0]} ${saved[3]}の保存済み予測を表示` : `${label}：算出不能（学習・参考係数なし）`;
       return row;
     }));
     notice.hidden = false;
@@ -682,32 +987,43 @@ function renderForecastInformation(context, state) {
 }
 
 function renderAdjustmentForecast() {
+  saveSequenceDraft();
+  renderFirstStageForecast();
+  if (adjustmentForecast || confirmedCarry || adjustmentSequence) renderAdjustmentOrigins();
+  else {
+    document.getElementById('adjustmentOriginStatus').hidden = true;
+    dotOverlay.querySelector('.inherited-origins')?.remove();
+  }
   const context = getCurrentForecastContext();
   const state = renderForecastStatus(context);
   renderForecastInformation(context, state);
   globalThis.balanceSaveState?.();
   dotOverlay.querySelector('.adjustment-forecast')?.remove();
-  if (guideNumberChoices.length && !guideNumberChoices[guideCandidateIndex]?.candidate) return;
+  if (!adjustmentLock && guideNumberChoices.length && !guideNumberChoices[guideCandidateIndex]?.candidate) return;
   if (!adjustmentForecast) return;
-  if (adjustmentForecast.manualBlade) return;
+  const confirmed = isConfirmedSequenceForecast();
+  if (adjustmentForecast.manualBlade && !confirmed) return;
   if (!dotSets.some(set => set.learningId === adjustmentForecast.targetId)) { adjustmentForecast = null; return; }
   const displayPoints = getForecastDisplayPoints(adjustmentForecast);
   if (adjustmentForecast.type !== (currentChartPage === 0 ? 'LINK' : 'TAB')) return;
   if (!dotOverlay.classList.contains('guides-visible')) return;
-  if (adjustmentForecast.manualDirection) return;
   const ns = 'http://www.w3.org/2000/svg';
   const layer = document.createElementNS(ns, 'g');
   layer.setAttribute('class', `adjustment-forecast ${adjustmentForecast.phase}`);
+  if (confirmed) layer.dataset.confirmedStage = String(adjustmentSequence.stages.indexOf(adjustmentLock) + 1);
   layer.style.pointerEvents = 'none';
   // 生成済み座標をそのまま描画する。
   displayPoints.forEach(({ color, x, y, savedValues }) => {
     if (![x, y].every(Number.isFinite)) return;
+    if (!hasVisibleForecastGuide(color)) return;
     const group = document.createElementNS(ns, 'g');
     group.setAttribute('transform', `translate(${x} ${y})`);
-    group.style.color = color === 'red' ? DOT_COLORS.red : adjustmentForecast.type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue;
+    group.style.color = DOT_COLORS[color];
     group.dataset.color = color;
     const title = document.createElementNS(ns, 'title');
-    title.textContent = `${color === 'red' ? 'HOV' : '巡航'}予想位置`;
+    title.textContent = confirmed
+      ? `${adjustmentForecast.type}の確定予測（${color === 'red' ? 'HOV' : '巡航'}）`
+      : `${color === 'red' ? 'HOV' : '巡航'}予想位置`;
     if (savedValues) title.textContent += `（保存済み：${savedValues.map((value, index) => formatMemoValue(value, index, savedValues[1])).join(' ／ ')}）`;
     const ring = document.createElementNS(ns, 'circle');
     ring.setAttribute('r', '12');
@@ -834,8 +1150,9 @@ pitchModeToggle.addEventListener('click', () => {
 function updateTrimModeUI() {
   trimModeToggle.disabled = adjustmentLock?.page === 1;
   trimModeToggle.hidden = currentChartPage !== 1;
-  setRotationModeLabel(trimModeToggle, `紫六角形：${trimAutoMode ? '自動' : '手動'}`,
-    trimAutoMode && !trimAutoReady ? '条件待ち' : '');
+  const waiting = [!trimHovAutoReady && 'HOV', !trimAutoReady && '巡航'].filter(Boolean);
+  setRotationModeLabel(trimModeToggle, `赤・青六角形：${trimAutoMode ? '自動' : '手動'}`,
+    trimAutoMode && waiting.length ? `${waiting.join('・')}待ち` : '');
   trimModeToggle.setAttribute('aria-pressed', String(trimAutoMode));
   updateRotationLock();
 }
@@ -843,6 +1160,7 @@ function updateTrimModeUI() {
 trimModeToggle.addEventListener('click', () => {
   if (adjustmentLock?.page === 1) return;
   manualTrimCruiseAngle = autoTrimCruiseAngle = cruiseAngle;
+  lastAutoRotation.TAB.red = getLearnedRotation('TAB', 'red') ?? getLatestTrimSyncAngle('red');
   lastAutoRotation.TAB.blue = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
   trimAutoMode = !trimAutoMode;
   if (trimAutoMode) syncAutoTrimRotation();
@@ -852,11 +1170,20 @@ trimModeToggle.addEventListener('click', () => {
 });
 
 function showChartPage(page) {
+  restoreLegacyAdjustmentSequence();
+  restoreConfirmedCarry();
   if (page < 0 || page >= chartNames.length || page === currentChartPage) return;
+  saveSequenceDraft();
   saveAdjustmentSelection();
   guideCandidateIndices[currentChartPage] = guideCandidateIndex;
   saveRotation();
   currentChartPage = page;
+  if (adjustmentSequence) {
+    adjustmentLock = getSequenceStage(page);
+    selectedAdjustmentTarget = dotSets.find(set => set.learningId === getSequenceTargetId()) ?? null;
+    adjustmentForecast = structuredClone(adjustmentLock?.forecast
+      ?? (adjustmentSequence.draft?.page === page ? adjustmentSequence.draft.forecast : null));
+  }
   guideCandidateIndex = guideCandidateIndices[page];
   restoreAdjustmentSelection();
   dotOverlay.classList.toggle('trim-tab', page === 1);
@@ -878,9 +1205,11 @@ function showChartPage(page) {
     if (index === page) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   });
-  renderDirectionLines();
+  renderDirectionLines(adjustmentSequence?.draft?.page === page);
   renderAdjustmentForecast();
   updateEditingUI();
+  updateSequenceMessage();
+  updateAdjustmentTarget();
 }
 
 chartPageButtons.forEach((button, index) => button.addEventListener('click', () => showChartPage(index)));
@@ -1031,7 +1360,7 @@ function updateRotationLock() {
   chartObject.contentWindow?.postMessage({ type: 'balance-chart-rotation-lock', locked: rotationLocked }, '*');
   rotationHandles.forEach((handle) => {
     const disabled = rotationLocked || (currentChartPage === 0 && pitchAutoMode)
-      || (currentChartPage === 1 && trimAutoMode && handle.id === 'cruiseRotationHandle');
+      || (currentChartPage === 1 && trimAutoMode);
     handle.style.pointerEvents = disabled ? 'none' : 'stroke';
     handle.setAttribute('pointer-events', disabled ? 'none' : 'stroke');
     handle.style.cursor = disabled ? 'default' : 'grab';
@@ -1126,16 +1455,16 @@ function getDotCoordinates(dot) {
   };
 }
 
-function getLatestTrimSyncAngle() {
+function getLatestTrimSyncAngle(color = 'blue') {
   for (let index = dotSets.length - 2; index >= 0; index -= 1) {
     const before = dotSets[index];
     const after = dotSets[index + 1];
-    if (!before.blue || !after.blue) continue;
+    if (!before[color] || !after[color]) continue;
     // 自動回転への利用は学習の実調整指定とは独立させる。
     if (!getSingleAdjustment(before, 'TAB')) continue;
     const adjustment = before.adjustments[0];
-    const start = getDotCoordinates(before.blue);
-    const end = getDotCoordinates(after.blue);
+    const start = getDotCoordinates(before[color]);
+    const end = getDotCoordinates(after[color]);
     if (Math.hypot(end.x - start.x, end.y - start.y) < 0.001) continue;
     const side = DIRECTION_ARROW_SEGMENTS.find((segment) => segment.number === Number(adjustment[0]));
     const towardEnd = adjustment[3] === 'UP' ? side.upAtEnd : !side.upAtEnd;
@@ -1207,17 +1536,23 @@ function applyCruiseRotation(angle) {
 
 function syncAutoTrimRotation() {
   if (!trimAutoMode) return;
-  const angle = getLearnedRotation('TAB', 'blue') ?? getLatestTrimSyncAngle();
-  trimAutoReady = angle !== null;
-  const changed = !restoringAppState && angle !== null && angle !== lastAutoRotation.TAB.blue;
-  lastAutoRotation.TAB.blue = angle;
+  const nextAngles = { ...pageRotations[1] };
+  for (const [color, key] of [['red', 'hovAngle'], ['blue', 'cruiseAngle']]) {
+    const angle = getLearnedRotation('TAB', color) ?? getLatestTrimSyncAngle(color);
+    if (color === 'red') trimHovAutoReady = angle !== null;
+    else trimAutoReady = angle !== null;
+    const changed = !restoringAppState && angle !== null && angle !== lastAutoRotation.TAB[color];
+    lastAutoRotation.TAB[color] = angle;
+    if (restoringAppState) continue;
+    nextAngles[key] = changed ? angle : currentChartPage === 1
+      ? (color === 'red' ? hovAngle : cruiseAngle) : pageRotations[1][key];
+    if (color === 'blue' && changed) autoTrimCruiseAngle = angle;
+  }
   if (restoringAppState) return;
-  if (changed) autoTrimCruiseAngle = angle;
-  const nextAngle = changed ? autoTrimCruiseAngle : currentChartPage === 1 ? cruiseAngle : pageRotations[1].cruiseAngle;
-  manualTrimCruiseAngle = nextAngle;
-  pageRotations[1].cruiseAngle = nextAngle;
-  if (currentChartPage === 1) applyCruiseRotation(nextAngle);
-  trimModeToggle.textContent = `紫六角形：${trimAutoReady ? '自動' : '自動（条件待ち）'}`;
+  manualTrimCruiseAngle = nextAngles.cruiseAngle;
+  Object.assign(pageRotations[1], nextAngles);
+  if (currentChartPage === 1) applyChartRotation(nextAngles.hovAngle, nextAngles.cruiseAngle);
+  updateTrimModeUI();
 }
 
 function rotateAroundChartCenter(point, angle) {
@@ -1412,7 +1747,7 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
 }
 
 function getLinkRankingCandidates(candidates) {
-  const amountText = getSharedAdjustmentAmount(0), target = dotSets.at(-1);
+  const amountText = getSharedAdjustmentAmount(0), target = getAdjustmentStartSet();
   // 探索量・円周交点ではなく、表示する量・方向と既存の距離推定で評価する。
   return candidates.filter(c => !c.amountText || c.amountText === amountText).map(original => {
     const action = BalanceLearning.adjustment([String(original.blade), 'LINK', amountText, original.direction]);
@@ -1448,7 +1783,7 @@ function getLinkRankingCandidates(candidates) {
 
 function selectLinkGuideCandidate(candidates) {
   if (pitchAutoMode) {
-    const normalized = getLinkRankingCandidates(candidates), target = dotSets.at(-1);
+    const normalized = getLinkRankingCandidates(candidates), target = getAdjustmentStartSet();
     const selected = BalanceLinkRanking.select(normalized, target?.red?.radius, target?.blue?.radius);
     // 方向・予測とも評価不能ならNo順の診断表示。達成を示す予測は作らない。
     return (selected ?? normalized.sort((a, b) => a.blade - b.blade
@@ -1493,7 +1828,7 @@ function selectGuideNumberCandidate(candidates, selectBest) {
   let pool = [...candidates];
   const choices = [];
   if (pitchAutoMode && currentChartPage === 0 && selectBest === selectLinkGuideCandidate) {
-    const target = dotSets.at(-1);
+    const target = getAdjustmentStartSet();
     const result = BalanceLinkRanking.rank(getLinkRankingCandidates(candidates),target?.red?.radius,target?.blue?.radius);
     choices.push(...result.ranked.map(candidate => ({blade:candidate.blade,candidate:candidate.original})));
     if (choices.length) pool = [];
@@ -1532,7 +1867,7 @@ function getLearnedGuideLines(finalSet) {
   guidePredictionDebug = { type, fallback: true, reason: automatic ? 'insufficient-samples' : 'manual-mode' };
   if (!automatic || !finalSet) return null;
   // HOV予測を基準に候補を生成し、LINKは対応する巡航予測も評価する。
-  const colors = type === 'TAB' ? (finalSet.blue ? ['blue'] : [])
+  const colors = type === 'TAB' ? (finalSet.blue ? ['blue'] : finalSet.red ? ['red'] : [])
     : finalSet.red ? ['red'] : [];
   if (!colors.length || colors.some(color => getLearnedRotation(type, color) === null)) return null;
   const candidates = [];
@@ -1601,7 +1936,7 @@ function getLearnedGuideLines(finalSet) {
     blade: selected.blade, direction: selected.direction,
     amountText: selected.amountText,
     line: getPredictionGuideLine(prediction),
-    color: prediction.color === 'red' ? DOT_COLORS.red : type === 'TAB' ? '#7b2cbf' : DOT_COLORS.blue,
+    color: DOT_COLORS[prediction.color],
     marker: `${prediction.color}DirectionLineArrow`
   })) : [];
 }
@@ -1666,6 +2001,11 @@ function renderDirectionLines(preserveSelection = false) {
   renderingDirectionLines = true;
   try { drawDirectionLines(preserveSelection); }
   finally { renderingDirectionLines = false; evaluatedLinkAmount = getSharedAdjustmentAmount(0); }
+  if (adjustmentLock?.editedGuides) {
+    renderEditedConfirmedGuides(adjustmentLock);
+    adjustmentForecast = structuredClone(adjustmentLock.forecast);
+    renderAdjustmentForecast();
+  }
   // 別チャート閲覧中の削除で破棄した固定予測は、追加側へ戻った時に生成し直す。
   if (adjustmentLock && !adjustmentForecast) refreshAdjustmentForecastAfterDeletion();
 }
@@ -1686,7 +2026,7 @@ function drawDirectionLines(preserveSelection = false) {
   const blueDots = [];
   // 基準線の候補は、現在の最終結果番号にある赤・青ドットだけに限定する。
   const finalIndex = dotSets.length - 1;
-  const finalSet = dotSets[finalIndex];
+  const finalSet = getAdjustmentStartSet(dotSets[finalIndex]);
   if (finalSet) {
     // 結果に複数の調整量がある場合は、最後に追加した番号・方向を対応情報として使う。
     // 旧データの memo も読み取り、調整量が未登録なら同じ結果番号内で対応させる。
@@ -1710,7 +2050,8 @@ function drawDirectionLines(preserveSelection = false) {
     }
   } else if (currentChartPage === 1) {
     // トリムタブは巡航線だけを、矢印方向で到達できる中心距離で選ぶ。
-    const ranked = blueDots.sort((first, second) =>
+    const sourceColor = blueDots.length ? 'blue' : 'red';
+    const ranked = (blueDots.length ? blueDots : redDots).sort((first, second) =>
       Number(second.line.centerDistance <= CENTER_DISTANCE_THRESHOLD) - Number(first.line.centerDistance <= CENTER_DISTANCE_THRESHOLD)
       || first.line.centerDistance - second.line.centerDistance);
     const candidates = ranked.map(entry => ({ ...entry, blade: entry.line.number }));
@@ -1720,7 +2061,7 @@ function drawDirectionLines(preserveSelection = false) {
       else renderAdjustmentForecast();
       return;
     }
-    selectedLines = [{ line: selected.line, color: '#7b2cbf', marker: 'blueDirectionLineArrow' }];
+    selectedLines = [{ line: selected.line, color: DOT_COLORS[sourceColor], marker: `${sourceColor}DirectionLineArrow` }];
   } else if (redDots.length) {
     // 学習不足時も表示量の推定終点を評価する。手動の有向線評価は維持する。
     const centerDistance = getGuidePathDistance;
@@ -1747,19 +2088,36 @@ function drawDirectionLines(preserveSelection = false) {
     if (selected.blue) selectedLines.push({ line: selected.blue, color: DOT_COLORS.blue, marker: 'blueDirectionLineArrow' });
   } else {
     updateGuideCandidateToggle();
+    if (currentChartPage === 0 && finalSet?.blue && !finalSet.red) {
+      const values = adjustmentLock?.values ?? adjustmentForecast?.values ?? memoValues;
+      syncManualDirectionGuides(values, true);
+      updateGuideSelectionVisibility(values);
+    }
     if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
     else renderAdjustmentForecast();
     return;
   }
 
-  appendDirectionArrowMarkers(guideLayer, currentChartPage === 1 ? '#7b2cbf' : DOT_COLORS.blue);
-  selectedLines.forEach(({ line, color, marker, blade = line.number, direction = line.direction, amountText }) => {
-    // 範囲外では実際のドットを始点に、候補評価と同じ調整方向へ描画する。
+  // TABの順位は巡航のまま、同じNo.・方向のHOVガイドを予測描画にも渡す。
+  if (currentChartPage === 1 && finalSet?.red) {
+    const cruise = selectedLines.find(entry => entry.marker === 'blueDirectionLineArrow');
+    if (cruise) {
+      const blade = cruise.blade ?? cruise.line.number;
+      const direction = cruise.direction ?? cruise.line.direction;
+      const line = getDirectionLine(finalSet.red, 'red', null, blade, direction);
+      if (line) selectedLines.push({ line, color: DOT_COLORS.red, marker: 'redDirectionLineArrow', selectionExcluded: true });
+    }
+  }
+  appendDirectionArrowMarkers(guideLayer, DOT_COLORS.blue);
+  selectedLines.forEach(({ line, color, marker, blade = line.number, direction = line.direction, amountText, selectionExcluded = false }) => {
+    // 引き継いだ起点でも通常と同じ円周間表示。計算の基準位置はline.baseのまま保持する。
+    // 範囲外の点は従来どおりドットを始点とする。
     const start = Math.hypot(line.base.x - CHART_CENTER_X, line.base.y - CHART_CENTER_Y) > CHART_RADIUS
       ? line.base : line.start;
     const end = line.displayEnd ?? line.end;
     const directionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     directionLine.setAttribute('class', 'guide-direction-line');
+    if (selectionExcluded) directionLine.dataset.selectionExcluded = 'true';
     directionLine.setAttribute('x1', String(start.x));
     directionLine.setAttribute('y1', String(start.y));
     directionLine.setAttribute('x2', String(end.x));
@@ -1784,7 +2142,9 @@ function drawDirectionLines(preserveSelection = false) {
     }
   });
   updateGuideViewportEnds();
-  if (adjustmentLock ? adjustmentLock.page === currentChartPage : preserveSelection) updateGuideSelectionVisibility(memoValues);
+  if (adjustmentLock ? adjustmentLock.page === currentChartPage
+    : preserveSelection || (adjustmentForecast?.manualDirection
+      && adjustmentForecast.type === (currentChartPage === 0 ? 'LINK' : 'TAB') && !selectingGuideNumber)) updateGuideSelectionVisibility(memoValues);
   else applySelectedGuideAdjustment(true);
   if (adjustmentForecast?.phase === 'preview') updateAdjustmentForecast(adjustmentForecast.values);
   else renderAdjustmentForecast();
@@ -1809,7 +2169,8 @@ deleteConfirmation.addEventListener('close', () => {
 });
 
 document.getElementById('resetLearning').addEventListener('click', () => {
-  confirmDeletion('自動補正の学習値だけを初期化しますか？測定結果・調整量・設定は残ります。', () => {
+  confirmDeletion('自動補正の学習値だけを初期化しますか？測定結果・確定調整・設定は残ります。', () => {
+    clearConfirmedEditLearningValues();
     learning.reset(dotSets);
     manualLearningReference.LINK = {};
     manualLearningReference.TAB = {};
@@ -1825,7 +2186,7 @@ function updateAdjustmentTarget() {
   const target = adjustmentLock ? dotSets.find(set => set.learningId === adjustmentLock.targetId)
     : selectedAdjustmentTarget ?? dotSets.at(-1);
   adjustmentTarget.replaceChildren();
-  adjustmentTarget.disabled = Boolean(adjustmentLock) || !dotSets.length;
+  adjustmentTarget.disabled = Boolean(adjustmentLock || Object.keys(adjustmentSequence?.active ?? {}).length) || !dotSets.length;
   if (!dotSets.length) {
     const option = document.createElement('option');
     option.textContent = '結果なし';
@@ -1842,7 +2203,7 @@ function updateAdjustmentTarget() {
 }
 
 adjustmentTarget.addEventListener('change', () => {
-  if (adjustmentLock) { updateAdjustmentTarget(); return; }
+  if (adjustmentLock || Object.keys(adjustmentSequence?.active ?? {}).length) { updateAdjustmentTarget(); return; }
   selectedAdjustmentTarget = dotSets[Number(adjustmentTarget.value)] ?? null;
   updateAdjustmentForecast();
 });
@@ -1893,7 +2254,12 @@ function updateEditingUI() {
 }
 
 function releaseAdjustmentLock() {
-  if (!adjustmentLock) return;
+  if (!adjustmentLock && !adjustmentSequence) return;
+  if (adjustmentSequence?.flow) {
+    adjustmentSequence.active = {};
+    adjustmentSequence.draft = null;
+    adjustmentSequence.currentTargetId = dotSets.at(-1)?.learningId ?? adjustmentSequence.targetId;
+  } else adjustmentSequence = null;
   adjustmentLock = null;
   resetSharedAdjustmentAmounts();
   restoreAdjustmentSelection();
@@ -1923,7 +2289,7 @@ function startResultEdit(set) {
 }
 
 function startAdjustmentEdit(set, adjustment) {
-  if (adjustmentLock) return;
+  if (adjustmentLock || isConfirmedAdjustment(set, adjustment) || !isLatestRecordedAdjustment(set, adjustment)) return;
   if (!dotSets.includes(set) || !set.adjustments?.includes(adjustment)) return;
   cancelEditing();
   if (cruiseAdditionTarget) finishCruiseAddition();
@@ -1935,6 +2301,11 @@ function startAdjustmentEdit(set, adjustment) {
   updateAdjustmentTarget();
   updateEditingUI();
   adjustmentForm.scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+
+function isConfirmedAdjustment(set, adjustment) {
+  const index = set?.adjustments?.indexOf(adjustment) ?? -1;
+  return adjustmentSequence?.stages.some(stage => stage.targetId === set?.learningId && stage.actionIndex === index) ?? false;
 }
 
 function attachEditAction(row, message, action) {
@@ -1977,7 +2348,7 @@ function renderHistoricalLearning() {
   candidates.forEach(candidate => {
     const before = dotSets[candidate.index], after = dotSets[candidate.index + 1];
     const { type, blade, direction } = candidate.action;
-    const target = type === 'TAB' ? 'TAB紫（巡航）' : candidate.color === 'red' ? 'LINK赤（HOV）' : 'LINK青（巡航）';
+    const target = type === 'TAB' ? 'TAB青（巡航）' : candidate.color === 'red' ? 'LINK赤（HOV）' : 'LINK青（巡航）';
     const measurement = dot => `${dot.clock} ／ ${dot.radius.toFixed(2)} IPS`;
     const row = document.createElement('div');
     row.className = 'historical-learning-row';
@@ -1991,6 +2362,7 @@ function renderHistoricalLearning() {
     button.setAttribute('aria-label', `${target} 結果${candidate.index + 1}→${candidate.index + 2}を実調整として学習`);
     button.addEventListener('click', () => {
       const accepted = learning.confirmHistorical(dotSets, candidate);
+      if (accepted) clearConfirmedEditLearningValues(before.learningId);
       renderDots();
       document.getElementById('historicalLearningMessage').textContent = accepted
         ? learning.inspect().storageError ?? `${target}の実調整を学習に追加しました。`
@@ -2002,8 +2374,24 @@ function renderHistoricalLearning() {
 }
 
 function renderDots() {
+  if (confirmedCarry) {
+    const source = dotSets.find(set => set.learningId === confirmedCarry.targetId);
+    if (!source || JSON.stringify(source.adjustments?.[confirmedCarry.actionIndex]) !== JSON.stringify(confirmedCarry.values)) confirmedCarry = null;
+  }
+  if (adjustmentSequence) {
+    const active = Object.fromEntries(Object.entries(adjustmentSequence.active ?? {}).map(([page,index])=>[page,adjustmentSequence.stages[index]]));
+    adjustmentSequence.stages = adjustmentSequence.stages.filter(stage =>
+      JSON.stringify(dotSets.find(set => set.learningId === stage.targetId)?.adjustments?.[stage.actionIndex]) === JSON.stringify(stage.values));
+    if (!adjustmentSequence.stages.length) { adjustmentSequence=null;adjustmentLock=null;confirmedCarry=null;updateMemoButtons(); }
+    else {
+      adjustmentSequence.targetId = adjustmentSequence.stages[0].targetId;
+      adjustmentSequence.active = Object.fromEntries(Object.entries(active).map(([page,stage])=>[page,adjustmentSequence.stages.indexOf(stage)]).filter(([,index])=>index>=0));
+      adjustmentLock = getSequenceStage();
+      restoreConfirmedCarry();
+    }
+  }
   if (!dotSets.length) updateMemoButtons();
-  if (!appStorage.readOnly) learning.sync(dotSets, {
+  if (!appStorage.readOnly) learning.sync(getConfirmedEditLearningSets(), {
     LINK: {
       red: pitchAutoMode && pitchAutoReady.red ? autoPitchAngles.hovAngle : manualPitchAngles.hovAngle,
       blue: pitchAutoMode && pitchAutoReady.blue ? autoPitchAngles.cruiseAngle : manualPitchAngles.cruiseAngle
@@ -2018,6 +2406,7 @@ function renderDots() {
   updateEditingUI();
   updateAdjustmentTarget();
   updateCruiseAdditionUI();
+  updateSequenceMessage();
   dotList.replaceChildren(...dotSets.map((set, index) => {
     const item = document.createElement('li');
     const hovWithin = Boolean(set.red && set.red.radius <= 0.2);
@@ -2043,7 +2432,7 @@ function renderDots() {
     remove.addEventListener('click', () => confirmDeletion(`結果${index + 1}を削除しますか？`, () => {
       dotSets.splice(index, 1);
       invalidateAdjustmentForecast();
-      if (adjustmentLock?.targetId === set.learningId) releaseAdjustmentLock();
+      if (confirmedCarry?.targetId === set.learningId || adjustmentLock?.targetId === set.learningId) releaseAdjustmentLock();
       saveDotSets();
       renderDots();
       refreshAdjustmentForecastAfterDeletion();
@@ -2067,10 +2456,15 @@ function renderDots() {
     set.adjustments?.forEach((adjustment, adjustmentIndex) => {
       const adjustmentRow = document.createElement('div');
       adjustmentRow.className = 'dot-adjustment-row';
-      if (!adjustmentLock) attachEditAction(adjustmentRow, 'この調整量を編集しますか？', () => startAdjustmentEdit(set, adjustment));
       const adjustmentLabel = document.createElement('span');
       adjustmentLabel.className = 'dot-memo';
       adjustmentLabel.textContent = `調整量: ${adjustment.map((value, fieldIndex) => formatMemoValue(value, fieldIndex, adjustment[1])).join(' ／ ')}${learning.isArmed(set) ? '（実調整）' : ''}`;
+      const stageIndex = adjustmentSequence?.stages.findIndex(stage =>
+        stage.targetId === set.learningId && stage.actionIndex === adjustmentIndex) ?? -1;
+      if (stageIndex >= 0) {
+        adjustmentRow.classList.add('confirmed-adjustment-row');
+        adjustmentLabel.prepend('確定');
+      }
       const deleteAdjustment = document.createElement('button');
       deleteAdjustment.type = 'button';
       deleteAdjustment.textContent = '削除';
@@ -2078,16 +2472,48 @@ function renderDots() {
       deleteAdjustment.addEventListener('click', () => confirmDeletion(`結果${index + 1}の調整量${adjustmentIndex + 1}を削除しますか？`, () => {
         // 固定対象は追加先の最後の調整。古い同内容の調整を削除しても解除しない。
         const releasesLock = adjustmentLock?.targetId === set.learningId && set.adjustments.at(-1) === adjustment;
+        const stageDeleted = adjustmentSequence?.stages.some(stage => stage.targetId === set.learningId && stage.actionIndex === adjustmentIndex);
+        const active = Object.fromEntries(Object.entries(adjustmentSequence?.active ?? {}).map(([page,index])=>[page,adjustmentSequence.stages[index]]));
+        if (stageDeleted) adjustmentSequence.stages = adjustmentSequence.stages.filter(stage=>stage.targetId!==set.learningId || stage.actionIndex!==adjustmentIndex);
+        adjustmentSequence?.stages.forEach(stage => {
+          if (stage.targetId === set.learningId && stage.actionIndex > adjustmentIndex) stage.actionIndex--;
+        });
+        if (adjustmentSequence) adjustmentSequence.active = Object.fromEntries(Object.entries(active).map(([page,stage])=>[page,adjustmentSequence.stages.indexOf(stage)]).filter(([,index])=>index>=0));
+        if (confirmedCarry?.targetId === set.learningId && confirmedCarry.actionIndex > adjustmentIndex) confirmedCarry.actionIndex--;
         set.adjustments.splice(adjustmentIndex, 1);
         invalidateAdjustmentForecast();
-        if (releasesLock) releaseAdjustmentLock();
+        if (releasesLock || stageDeleted) {
+          adjustmentLock = getSequenceStage();
+          if (!adjustmentLock) { resetSharedAdjustmentAmounts();restoreAdjustmentSelection(); }
+        }
         saveDotSets();
         renderDots();
         refreshAdjustmentForecastAfterDeletion();
         globalThis.balanceFlushState?.();
       }));
       adjustmentRow.append(adjustmentLabel, deleteAdjustment);
+      appendLatestConfirmedEditButton(adjustmentRow, set, adjustmentIndex);
       item.append(adjustmentRow);
+      if (stageIndex >= 0) {
+        const forecast = adjustmentSequence.stages[stageIndex].forecast;
+        const summary = document.createElement('p');
+        summary.className = 'confirmed-adjustment-forecast';
+        summary.dataset.adjustment = String(stageIndex + 1);
+        for (const color of ['red', 'blue']) {
+          const point = forecast.points.find(point => point.color === color
+            && [point.x, point.y].every(Number.isFinite));
+          const value = document.createElement('span');
+          value.dataset.color = color;
+          value.textContent = `${color === 'red' ? 'HOV' : '巡航'}確定予測 `;
+          if (point) {
+            const endpoint = Math.hypot(point.x - CHART_CENTER_X, point.y - CHART_CENTER_Y) / CHART_RADIUS;
+            value.textContent += `${endpoint.toFixed(2)} IPS${point.source === 'learned' ? '' : '（参考）'}`;
+            value.dataset.source = point.source ?? 'unknown';
+          } else value.textContent += '予測なし';
+          summary.append(value);
+        }
+        item.append(summary);
+      }
     });
     return item;
   }));
@@ -2266,6 +2692,8 @@ dotForm.addEventListener('submit', (event) => {
     }
     target.red = red;
     target.blue = blue;
+    releaseAdjustmentLock();
+    selectedAdjustmentTarget = target;
     saveDotSets();
     cancelEditing();
     renderDots();
@@ -2288,6 +2716,8 @@ dotForm.addEventListener('submit', (event) => {
     }
     target.blue = blue;
     compareAdjustmentForecast(target);
+    releaseAdjustmentLock();
+    selectedAdjustmentTarget = target;
     saveDotSets();
     finishCruiseAddition();
     renderDots();
@@ -2310,6 +2740,7 @@ dotForm.addEventListener('submit', (event) => {
     return;
   }
 
+  restoreConfirmedCarry();
   dotSets.push({ learningId: newLearningId(), red, blue, adjustments: [] });
   compareAdjustmentForecast(dotSets.at(-1));
   releaseAdjustmentLock();
@@ -2343,6 +2774,7 @@ adjustmentForm.addEventListener('submit', (event) => {
   const targetSet = dotSets.includes(selectedAdjustmentTarget) ? selectedAdjustmentTarget : dotSets.at(-1);
   if (adjustmentEdit) {
     const { set, adjustment } = adjustmentEdit;
+    if (isConfirmedAdjustment(set, adjustment) || !isLatestRecordedAdjustment(set, adjustment)) { cancelEditing(); return; }
     const index = set.adjustments?.indexOf(adjustment) ?? -1;
     if (!dotSets.includes(set) || index < 0) { cancelEditing(); return; }
     updateAdjustmentForecast(memoValues, true);
@@ -2357,18 +2789,44 @@ adjustmentForm.addEventListener('submit', (event) => {
     renderDots();
     return;
   }
-  updateAdjustmentForecast(memoValues, true);
+  const previousForecast = adjustmentForecast;
+  const confirmedOrigins = getOriginSnapshot(getAdjustmentStartSet(targetSet));
+  const confirmedForecast = confirmSelectedForecast();
+  const requiredColors = Object.keys(confirmedOrigins);
+  const completeForecast = confirmedForecast && requiredColors.length && requiredColors.every(color => confirmedForecast.points
+    .some(point => point.color === color && [point.x, point.y, point.distance].every(Number.isFinite)));
+  if (adjustmentSequence && !completeForecast) {
+    adjustmentForecast = previousForecast;
+    renderAdjustmentForecast();
+    adjustmentMessage.textContent = '起点データがある項目すべての予測が必要です。算出可能な調整を選択してください。';
+    return;
+  }
   targetSet.adjustments ??= [];
   targetSet.adjustments.push([...memoValues]);
   saveAdjustmentSelection();
-  adjustmentLock = { page: currentChartPage, values: [...memoValues], rank: guideCandidateIndex,
+  const stage = { page: currentChartPage, values: [...memoValues], rank: guideCandidateIndex,
     guideBlade: String(guideNumberChoices[guideCandidateIndex]?.blade ?? '—'),
-    targetId: targetSet.learningId, actualAdjustment: false };
+    targetId: targetSet.learningId, actualAdjustment: false,
+    actionIndex: targetSet.adjustments.length - 1, origins: confirmedOrigins,
+    rotations: structuredClone(pageRotations),
+    forecast: confirmedForecast ?? { targetId: targetSet.learningId, type: memoValues[1], values: [...memoValues],
+      phase: 'fixed', points: [], waiting: ['red', 'blue'] } };
+  adjustmentSequence ??= { targetId: targetSet.learningId, measurements: getMeasurementSignature(targetSet), stages: [], draft: null, active: {}, flow: true };
+  adjustmentSequence.flow = true;
+  adjustmentSequence.active ??= {};
+  adjustmentSequence.currentTargetId = targetSet.learningId;
+  adjustmentSequence.stages.push(stage);
+  adjustmentSequence.active[currentChartPage] = adjustmentSequence.stages.length - 1;
+  adjustmentLock = stage;
+  saveConfirmedCarry(adjustmentLock);
+  adjustmentSequence.draft = null;
+  forecastDisplayCache.clear();
   hideMemoPicker();
   activeMemoIndex = null;
   saveDotSets();
   updateMemoButtons();
   adjustmentMessage.textContent = '次の測定結果を登録するまで、追加した調整量を固定しています。';
+  updateSequenceMessage();
   updatePitchModeUI();
   updateTrimModeUI();
   renderDots();
@@ -2418,7 +2876,7 @@ function setupRotationControls() {
     rotationFrame = null;
     if (!activeRotation || !pendingPointer) return;
     if (rotationLocked || rotationLock.checked || (currentChartPage === 0 && pitchAutoMode)
-      || (currentChartPage === 1 && trimAutoMode && activeRotation.name === 'cruise')) {
+      || (currentChartPage === 1 && trimAutoMode)) {
       pendingPointer = null;
       return;
     }
@@ -2469,7 +2927,7 @@ function setupRotationControls() {
     state.handle.addEventListener('pointerdown', (event) => {
       const isZoomed = Number(svg.viewBox.baseVal.width) < 794;
       if (rotationLocked || rotationLock.checked || (currentChartPage === 0 && pitchAutoMode)
-        || (currentChartPage === 1 && trimAutoMode && state.name === 'cruise')
+        || (currentChartPage === 1 && trimAutoMode)
         || svg.dataset.pinching === 'true' || isZoomed) {
         event.stopImmediatePropagation();
         return;

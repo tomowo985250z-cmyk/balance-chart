@@ -30,8 +30,8 @@
         window.lifecycleRecords=JSON.stringify(BalanceState.keys.map(key=>appStorage.getItem(key)));`);
       selectAmount('1/4');
       assert(run("memoValues[0]==='3' && memoValues[3]==='DOWN'"), 'top priority remains No.3 DOWN');
-      assert(!bluePoint(), 'No.3 DOWN retains missing Cruise estimate');
-      assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'), 'missing estimate never creates a Cruise dot');
+      assert(bluePoint()?.source==='reference-coefficient', 'No.3 DOWN uses identified missing-data coefficient');
+      const referenceBlue=bluePoint();checkSaved(referenceBlue);
       selectRank(1); selectAmount('1/4');
       const generatedAction = run('memoValues.slice()');
       assert(generatedAction[0] !== '3', 'second No differs from missing-estimate No');
@@ -39,8 +39,8 @@
       assert(Boolean(blue), 'existing calculation generates Cruise for No.2');
       checkSaved(blue);
       selectRank(0); selectAmount('1/4');
-      assert(!bluePoint(), 'returning to No.3 keeps its calculation unchanged');
-      assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'), 'No.2 saved dot is not displayed for No.3');
+      assert(JSON.stringify(bluePoint())===JSON.stringify(referenceBlue), 'returning to No.3 restores its own reference prediction');
+      checkSaved(referenceBlue);
       selectRank(1); selectAmount('1/4'); checkSaved(blue);
       run('window.savedCruiseGuide=forecastGuides.blue;delete forecastGuides.blue;updateAdjustmentForecast()');
       assert(!bluePoint(), 'missing guide does not change the calculated point list');
@@ -59,8 +59,8 @@
       assert(run('!dotOverlay.querySelector(".forecast-body")'), 'manual No hides predictions');
       run('applySelectedGuideAdjustment()'); checkSaved(blue);
       run("memoFour.click();selectedMemoValue='DOWN';confirmMemoPicker.click()");
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), 'manual direction hides predictions');
-      run('applySelectedGuideAdjustment()'); checkSaved(blue);
+      assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), 'manual direction shows recalculated predictions');
+      run(`memoFour.click();selectedMemoValue='${generatedAction[3]}';confirmMemoPicker.click()`); checkSaved(blue);
       assert(run('JSON.stringify(learning.inspect())===lifecycleLearning'), 'display cache leaves learning unchanged');
       assert(run('JSON.stringify(BalanceState.keys.map(key=>appStorage.getItem(key)))===lifecycleRecords'), 'display cache leaves measurement and learning records unchanged');
       run('delete forecastGuides.blue;dotSets.at(-1).blue.radius=0.6;updateAdjustmentForecast()');

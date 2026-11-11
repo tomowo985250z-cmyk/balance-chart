@@ -39,13 +39,13 @@
           const label=JSON.stringify({mode,page,radius,angle,rotation,rank});
           assert(run(`[...dotOverlay.querySelectorAll('.guide-direction-line')].every(node=>{
             const color=node.getAttribute('marker-end').includes('red')?'red':'blue';
-            const unit=forecastGuides[color].unit;
+            const unit=forecastGuides[color]?.unit ?? getGuideMovementUnit(guideDisplayGeometry.get(node));
             const dx=node.x2.baseVal.value-node.x1.baseVal.value,dy=node.y2.baseVal.value-node.y1.baseVal.value;
             // SVGAnimatedLengthのfloat丸めを座標単位で許容する（短い3位候補も対象）。
             return dx*unit.x+dy*unit.y>0 && Math.abs(dx*unit.y-dy*unit.x)<1e-4;
           })`), 'DOM shares movement direction '+label);
           assert(run(`guidePredictionDebug.fallback
-            ? dotOverlay.querySelectorAll('.guide-direction-line').length===${page?1:2}
+            ? dotOverlay.querySelectorAll('.guide-direction-line').length===2
             : Boolean(guidePredictionDebug.selected)===Boolean(dotOverlay.querySelector('.guide-direction-line'))`), 'selected candidates rendered '+label);
           if(mode==='learned' && page===0 && run('!guidePredictionDebug.fallback')) assert(run(`guidePredictionDebug.candidates.every(candidate=>{
             const p=candidate.predictions[0],dx=p.position.x-p.start.x,dy=p.position.y-p.start.y,l=Math.hypot(dx,dy);

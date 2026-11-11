@@ -51,7 +51,7 @@
               && adjustmentForecast.points.every(point=>{
                 const action=BalanceLearning.adjustment(memoValues),start=getDotCoordinates(dotSets.at(-1)[point.color]);
                 const prediction=learning.predict(action.type,point.color,action.blade,action.direction,action.amount,start);
-                const estimate=BalanceDistancePrior.resolve(action,point.color,prediction,prediction?[]:learning.inspect().samples,CHART_RADIUS);
+                const estimate=resolveDisplayDistance(action,point.color,prediction,prediction?[]:learning.inspect().samples,CHART_RADIUS);
                 const guide=forecastGuides[point.color];
                 return estimate && guide.blade===action.blade && Math.abs(point.x-start.x-guide.unit.x*estimate.distance)<1e-8
                   && Math.abs(point.y-start.y-guide.unit.y*estimate.distance)<1e-8;

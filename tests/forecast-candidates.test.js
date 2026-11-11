@@ -108,7 +108,10 @@
         assert(run('JSON.stringify(adjustmentForecast)===phaseSnapshot'), 'renderer leaves forecast phase and data unchanged');
       }
       run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');dotForm.requestSubmit()`);
-      assert(run('!adjustmentLock'), 'next measurement releases candidate input lock');
+      assert(run('adjustmentSequence?.stages.length===1 && !adjustmentLock && !Object.keys(adjustmentSequence.active).length && !addAdjustmentButton.disabled && !memoButtons[2].disabled'), 'partial actual releases both page locks while retaining confirmed history');
+      run('showChartPage(1-currentChartPage)');
+      assert(run('!adjustmentLock && !addAdjustmentButton.disabled && !memoButtons[2].disabled'), 'partial actual also leaves the other page editable');
+      run("document.getElementById('resetLearning').click();deleteConfirmation.close('delete');deleteConfirmation.dispatchEvent(new Event('close'))");
     }
     output.textContent = `PASS: ${checks} checks — three Nos, linked previews, recorded adjustments, LINK HOV/Cruise and TAB\n`;
     document.title = 'PASS';

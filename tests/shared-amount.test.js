@@ -88,7 +88,9 @@
         checkAmount(amount, 'No switching cannot change added amount');
       }
       run(`showChartPage(${1-page})`);
-      assert(run('JSON.stringify(memoValues)===JSON.stringify(beforeSubmit) && memoButtons.every(button=>button.disabled)'), 'other chart retains locked added input');
+      assert(run(`adjustmentSequence && !adjustmentLock && !memoButtons[2].disabled
+        && memoValues[1]==='${page?'LINK':'TAB'}'`),
+        'other chart permits second-stage input even when a first forecast is unavailable');
       run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach((input,i)=>input.value=['5','0','0.3'][i]);dotForm.requestSubmit()`);
       checkAmount(page ? '1/4' : '1', 'new measurement resets other type selection');
       run(`showChartPage(${page})`);
@@ -139,14 +141,15 @@
     assert(run('JSON.stringify(dotSets.at(-1).adjustments.at(-1))===JSON.stringify(beforeSubmit)'), 'submit records the selected shared amount');
     checkAmount('2/3', 'submit retains shared LINK amount');
     run(`redInputs.forEach((input,i)=>input.value=['2','0','0.4'][i]);blueInputs.forEach(input=>input.value='');dotForm.requestSubmit()`);
-    checkAmount('1/4', 'next measurement resets shared LINK amount');
+    checkAmount('1/4', 'partial actual resets LINK amount for the next adjustment');
+    assert(run('!!adjustmentSequence && !adjustmentLock && !Object.keys(adjustmentSequence.active).length'), 'partial actual releases both page locks and preserves previous history');
+    run("document.getElementById('resetLearning').click();deleteConfirmation.close('delete');deleteConfirmation.dispatchEvent(new Event('close'))");
     selectAmount('1/2');
     assert(run('sharedRecordedSet.adjustments.at(-1)[2]==="2/3"'), 'changing shared amount does not rewrite history');
-    run('startAdjustmentEdit(sharedRecordedSet,sharedRecordedSet.adjustments.at(-1))');
-    selectAmount('3/4');run('adjustmentForm.requestSubmit()');
-    assert(run('!adjustmentEdit && sharedRecordedSet.adjustments.at(-1)[2]==="3/4"'), 'edit updates recorded amount');
+    run('dotList.querySelector(".edit-confirmed-adjustment").click();confirmedEditAmount.value="3/4";confirmedEditForm.requestSubmit()');
+    assert(run('!confirmedEditDialog.open && sharedRecordedSet.adjustments.at(-1)[2]==="3/4"'), 'latest confirmed edit updates recorded amount');
     checkAmount('1/2', 'edit completion restores existing draft amount without reset');
-    run('startAdjustmentEdit(sharedRecordedSet,sharedRecordedSet.adjustments.at(-1));cancelAdjustmentEdit.click()');
+    run('dotList.querySelector(".edit-confirmed-adjustment").click();document.getElementById("cancelConfirmedEdit").click()');
     checkAmount('1/2', 'edit cancellation restores existing draft amount without reset');
     run('showChartPage(1)');selectAmount('3');run('showChartPage(0);dotSets.splice(0);saveDotSets();renderDots()');
     checkAmount('1/2', 'deleting all results preserves selected LINK amount');

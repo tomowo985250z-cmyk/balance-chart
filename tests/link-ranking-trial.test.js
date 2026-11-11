@@ -77,8 +77,8 @@
       assert(result.selected.amountText === result.amount && result.memo[2] === result.amount, label + ': evaluated amount matches shared and displayed amount');
       for (const p of result.selected.predictions) {
         const point = result.points.find(item => item.color === p.color);
-        assert(p.position ? Boolean(point) && near(p.position.x, point.x) && near(p.position.y, point.y) : !point,
-          label + '/' + p.color + ': ranked endpoint equals existing forecast coordinates');
+        assert(p.position ? Boolean(point) && near(p.position.x, point.x) && near(p.position.y, point.y) : point?.source==='reference-coefficient',
+          label + '/' + p.color + ': ranked endpoint unchanged; missing value uses display-only coefficient');
       }
       if (result.selected.predictions.some(p => p.source !== 'learned')) assert(result.notice.includes('予測不確実'), label + ': uncertainty visible beside forecast');
     };

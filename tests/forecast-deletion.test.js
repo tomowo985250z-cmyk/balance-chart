@@ -28,11 +28,11 @@
       assert(run(`!getVisibleGuideAdjustment() || (String(getVisibleGuideAdjustment().blade)===memoValues[0]
         && getVisibleGuideAdjustment().direction===memoValues[3])`), label + ': guide matches No and direction');
       assert(run(`!adjustmentForecast || adjustmentForecast.points.every(point=>{
-        const target=dotSets.find(set=>set.learningId===adjustmentForecast.targetId);
+        const target=getAdjustmentStartSet(dotSets.find(set=>set.learningId===adjustmentForecast.targetId));
         const action=BalanceLearning.adjustment(memoValues),guide=forecastGuides[point.color];
         const start=getDotCoordinates(target[point.color]);
         const prediction=learning.predict(action.type,point.color,action.blade,action.direction,action.amount,start);
-        const estimate=BalanceDistancePrior.resolve(action,point.color,prediction,prediction?[]:learning.inspect().samples,CHART_RADIUS);
+        const estimate=resolveDisplayDistance(action,point.color,prediction,prediction?[]:learning.inspect().samples,CHART_RADIUS);
         return estimate && guide && guide.blade===action.blade && guide.direction===action.direction
           && Math.abs(point.distance-estimate.distance)<1e-8
           && Math.abs(point.x-start.x-guide.unit.x*estimate.distance)<1e-8
@@ -99,8 +99,10 @@
       setup(page,'manual');
       run(`dotSets[0].adjustments.push(['1','${page?'TAB':'LINK'}','3','UP']);
         adjustmentForm.requestSubmit();showChartPage(${1-page})`);
+      const firstStage = run('JSON.stringify(adjustmentSequence.stages[0].forecast)');
       remove(0,0);
-      assert(run('Boolean(adjustmentLock) && adjustmentForecast===null && forecastDisplayCache.size===0'), 'other chart deletion clears old forecast without releasing unrelated lock');
+      assert(run('!!adjustmentSequence && !adjustmentLock && adjustmentSequence.stages[0].actionIndex===0 && JSON.stringify(adjustmentSequence.stages[0].forecast)') === firstStage,
+        'other chart deletion preserves the first stage and keeps the second stage editable');
       await reload();run(`showChartPage(${page})`);
       assert(run('Boolean(adjustmentLock) && adjustmentForecast?.phase==="fixed"'), 'returning to locked type recalculates its forecast');
       fresh('locked return');
@@ -114,7 +116,7 @@
       remove(0,0);
       fresh('missing Cruise');
       assert(run('!adjustmentForecast?.points.some(point=>point.color==="blue") && !dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'), 'missing Cruise never restores cached dot');
-      if(page)assert(run('!dotOverlay.querySelector(".forecast-body")'), 'TAB without Cruise hides all forecasts');
+      if(page)assert(run('adjustmentForecast?.points.some(point=>point.color==="red") && !!dotOverlay.querySelector(".adjustment-forecast [data-color=red]")'), 'TAB without Cruise keeps independent HOV forecast');
       await reload();
       assert(run('!dotOverlay.querySelector(".adjustment-forecast [data-color=blue]")'), 'missing Cruise remains hidden after reload');
     }

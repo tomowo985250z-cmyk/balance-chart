@@ -65,8 +65,8 @@
         assert(value.values[2]==='1/4'&&value.forecast.values[2]==='1/4', 'No.1-3 switching preserves shared adjustment amount');
         for (const p of candidate.predictions) {
           const point = value.forecast.points.find(point=>point.color===p.color);
-          assert(p.position ? point&&Math.hypot(point.x-p.position.x,point.y-p.position.y)<1e-8 : !point,
-            'each No ranked endpoint equals displayed forecast');
+          assert(p.position ? point&&Math.hypot(point.x-p.position.x,point.y-p.position.y)<1e-8 : point?.source==='reference-coefficient',
+            'existing ranked endpoints preserved; missing endpoint uses display-only coefficient');
           const unit = value.guides[p.color]?.unit;
           assert(unit&&Math.hypot(unit.x-candidate.units[p.color].x,unit.y-candidate.units[p.color].y)<1e-8,
             'guide direction equals evaluated adjustment direction');
@@ -77,8 +77,8 @@
           return x*u.x+y*u.y>0&&Math.abs(x*u.y-y*u.x)<1e-4;})`), 'drawn arrow agrees with prediction movement vector for each No');
         if(candidate.blade===3) {
           assert(run('document.getElementById("hovForecastResult").dataset.trend==="worsened" && document.querySelector("#hovForecastResult .forecast-limit").textContent==="0.2 IPS超"')
-            &&run('document.getElementById("cruiseForecastResult").dataset.trend==="none"')===(hov===.32),
-            'No.3 HOV worsening and actual Cruise missing status stay visible outside collapsed caution');
+            &&run('document.getElementById("cruiseForecastResult").dataset.trend!=="none"'),
+            'No.3 HOV worsening and Cruise reference forecast stay visible outside collapsed caution');
           assert(candidate.predictions[0].endpoint>hov, 'No.3 cannot improve HOV at this shared amount');
         }
         displayed.push(value);

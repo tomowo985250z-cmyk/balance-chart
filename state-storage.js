@@ -12,7 +12,49 @@ const BalanceState = (() => {
     const point = value => object(value) && ['red', 'blue'].includes(value.color)
       && [value.x, value.y, value.distance].every(Number.isFinite);
     const forecast = data?.forecast;
-    const valid = object(data) && data.version === 1 && typeof data.measurements === 'string'
+    const validForecast = value => object(value) && typeof value.targetId === 'string'
+      && ['LINK', 'TAB'].includes(value.type) && ['preview', 'fixed', 'comparison'].includes(value.phase)
+      && strings(value.values, 4) && Array.isArray(value.points) && value.points.every(point) && Array.isArray(value.waiting);
+    const sequence = data?.adjustmentSequence;
+    const origins = value => value === undefined || (object(value) && Object.entries(value).every(([color, origin]) =>
+      ['red', 'blue'].includes(color) && object(origin) && ['actual', 'confirmed'].includes(origin.kind)
+      && typeof origin.measurementId === 'string' && object(origin.dot) && origin.dot.color === color
+      && typeof origin.dot.clock === 'string' && Number.isFinite(origin.dot.angle)
+      && Number.isFinite(origin.dot.radius) && origin.dot.radius >= 0));
+    const carry = data?.confirmedCarry;
+    const validCarry = carry == null || (object(carry) && typeof carry.targetId === 'string'
+      && Number.isInteger(carry.actionIndex) && carry.actionIndex >= 0 && strings(carry.values, 4)
+      && Array.isArray(carry.points) && carry.points.every(point) && object(carry.observed)
+      && ['red', 'blue'].every(color => carry.observed[color] === null || (object(carry.observed[color])
+        && typeof carry.observed[color].id === 'string' && typeof carry.observed[color].signature === 'string')));
+    const validSequence = sequence == null || (object(sequence) && typeof sequence.targetId === 'string'
+      && typeof sequence.measurements === 'string' && Array.isArray(sequence.stages) && sequence.stages.length > 0
+      && (sequence.flow === undefined || typeof sequence.flow === 'boolean')
+      && (sequence.flow || [1, 2].includes(sequence.stages.length))
+      && (!sequence.flow || (object(sequence.active) && Object.entries(sequence.active).every(([page,index]) =>
+        ['0','1'].includes(page) && Number.isInteger(index) && index >= 0 && index < sequence.stages.length
+        && sequence.stages[index]?.page === Number(page))))
+      && (sequence.currentTargetId === undefined || typeof sequence.currentTargetId === 'string')
+      && sequence.stages.every((stage, index) => object(stage) && [0, 1].includes(stage.page)
+        && [0, 1, 2].includes(stage.rank) && strings(stage.values, 4) && stage.values.every(Boolean)
+        && stage.values[1] === (stage.page === 0 ? 'LINK' : 'TAB') && typeof stage.targetId === 'string'
+        && (index !== 0 || stage.targetId === sequence.targetId) && origins(stage.origins)
+        && ['1', '2', '3', '—'].includes(stage.guideBlade) && typeof stage.actualAdjustment === 'boolean'
+        && Number.isInteger(stage.actionIndex) && stage.actionIndex >= 0 && validForecast(stage.forecast)
+        && (stage.rotations === undefined || (Array.isArray(stage.rotations) && stage.rotations.length === 2 && stage.rotations.every(angles)))
+        && (stage.learningValues === undefined || (strings(stage.learningValues, 4) && target(stage.learningAfterId)))
+        && (stage.editedGuides === undefined || (object(stage.editedGuides) && Object.entries(stage.editedGuides).every(([color,line]) =>
+          ['red','blue'].includes(color) && object(line) && ['base','start','end'].every(key => object(line[key])
+            && [line[key].x,line[key].y].every(Number.isFinite)))))
+        && stage.forecast.targetId === stage.targetId && stage.forecast.type === stage.values[1]
+        && JSON.stringify(stage.forecast.values) === JSON.stringify(stage.values) && stage.forecast.phase === 'fixed'
+        && (index === 0 || (stage.origins ? Object.keys(stage.origins).length > 0
+          && Object.keys(stage.origins).every(color => stage.forecast.points.some(item => item.color === color))
+          : ['red', 'blue'].every(color => stage.forecast.points.some(item => item.color === color)))))
+      && (sequence.flow || new Set(sequence.stages.map(stage => stage.page)).size === sequence.stages.length)
+      && (sequence.draft == null || (object(sequence.draft) && [0, 1].includes(sequence.draft.page)
+        && (sequence.draft.forecast === null || validForecast(sequence.draft.forecast)))));
+    const valid = object(data) && validSequence && validCarry && data.version === 1 && typeof data.measurements === 'string'
       && strings(data.redInputs, 3) && strings(data.blueInputs, 3) && strings(data.memoValues, 4)
       && (data.adjustmentLock == null || (object(data.adjustmentLock)
         && [0, 1].includes(data.adjustmentLock.page) && [0, 1, 2].includes(data.adjustmentLock.rank)

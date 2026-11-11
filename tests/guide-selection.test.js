@@ -10,6 +10,7 @@
     const visible = () => run(`dotOverlay.querySelector('.direction-lines').style.opacity !== '0'`);
     for (const page of [0, 1]) for (const rank of [0, 1, 2]) {
       run(`adjustmentForecast=null;selectedAdjustmentTarget=null;learning.reset([]);dotSets.splice(0);
+        memoValues.fill('');adjustmentSelections.forEach(values=>values.fill(''));guideCandidateIndices.fill(0);
         currentChartPage=${page};guideCandidateIndex=${rank};pitchAutoMode=false;trimAutoMode=false;
         dotSets.push({learningId:newLearningId(),red:{...parseDotInput('2','0','0.5'),color:'red'},
           blue:{...parseDotInput('5','0','0.5'),color:'blue'},adjustments:[]});
@@ -18,18 +19,18 @@
       assert(visible(), 'automatic visible');
       for (const index of [0, 3]) {
         run(`openMemoPicker(${index});selectedMemoValue=${index === 0 ? "automaticValues[0]==='1'?'2':'1'" : "automaticValues[3]==='UP'?'DOWN':'UP'"};previewMemoSelection();`);
-        assert(!visible(), 'manual preview hides '+page+'/'+rank+'/'+index);
+        assert(visible()===(index===3), 'only manual No preview hides '+page+'/'+rank+'/'+index);
         run(`selectedMemoValue=automaticValues[${index}];previewMemoSelection();`);
         assert(visible(), 'return preview restores');
         run(`selectedMemoValue=${index === 0 ? "automaticValues[0]==='1'?'2':'1'" : "automaticValues[3]==='UP'?'DOWN':'UP'"};confirmMemoPicker.click();`);
-        assert(!visible(), 'confirmed change hides');
+        assert(visible()===(index===3), 'only confirmed manual No change hides');
         run(`openMemoPicker(${index});selectedMemoValue=automaticValues[${index}];confirmMemoPicker.click();`);
         assert(visible(), 'confirmed return restores independently of direction history');
       }
       run(`openMemoPicker(0);selectedMemoValue=automaticValues[0]==='1'?'2':'1';confirmMemoPicker.click();
         openMemoPicker(3);selectedMemoValue=automaticValues[3]==='UP'?'DOWN':'UP';confirmMemoPicker.click();
         openMemoPicker(0);selectedMemoValue=automaticValues[0];confirmMemoPicker.click();`);
-      assert(!visible(), 'restoring blade alone keeps changed direction hidden');
+      assert(visible(), 'restoring blade shows the selected manual direction');
       run(`openMemoPicker(3);selectedMemoValue=automaticValues[3];confirmMemoPicker.click();`);
       assert(visible(), 'restoring both shows');
       run(`openMemoPicker(0);selectedMemoValue=automaticValues[0]==='1'?'2':'1';confirmMemoPicker.click();

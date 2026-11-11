@@ -62,14 +62,14 @@ const BalanceDistancePrior = (() => {
   function lookup(action, color) {
     return models.get(keyFor(action, color)) ?? null;
   }
-  function resolveExact(action, color, confirmedSamples, radius) {
+  function resolveExact(action, color, confirmedSamples, radius, allowTabHovReference = false) {
     const prior = lookup(action, color);
     if (!prior) {
       const measured = confirmedSamples.findLast(sample => keyFor(sample, sample.color) === keyFor(action, color)
         && Number.isFinite(sample.actualVector?.distance) && sample.actualVector.distance >= 0);
       if (measured) return { distance: measured.actualVector.distance, source: 'measured', sampleCount: 1 };
       // 参考値だけNo./方向を緩和。同色・同種別・同量の元実測のみを集計する。
-      if (action.type === 'TAB' && color !== 'blue') return null;
+      if (action.type === 'TAB' && color !== 'blue' && !allowTabHovReference) return null;
       const values = samples.filter(sample => sample.type === action.type && sample.color === color
         // 新規Cruise LINKのUP実測はDOWNへ流用しない。他系統の既存集計は維持。
         && (!(action.type === 'LINK' && color === 'blue') || sample.direction === action.direction)
@@ -92,8 +92,8 @@ const BalanceDistancePrior = (() => {
     }
     return { distance, source: actualCount ? 'prior-adjusted' : 'prior', actualCount, prior };
   }
-  function resolveFallback(action, color, confirmedSamples, radius) {
-    const exact = resolveExact(action, color, confirmedSamples, radius);
+  function resolveFallback(action, color, confirmedSamples, radius, allowTabHovReference = false) {
+    const exact = resolveExact(action, color, confirmedSamples, radius, allowTabHovReference);
     if (exact) return exact;
     const amounts = new Set(samples.filter(sample => sample.type === action.type && sample.color === color)
       .map(sample => sample.amount));
@@ -103,7 +103,7 @@ const BalanceDistancePrior = (() => {
       }
     }
     const nearest = [...amounts].filter(amount => amount !== action.amount)
-      .map(amount => ({ amount, estimate: resolveExact({ ...action, amount }, color, confirmedSamples, radius) }))
+      .map(amount => ({ amount, estimate: resolveExact({ ...action, amount }, color, confirmedSamples, radius, allowTabHovReference) }))
       .filter(candidate => candidate.estimate)
       .sort((first, second) => Math.abs(first.amount - action.amount) - Math.abs(second.amount - action.amount)
         || first.amount - second.amount)[0];
@@ -116,16 +116,19 @@ const BalanceDistancePrior = (() => {
     if (Number.isFinite(prediction?.distance) && prediction.distance >= 0) {
       return { distance: prediction.distance, source: 'learned' };
     }
-    const estimate = resolveFallback(action, color, confirmedSamples, radius);
+    // 既存の算出値はそのまま採用。新しいTAB HOV表示で距離がない条件だけ、同色TABの参考集計を許可する。
+    let estimate = resolveFallback(action, color, confirmedSamples, radius);
+    const useTabHovReference = !estimate && action.type === 'TAB' && color === 'red';
+    if (useTabHovReference) estimate = resolveFallback(action, color, confirmedSamples, radius, true);
     if (action.type !== 'TAB' || !estimate) return estimate;
     const amounts = [1, 2, 3];
     const series = amounts.map(amount => ({ amount,
-      estimate: resolveFallback({ ...action, amount }, color, confirmedSamples, radius) }))
+      estimate: resolveFallback({ ...action, amount }, color, confirmedSamples, radius, useTabHovReference) }))
       .filter(item => Number.isFinite(item.estimate?.distance));
     const monotonic = series.every((item, index) => index === 0 || series[index - 1].estimate.distance < item.estimate.distance);
     if (monotonic) return estimate;
     const unitDistances = amounts.map(amount => {
-      const direct = resolveExact({ ...action, amount }, color, confirmedSamples, radius);
+      const direct = resolveExact({ ...action, amount }, color, confirmedSamples, radius, useTabHovReference);
       return Number.isFinite(direct?.distance) && direct.distance > 0 ? direct.distance / amount : null;
     }).filter(Number.isFinite).sort((first, second) => first - second);
     if (unitDistances.length < 2) return estimate;

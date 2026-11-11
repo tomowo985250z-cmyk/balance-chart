@@ -155,7 +155,7 @@
           const forecast = run('adjustmentForecast');
           for (const p of normalized.predictions) {
             const point = forecast.points.find(point=>point.color===p.color);
-            assert(p.position ? point && near(point.x,p.position.x) && near(point.y,p.position.y) : !point, 'ranking endpoint equals unchanged forecast calculation');
+            assert(p.position ? point && near(point.x,p.position.x) && near(point.y,p.position.y) : point?.source==='reference-coefficient', 'existing ranked endpoint unchanged; missing value uses separate display coefficient');
             const expected=run(`(()=>{const u=forecastGuides['${p.color}']?.unit;
               return u&&${p.currentDistance}>0?-(((${p.start.x})-CHART_CENTER_X)*u.x+((${p.start.y})-CHART_CENTER_Y)*u.y)/Math.hypot(u.x,u.y)/CHART_RADIUS:null;})()`);
             assert(expected===null?p.inwardProjection===null:near(p.inwardProjection,expected),

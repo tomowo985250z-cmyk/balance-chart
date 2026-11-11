@@ -1,13 +1,7 @@
 ﻿<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 794 1123" role="img" aria-labelledby="chart-title chart-description">
   <title id="chart-title">バランスチャート</title>
   <desc id="chart-description">12方向、半径0.1から1.0までの極座標チャート</desc>
-  <style>
-    .trim-tab #hovLayer { display: none; }
-    .trim-tab #cruiseLayer { stroke: #7b2cbf; }
-    .trim-tab #cruiseArrowHead path,
-    .trim-tab #cruiseTypeLabels,
-    .trim-tab #cruiseDirectionLabels { fill: #7b2cbf; }
-  </style>
+  <!-- LINK/TABとも同じ赤・青の六角形を描画し、回転角は親画面の方式別計算を使う。 -->
 
   <defs>
     <marker id="hovArrowHead" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="18" markerHeight="15" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
@@ -313,7 +307,7 @@
         if (zoom <= 1 && event.touches.length === 1 && svg.dataset.rotationLocked !== 'true'
           && event.target.closest('#hovRotationHandle, #cruiseRotationHandle')
           && svg.dataset.pitchAutoMode !== 'true'
-          && !(svg.dataset.trimAutoMode === 'true' && event.target.closest('#cruiseRotationHandle'))) {
+          && svg.dataset.trimAutoMode !== 'true') {
           rotationTouchActive = true;
           event.preventDefault();
         }
@@ -438,7 +432,7 @@
         const group = handle.closest('#hovGroup, #cruiseGroup');
 
         const name = group.id === 'hovGroup' ? 'hov' : 'cruise';
-        if (svg.dataset.pitchAutoMode === 'true' || (name === 'cruise' && svg.dataset.trimAutoMode === 'true')) return;
+        if (svg.dataset.pitchAutoMode === 'true' || svg.dataset.trimAutoMode === 'true') return;
         if (active) stopRotation({ pointerId: active.pointerId });
         active = { group, name, pointerId: event.pointerId, startAngle: pointerAngle(event), groupAngle: angles[name] };
         svg.setPointerCapture(event.pointerId);
@@ -450,7 +444,7 @@
         if (!active || event.pointerId !== active.pointerId) return;
         if (pinching) return;
         if (svg.dataset.rotationLocked === 'true' || svg.dataset.pitchAutoMode === 'true'
-          || (active.name === 'cruise' && svg.dataset.trimAutoMode === 'true')) {
+          || svg.dataset.trimAutoMode === 'true') {
           stopRotation(event);
           return;
         }

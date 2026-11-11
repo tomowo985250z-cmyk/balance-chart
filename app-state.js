@@ -11,7 +11,7 @@
     version: 1, measurements: JSON.stringify(dotSets),
     redInputs: redInputs.map(input => input.value), blueInputs: blueInputs.map(input => input.value),
     memoValues: [...memoValues], adjustmentSelections: adjustmentSelections.map(values => [...values]),
-    adjustmentLock,
+    adjustmentLock, adjustmentSequence, confirmedCarry,
     currentChartPage, guideCandidateIndex, guideCandidateIndices: guideCandidateIndices.map((rank, page) => page === currentChartPage ? guideCandidateIndex : rank), pitchAutoMode, trimAutoMode,
     hovAngle, cruiseAngle, pageRotations, manualPitchAngles, manualPitchInitialized, autoPitchAngles, initialChartRotations,
     manualTrimCruiseAngle, autoTrimCruiseAngle, manualLearningReference,
@@ -88,11 +88,15 @@
         : state.adjustmentSelections;
       adjustmentSelections.splice(0, 6, ...selections);
       adjustmentLock = state.adjustmentLock ?? null;
+      adjustmentSequence = state.adjustmentSequence ?? null;
+      confirmedCarry = state.confirmedCarry ?? null;
+      if (adjustmentSequence) adjustmentLock = getSequenceStage();
       // 追加後は入力も保存値を保持し、未追加の場合だけ従来の起動時初期化を行う。
-      if (!adjustmentLock) resetSharedAdjustmentAmounts();
+      if (!adjustmentLock && (!adjustmentSequence || (adjustmentSequence.flow && !Object.keys(adjustmentSequence.active).length))) resetSharedAdjustmentAmounts();
       redInputs.forEach((input, index) => { input.value = state.redInputs[index]; });
       blueInputs.forEach((input, index) => { input.value = state.blueInputs[index]; });
       selectedAdjustmentTarget = setFor(state.selectedTarget);
+      if (adjustmentSequence) selectedAdjustmentTarget = setFor(getSequenceTargetId());
       rotationLock.checked = state.rotationLocked; legacyActualAdjustment = state.actualAdjustment;
       if (adjustmentLock) {
         guideCandidateIndices[adjustmentLock.page] = adjustmentLock.rank;
@@ -107,11 +111,17 @@
         for (const [key, entry] of state.forecastCache) forecastDisplayCache.set(key, { ...entry, points: new Map(entry.points) });
         if (state.resultEdit && setFor(state.resultEdit.target)) resultEdit = { set: setFor(state.resultEdit.target), draft: state.resultEdit.draft };
         const editSet = state.adjustmentEdit && setFor(state.adjustmentEdit.target);
-        if (!adjustmentLock && editSet?.adjustments[state.adjustmentEdit.index]) adjustmentEdit = { set: editSet,
+        if (!adjustmentLock && editSet?.adjustments[state.adjustmentEdit.index]
+          && !isConfirmedAdjustment(editSet, editSet.adjustments[state.adjustmentEdit.index])
+          && isLatestRecordedAdjustment(editSet, editSet.adjustments[state.adjustmentEdit.index])) adjustmentEdit = { set: editSet,
           adjustment: editSet.adjustments[state.adjustmentEdit.index], draft: state.adjustmentEdit.draft,
           draftTarget: setFor(state.adjustmentEdit.draftTarget) };
         cruiseAdditionTarget = setFor(state.cruiseTarget); cruiseInputDraft = state.cruiseInputDraft;
       }
+      restoreLegacyAdjustmentSequence();
+      restoreConfirmedCarry();
+      if (adjustmentSequence) adjustmentForecast = structuredClone(adjustmentLock?.forecast
+        ?? (adjustmentSequence.draft?.page === currentChartPage ? adjustmentSequence.draft.forecast : null));
       dotOverlay.classList.toggle('trim-tab', currentChartPage === 1);
       chartTitle.textContent = chartNames[currentChartPage];
       chartPageButtons.forEach((button, index) => {
@@ -124,6 +134,7 @@
       applyChartRotation(state.hovAngle, state.cruiseAngle);
       renderDirectionLines();
       updatePitchModeUI(); updateTrimModeUI(); setGuidesVisible(state.guidesVisible);
+      updateSequenceMessage();
       const view = typeof state.viewBox === 'string' ? state.viewBox.trim().split(/\s+/).map(Number) : [];
       if (view.length === 4 && view.every(Number.isFinite) && view[2] > 0 && view[3] > 0) {
         dotOverlay.setAttribute('viewBox', state.viewBox);
@@ -136,6 +147,7 @@
     // 位置に合わせてガイドだけ描き直し、復元済みの予測・入力は保持する。
     restoringAppState = true;
     try { renderDirectionLines(); } finally { restoringAppState = false; }
+    if (!adjustmentLock && adjustmentForecast?.manualDirection) updateAdjustmentForecast(memoValues);
     if (adjustmentLock && !adjustmentForecast) refreshAdjustmentForecastAfterDeletion();
   };
   try {

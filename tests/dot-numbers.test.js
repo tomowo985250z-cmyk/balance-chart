@@ -14,7 +14,9 @@
     const flushLayoutFrame = () => run(`if(dotNumberLayoutFrame!==null){
       cancelAnimationFrame(dotNumberLayoutFrame);dotNumberLayoutFrame=null;layoutDotNumbers();}`);
     await tick();
-    run(`dotSets.splice(0);for(let i=0;i<14;i++)dotSets.push({red:{color:'red',radius:0,angle:0,clock:'0:00'}});renderDots()`);
+    // Use the same IDs as normal measurement entry; forecasts and UI storage require a target ID.
+    run(`dotSets.splice(0);for(let i=0;i<14;i++)dotSets.push({learningId:newLearningId(),adjustments:[],
+      red:{color:'red',radius:0,angle:0,clock:'0:00'}});renderDots()`);
     await tick(); run('balanceFlushState()');
     const state = () => run(`(()=>{
       const storage=JSON.parse(appStorage.exportText()).records;
@@ -104,7 +106,7 @@
     assert(positions() === settled, 'collision-free viewBox changes preserve positions after settling');
     frame.style.width = '900px'; await tick(); verify();
     assert(state() === before, 'layout preserves calculation, learning and storage');
-    run(`dotSets.splice(0);dotSets.push({red:{color:'red',radius:0,angle:0,clock:'0:00'}});renderDots()`);
+    run(`dotSets.splice(0);dotSets.push({learningId:newLearningId(),adjustments:[],red:{color:'red',radius:0,angle:0,clock:'0:00'}});renderDots()`);
     assert(run(`(()=>{const n=dotOverlay.querySelector('text[data-dot-x]'),b=n.getBBox();return Math.hypot(b.x+b.width/2-397,b.y+b.height/2-520)<25})()`), 'isolated number stays close');
     output.textContent = `PASS: ${checks} checks`; document.title = 'PASS';
   } catch (error) { output.textContent = 'FAIL: ' + error.stack; document.title = 'FAIL'; }

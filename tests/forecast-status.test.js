@@ -54,7 +54,7 @@
         assert(run(`adjustmentForecast.values[2]==='${amount}'`), type + ': status uses current amount forecast');
       }
       run('openMemoPicker(3);selectedMemoValue=memoValues[3]==="UP"?"DOWN":"UP";previewMemoSelection()');
-      expect('none', type + ': manually changed direction has no displayed forecast');
+      expect('reference', type + ': manually changed direction displays reference forecast');
       run('closeMemoPicker.click()');expect('reference', type + ': cancelling direction restores reference');
       run(`showChartPage(${1-page})`);
       assert(run('memoValues[1]') === (page ? 'LINK' : 'TAB'), 'switch updates input type');

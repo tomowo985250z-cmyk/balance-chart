@@ -52,7 +52,7 @@
           assert(run(`adjustmentForecast.points.every(point=>{
             const action=BalanceLearning.adjustment(memoValues),start=getDotCoordinates(dotSets.at(-1)[point.color]);
             const prediction=learning.predict(action.type,point.color,action.blade,action.direction,action.amount,start);
-            const estimate=BalanceDistancePrior.resolve(action,point.color,prediction,prediction?[]:learning.inspect().samples,CHART_RADIUS);
+            const estimate=resolveDisplayDistance(action,point.color,prediction,prediction?[]:learning.inspect().samples,CHART_RADIUS);
             const unit=forecastGuides[point.color].unit;
             return Math.abs(point.x-start.x-unit.x*estimate.distance)<1e-8 && Math.abs(point.y-start.y-unit.y*estimate.distance)<1e-8;
           })`), 'forecast coordinates retain existing calculation');
@@ -61,7 +61,7 @@
           assert(run(`dotOverlay.querySelector('.direction-lines').style.opacity==='0' && !dotOverlay.querySelector('.forecast-body')`), 'manual No hides guides and dots');
           run('closeMemoPicker.click()');
           run(`openMemoPicker(3);selectedMemoValue=numberAutomatic[3]==='UP'?'DOWN':'UP';confirmMemoPicker.click()`);
-          assert(run(`dotOverlay.querySelector('.direction-lines').style.opacity==='0' && !dotOverlay.querySelector('.forecast-body')`), 'manual direction hides guides and dots');
+          assert(run(`dotOverlay.querySelector('.direction-lines').style.opacity!=='0' && !!dotOverlay.querySelector('.forecast-body')`), 'manual direction updates visible guides and dots');
           run('applySelectedGuideAdjustment()');
         } else assert(run('!dotOverlay.querySelector(".guide-direction-line") && !dotOverlay.querySelector(".forecast-body")'), 'unavailable candidate never fabricates guides or predictions');
         if (step < 3) run('guideCandidateToggle.click()');
