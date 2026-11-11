@@ -39,6 +39,8 @@ const lastAutoRotation = { TAB: {} };
 const guideToggle = document.getElementById('guideToggle');
 const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
+let tabIntersectionCandidates = [];
+let tabIntersectionHighlight = null;
 let guideCandidateIndex = 0;
 const guideCandidateIndices = [0, 0];
 // 調整量の操作後は、順位ではなく現在のNoを次のNo操作まで追跡する。
@@ -306,6 +308,52 @@ guideCandidateToggle.addEventListener('click', () => {
   selectingGuideNumber = true;
   try { renderDirectionLines(); } finally { selectingGuideNumber = false; }
 });
+
+function updateTabIntersectionHighlight() {
+  tabIntersectionHighlight = null;
+  const target = currentChartPage === 1 ? getAdjustmentStartSet() : null;
+  if (target?.red && target?.blue && tabIntersectionCandidates.length) {
+    const amount = Number(getSharedAdjustmentAmount(1));
+    const samples = learning.inspect().samples;
+    const rows = [];
+    for (const blade of [1, 2, 3]) for (const direction of ['UP', 'DOWN']) {
+      const matching = tabIntersectionCandidates.filter(raw => raw.blade === blade && (raw.direction ?? raw.line?.direction) === direction);
+      const raw = matching.find(item => Number(item.amountText) === amount) ?? matching[0];
+      const row = { blade, direction, red: null, blue: null };
+      for (const color of ['red', 'blue']) {
+        if (!raw) continue;
+        const start = getDotCoordinates(target[color]);
+        const predictionGuide = raw.predictions?.find(p => p.color === color);
+        const line = color === 'red' ? getDirectionLine(target.red, color, null, blade, direction)
+          : raw.line ?? (predictionGuide ? getPredictionGuideLine(predictionGuide) : null);
+        if (!line) continue;
+        const vector = getGuideMovementUnit(line), length = Math.hypot(vector.x, vector.y);
+        if (!(length > 0)) continue;
+        const unit = { x: vector.x / length, y: vector.y / length };
+        const amounts = BalanceLearning.amounts.TAB.flatMap(text => {
+          const action = BalanceLearning.adjustment([String(blade), 'TAB', text, direction]);
+          const prediction = learning.predict('TAB', color, blade, direction, action.amount, start);
+          const estimate = resolveDisplayDistance(action, color, prediction, prediction ? [] : samples, CHART_RADIUS);
+          if (!Number.isFinite(estimate?.distance) || estimate.distance < 0) return [];
+          const x = start.x + unit.x * estimate.distance, y = start.y + unit.y * estimate.distance;
+          return [{ amount: action.amount, distance: estimate.distance, ips: Math.hypot(x - CHART_CENTER_X, y - CHART_CENTER_Y) / CHART_RADIUS }];
+        });
+        const x = start.x - CHART_CENTER_X, y = start.y - CHART_CENTER_Y, projection = x * unit.x + y * unit.y;
+        const discriminant = projection * projection - (x * x + y * y - CHART_RADIUS * CHART_RADIUS);
+        const rayExit = discriminant < 0 ? 0 : Math.max(0, -projection + Math.sqrt(discriminant));
+        row[color] = { start, unit, amounts, maxTravel: Math.min(line.maxTravel ?? rayExit, Math.max(0, ...amounts.map(p => p.distance))) };
+      }
+      rows.push(row);
+    }
+    const legacyOrder = guideNumberChoices.map(choice => ({ blade: choice.blade, direction: choice.candidate?.direction ?? choice.candidate?.line?.direction }));
+    tabIntersectionHighlight = BalanceTabIntersection.evaluate(rows, legacyOrder, { x: CHART_CENTER_X, y: CHART_CENTER_Y }, CHART_RADIUS, amount);
+  }
+  const blade = adjustmentLock?.page === currentChartPage ? Number(adjustmentLock.guideBlade) : guideNumberChoices[guideCandidateIndex]?.blade;
+  const best = currentChartPage === 1 && Boolean(tabIntersectionHighlight?.winner) && tabIntersectionHighlight.winner.blade === blade;
+  guideCandidateToggle.dataset.intersectionBest = String(best);
+  if (best) guideCandidateToggle.setAttribute('aria-description', '赤青の有効交点が最も中心に近い候補です。');
+  else guideCandidateToggle.removeAttribute('aria-description');
+}
 
 function updateGuideCandidateToggle() {
   const locked = adjustmentLock?.page === currentChartPage;
@@ -796,6 +844,7 @@ function updateAdjustmentForecast(values = memoValues, fixed = false,
     && evaluatedLinkAmount !== getSharedAdjustmentAmount(0)) {
     renderDirectionLines(Boolean(adjustmentForecast?.manualBlade || adjustmentForecast?.manualDirection));
   }
+  if (!renderingDirectionLines) updateTabIntersectionHighlight();
 }
 
 // 表示・確定予測だけの不足時補完。候補順位と既存の学習式には渡さない。
@@ -1825,6 +1874,7 @@ function selectRankedLinkGuideCandidate(candidates, rank = guideCandidateIndex) 
 
 // 表示候補だけをNoごとにまとめる。評価式・予測値は既存のものをそのまま使う。
 function selectGuideNumberCandidate(candidates, selectBest) {
+  if (currentChartPage === 1) tabIntersectionCandidates = candidates;
   let pool = [...candidates];
   const choices = [];
   if (pitchAutoMode && currentChartPage === 0 && selectBest === selectLinkGuideCandidate) {
@@ -2008,9 +2058,11 @@ function renderDirectionLines(preserveSelection = false) {
   }
   // 別チャート閲覧中の削除で破棄した固定予測は、追加側へ戻った時に生成し直す。
   if (adjustmentLock && !adjustmentForecast) refreshAdjustmentForecastAfterDeletion();
+  updateTabIntersectionHighlight();
 }
 
 function drawDirectionLines(preserveSelection = false) {
+  tabIntersectionCandidates = [];
   forecastGuides = {};
   guideNumberChoices = [];
   let guideLayer = dotOverlay.querySelector('.direction-lines');
