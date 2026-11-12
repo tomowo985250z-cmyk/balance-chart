@@ -40,10 +40,10 @@
     const run = code => frame.contentWindow.eval(code);
     frame.contentDocument.documentElement.style.scrollbarWidth = 'none';
     const select = (index, value) => run(`openMemoPicker(${index});selectedMemoValue='${value}';previewMemoSelection();confirmMemoPicker.click()`);
-    const fixture = (r = .07023144186707214, ra = 178.3570380974561, b = .2784117869567126, ba = 73.82363833487034, rotation = 38.57659178087488) => run(`
+    const fixture = (r = .07023144186707214, ra = 178.3570380974561, b = .2784117869567126, ba = 73.82363833487034, rotation = 38.57659178087488, redRotation = 0) => run(`
       adjustmentSequence=null;adjustmentLock=null;confirmedCarry=null;adjustmentForecast=null;selectedAdjustmentTarget=null;
       learning.reset([]);dotSets.splice(0);forecastDisplayCache.clear();retainedGuideNumbers.fill(null);guideCandidateIndices.fill(0);
-      pitchAutoMode=false;trimAutoMode=false;showChartPage(1);applyChartRotation(0,${rotation});
+      pitchAutoMode=false;trimAutoMode=false;showChartPage(1);applyChartRotation(${redRotation},${rotation});
       memoValues.fill('');adjustmentSelections.forEach(values=>values.fill(''));guideCandidateIndex=0;
       const make=(radius,angle,color)=>radius===null?null:{radius,angle,color,clock:'12:00'};
       if(${r !== null || b !== null})dotSets.push({learningId:newLearningId(),red:make(${r},${ra},'red'),blue:make(${b},${ba},'blue'),adjustments:[]});
@@ -56,10 +56,11 @@
       assert(displayed() === automatic, label + ': prior interaction already refreshed the intersection and border automatically');
       assert(run(`(()=>{
         const blade=adjustmentLock?.page===currentChartPage?Number(adjustmentLock.guideBlade):guideNumberChoices[guideCandidateIndex]?.blade;
-        const expected=currentChartPage===1&&!!tabIntersectionHighlight?.winner&&tabIntersectionHighlight.winner.blade===blade;
-        return (guideCandidateToggle.dataset.intersectionBest==='true')===expected
+        const stage=twoAdjustmentReference?.winner?.optimized.find(s=>s.action.type===(currentChartPage?'TAB':'LINK'));
+        const expected=!!stage&&!adjustmentLock&&stage.action.blade===blade;
+        return (guideCandidateToggle.dataset.twoAdjustmentBest==='true')===expected
           && parseFloat(getComputedStyle(guideCandidateToggle).borderTopWidth)===(expected?4:1);
-      })()`), label + ': exactly 4px only when displayed TAB No. matches nearest valid intersection');
+      })()`), label + ': exactly 4px only when displayed No. matches the two-adjustment reference');
       assert(run(`(()=>{const b=guideCandidateToggle.getBoundingClientRect(),m=(currentChartPage?trimModeToggle:pitchModeToggle).getBoundingClientRect();return b.height===44&&m.height===44&&b.left>=0&&m.right<=innerWidth&&b.right<=m.left&&Math.abs(b.top-m.top)<.5&&guideCandidateToggle.scrollWidth<=guideCandidateToggle.clientWidth&&document.documentElement.scrollWidth<=innerWidth;})()`), label + ': original controls and mobile geometry unchanged');
       if (run('currentChartPage===1')) assert(run(`(()=>{
         const expected=[];
@@ -94,6 +95,39 @@
       check('generated ' + i);
     }
     assert(valid > 0 && different > 0 && recommendations.size > 1, 'fixtures exercise multiple recommendations independent of legacy first rank');
+    // Image-like angles are estimates: measurements alone do not restore persisted rotations.
+    // A displayed chord can cross behind the dot, outside the allowed forward movement.
+    fixture(.03, 305, .46, 30, -90, -34.4);
+    run('while(guideNumberChoices[guideCandidateIndex].blade!==3)guideCandidateToggle.click()');
+    const imageRecords = run('JSON.stringify([dotSets,learning.inspect()])');
+    const domCrossing = () => run(`(()=>{
+      const read=color=>{const n=dotOverlay.querySelector('.guide-direction-line[marker-end="url(#'+color+'DirectionLineArrow)"]');
+        const a={x:+n.getAttribute('x1'),y:+n.getAttribute('y1')},b={x:+n.getAttribute('x2'),y:+n.getAttribute('y2')};
+        return {a,v:{x:b.x-a.x,y:b.y-a.y},geometry:guideDisplayGeometry.get(n),guide:forecastGuides[color]};};
+      const red=read('red'),blue=read('blue'),cross=(a,b)=>a.x*b.y-a.y*b.x;
+      const delta={x:blue.a.x-red.a.x,y:blue.a.y-red.a.y},det=cross(red.v,blue.v);
+      const t=cross(delta,blue.v)/det,s=cross(delta,red.v)/det;
+      const point={x:red.a.x+t*red.v.x,y:red.a.y+t*red.v.y};
+      const row=tabIntersectionHighlight.rows.find(r=>r.blade===3&&r.direction===memoValues[3]);
+      const audit=(color,line)=>{const r=row[color],d={x:point.x-r.start.x,y:point.y-r.start.y};
+        return {originError:Math.hypot(r.start.x-line.geometry.base.x,r.start.y-line.geometry.base.y),
+          lineError:Math.abs(cross(r.unit,line.v))/Math.hypot(line.v.x,line.v.y),
+          directionError:Math.hypot(r.unit.x-line.guide.unit.x,r.unit.y-line.guide.unit.y),
+          travel:d.x*r.unit.x+d.y*r.unit.y,max:r.maxTravel};};
+      return {det,t,s,point,red:audit('red',red),blue:audit('blue',blue),intersection:row.intersection,winner:tabIntersectionHighlight.winner};
+    })()`);
+    for (const direction of ['DOWN','UP']) {
+      select(3,direction);const actual=domCrossing();
+      assert(Math.abs(actual.det)>1&&actual.t>0&&actual.t<1&&actual.s>0&&actual.s<1, direction+': actual rendered red/blue segments cross, never classify as parallel');
+      assert(near(actual.point.x,442.7620098328004)&&near(actual.point.y,408.04419645260833), direction+': independent SVG intersection coordinate');
+      for (const color of ['red','blue']) assert(actual[color].originError<1e-7&&actual[color].lineError<1e-7&&actual[color].directionError<1e-7,
+        direction+': evaluated '+color+' origin, orientation and direction equal rendered geometry');
+      if(direction==='DOWN')assert(actual.red.travel<0&&actual.blue.travel<0,'DOWN: visible crossing is behind both origins');
+      else assert(actual.red.travel>actual.red.max&&actual.blue.travel>0&&actual.blue.travel<=actual.blue.max,'UP: HOV crossing exceeds 3-degree maximum, cruise is within reach');
+      assert(!actual.intersection&&!actual.winner,'visual crossing alone is insufficient for a valid adjustment intersection');
+      check('image-like rendered crossing '+direction);
+    }
+    assert(run('JSON.stringify([dotSets,learning.inspect()])')===imageRecords,'crossing diagnostics do not alter actual measurements or learning');
     for (const width of [320, 375, 390, 430]) {
       frame.style.width = width + 'px';await tick();
       for (const spec of [[], [.1, 180, .3, 150, 0], [null, 0, .3, 90, 60], [.1, 90, null, 0, 60], [null, 0, null, 0, 60], [.8, 45, .8, 220, 90]]) {
@@ -142,7 +176,7 @@
     }
     run('balanceFlushState()');loaded=new Promise(resolve=>frame.onload=resolve);frame.contentWindow.location.reload();await loaded;await tick();check('reload');
     assert(run('(()=>{BalanceState.validateRecords(JSON.parse(appStorage.exportText()).records);return true})()'), 'backup format unchanged');
-    output.textContent = `PASS: ${checks} checks — display-only intersection, independent legacy rank parity, original single-button cycling, 1px/4px border, manual/learned, origins/history/locks, no synthetic learning, reload and four mobile widths; ${valid} valid/${different} different in 160 generated fixtures`;
+    output.textContent = `PASS: ${checks} checks — retained intersection geometry, independent legacy rank parity, original single-button cycling, 1px/4px two-adjustment border, manual/learned, origins/history/locks, no synthetic learning, reload and four mobile widths; ${valid} valid/${different} different in 160 generated fixtures`;
     document.title='PASS';frame.remove();
   } catch (error) { output.textContent=`FAIL after ${checks} checks\n${error.stack}`;document.title='FAIL'; }
 })();

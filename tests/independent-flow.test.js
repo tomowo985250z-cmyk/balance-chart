@@ -60,7 +60,7 @@
             assert(run('!adjustmentEdit')&&history()===saved,label+': locked action cannot enter editing from the unlocked page');
           }
         }
-        assert(!run('document.body.textContent.includes("段階")'),label+': original flow has no stage UI');
+        assert(!run(`(()=>{const body=document.body.cloneNode(true);body.querySelectorAll('#twoAdjustmentNote,.two-adjustment-reference-points').forEach(node=>node.remove());return body.textContent.includes('段階');})()`),label+': original flow has no stage UI outside the new reference display');
         const saved=history();await reload();locks(adjusted,label+'/reload');verifyHistory(count,label+'/reload');
         assert(history()===saved,label+': saved history restores without numerical changes');
         run('BalanceState.validateRecords(JSON.parse(appStorage.exportText()).records)');

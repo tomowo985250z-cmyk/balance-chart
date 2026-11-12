@@ -41,6 +41,11 @@ const guideToggleText = document.getElementById('guideToggleText');
 const guideCandidateToggle = document.getElementById('guideCandidateToggle');
 let tabIntersectionCandidates = [];
 let tabIntersectionHighlight = null;
+let twoAdjustmentReference = null;
+let twoAdjustmentReferenceKey = null;
+let twoAdjustmentReferenceReady = false;
+let twoAdjustmentReferenceError = null;
+const twoAdjustmentNote = document.getElementById('twoAdjustmentNote');
 let guideCandidateIndex = 0;
 const guideCandidateIndices = [0, 0];
 // 調整量の操作後は、順位ではなく現在のNoを次のNo操作まで追跡する。
@@ -353,6 +358,65 @@ function updateTabIntersectionHighlight() {
   guideCandidateToggle.dataset.intersectionBest = String(best);
   if (best) guideCandidateToggle.setAttribute('aria-description', '赤青の有効交点が最も中心に近い候補です。');
   else guideCandidateToggle.removeAttribute('aria-description');
+  updateTwoAdjustmentReference();
+}
+
+// 表示用の参考予測。入力・正式順位・予測キャッシュ・確定履歴・学習には書き込まない。
+function updateTwoAdjustmentReference() {
+  if (!twoAdjustmentReferenceReady || restoringAppState) return;
+  try {
+    const input = BalanceTwoAdjustmentContext.inputs(), context = BalanceTwoAdjustmentContext.create();
+    const key = JSON.stringify([input, context.rotations, context.shared, pitchAutoMode, trimAutoMode, learning.inspect(), currentChartPage]);
+    if (key !== twoAdjustmentReferenceKey) {
+      const reference = BalanceTwoAdjustment.search({ ...input, amounts: BalanceLearning.amounts,
+        predict: context.predict, legacyRank: context.legacyRank,
+        center: { x: CHART_CENTER_X, y: CHART_CENTER_Y }, radius: CHART_RADIUS });
+      reference.input = input;
+      twoAdjustmentReference = reference;
+      twoAdjustmentReferenceKey = key;
+    }
+    twoAdjustmentReferenceError = null;
+  } catch (error) {
+    twoAdjustmentReference = null;
+    twoAdjustmentReferenceKey = null;
+    twoAdjustmentReferenceError = error.message;
+    console.error('2段階の参考予測を算出できませんでした', error);
+  }
+  renderTwoAdjustmentReference();
+}
+
+function renderTwoAdjustmentReference() {
+  const winner = twoAdjustmentReference?.winner, type = currentChartPage === 0 ? 'LINK' : 'TAB';
+  const stage = winner?.optimized.find(item => item.action.type === type);
+  const blade = adjustmentLock ? Number(adjustmentLock.guideBlade) : guideNumberChoices[guideCandidateIndex]?.blade;
+  const best = Boolean(stage && !adjustmentLock && stage.action.blade === blade);
+  guideCandidateToggle.dataset.twoAdjustmentBest = String(best);
+  if (best) guideCandidateToggle.setAttribute('aria-description', 'LINK＋TABの2段階参考予測で選ばれたNo.です。');
+  else guideCandidateToggle.removeAttribute('aria-description');
+  twoAdjustmentNote.hidden = !winner;
+  const values = winner?.stages.map(item => {
+    const action = item.action;
+    return `${item.fixed ? '確定済み固定 ' : ''}${action.type} No.${action.blade} ${action.direction} ${action.amountText}${action.type === 'TAB' ? '°' : 'フラット'}`;
+  }).join(' → ');
+  const worsening = winner ? ['red', 'blue'].filter(color => winner.metrics.worsened[color])
+    .map(color => color === 'red' ? 'HOV悪化' : '巡航悪化').join('・') : '';
+  twoAdjustmentNote.textContent = winner
+    ? `2段階の参考予測（点線の四角・実測ではありません）\n${values}\n最終 HOV ${winner.metrics.ips.red.toFixed(3)} ／ 巡航 ${winner.metrics.ips.blue.toFixed(3)} IPS`
+      + (worsening ? `\n${worsening}（調整起点との比較）` : '')
+      + (winner.metrics.hovSafe ? '' : '\nHOV 0.2 IPS以内に到達する候補はありません。') : '';
+  dotOverlay.querySelector('.two-adjustment-reference-points')?.remove();
+  if (!winner) return;
+  const ns = 'http://www.w3.org/2000/svg', layer = document.createElementNS(ns, 'g');
+  layer.setAttribute('class', 'two-adjustment-reference-points');
+  for (const color of ['red', 'blue']) {
+    const point = winner.final[color], rect = document.createElementNS(ns, 'rect');
+    for (const [name, value] of Object.entries({ x: point.x - 9, y: point.y - 9, width: 18, height: 18,
+      fill: 'none', stroke: DOT_COLORS[color], 'stroke-width': 2, 'stroke-dasharray': '4 3' })) rect.setAttribute(name, value);
+    const title = document.createElementNS(ns, 'title');
+    title.textContent = 'LINK＋TABの2段階参考予測・実測ではありません';
+    rect.append(title); layer.append(rect);
+  }
+  dotOverlay.append(layer);
 }
 
 function updateGuideCandidateToggle() {
@@ -1628,9 +1692,9 @@ function distanceToSegment(point, start, end) {
   return Math.hypot(point.x - (start.x + ratio * dx), point.y - (start.y + ratio * dy));
 }
 
-function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection) {
+function getDirectionLine(dot, layer, adjustment, forcedNumber, forcedDirection, angles = { hovAngle, cruiseAngle }) {
   const center = getDotCoordinates(dot);
-  const rotation = layer === 'red' ? hovAngle : cruiseAngle;
+  const rotation = layer === 'red' ? angles.hovAngle : angles.cruiseAngle;
   const layerScale = layer === 'red' ? 1.02 : 0.84;
   const selectedNumber = Number.isInteger(forcedNumber) ? forcedNumber : Number(adjustment?.[0]);
   const direction = forcedDirection ?? (adjustment?.[3] === 'DOWN' ? 'DOWN' : 'UP');
@@ -1795,8 +1859,7 @@ function appendDirectionArrowMarkers(target, blueColor = DOT_COLORS.blue) {
   target.append(defs);
 }
 
-function getLinkRankingCandidates(candidates) {
-  const amountText = getSharedAdjustmentAmount(0), target = getAdjustmentStartSet();
+function getLinkRankingCandidates(candidates, target = getAdjustmentStartSet(), amountText = getSharedAdjustmentAmount(0), samples = null) {
   // 探索量・円周交点ではなく、表示する量・方向と既存の距離推定で評価する。
   return candidates.filter(c => !c.amountText || c.amountText === amountText).map(original => {
     const action = BalanceLearning.adjustment([String(original.blade), 'LINK', amountText, original.direction]);
@@ -1808,7 +1871,7 @@ function getLinkRankingCandidates(candidates) {
         : p ? getPredictionGuideLine(p) : null;
       const prediction = learning.predict('LINK', color, action.blade, action.direction, action.amount, start);
       const estimate = BalanceDistancePrior.resolve(action, color, prediction,
-        prediction ? [] : learning.inspect().samples, CHART_RADIUS);
+        prediction ? [] : samples ?? learning.inspect().samples, CHART_RADIUS);
       const unit = guide ? getGuideMovementUnit(guide) : null;
       const valid = estimate && Number.isFinite(estimate.distance) && estimate.distance >= 0
         && unit && Math.hypot(unit.x, unit.y) > 0;
@@ -1830,8 +1893,8 @@ function getLinkRankingCandidates(candidates) {
   });
 }
 
-function selectLinkGuideCandidate(candidates) {
-  if (pitchAutoMode) {
+function selectLinkGuideCandidate(candidates, automatic = pitchAutoMode) {
+  if (automatic) {
     const normalized = getLinkRankingCandidates(candidates), target = getAdjustmentStartSet();
     const selected = BalanceLinkRanking.select(normalized, target?.red?.radius, target?.blue?.radius);
     // 方向・予測とも評価不能ならNo順の診断表示。達成を示す予測は作らない。
@@ -3072,3 +3135,6 @@ function requestChartRotation() {
 }
 chartObject.addEventListener('load', requestChartRotation);
 requestChartRotation();
+// 独立した比較用iframeには正式表示を重ねない。
+twoAdjustmentReferenceReady = !globalThis.tabIntersectionMemoryStorage;
+document.body.dataset.twoAdjustmentEnabled = String(twoAdjustmentReferenceReady);

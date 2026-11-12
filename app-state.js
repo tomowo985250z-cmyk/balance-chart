@@ -154,6 +154,7 @@
     const saved = appStorage.getItem(BalanceState.uiKey);
     if (saved && !appStorage.readOnly) restore(JSON.parse(saved));
   } catch (error) { appStorage.protect(error); }
+  updateTwoAdjustmentReference();
   ready = true;
   updateStatus();
   updateInitialPositionButton();
@@ -177,6 +178,7 @@
     try {
       appStorage.setItem(BalanceState.uiKey, JSON.stringify({ ...capture(), initialChartRotations: next }));
       initialChartRotations = next;
+      updateTwoAdjustmentReference();
       updateInitialPositionButton();
       positionStatus.textContent = '初期位置を登録しました。';
     } catch {
