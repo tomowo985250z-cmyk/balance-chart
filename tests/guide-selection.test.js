@@ -19,11 +19,11 @@
       assert(visible(), 'automatic visible');
       for (const index of [0, 3]) {
         run(`openMemoPicker(${index});selectedMemoValue=${index === 0 ? "automaticValues[0]==='1'?'2':'1'" : "automaticValues[3]==='UP'?'DOWN':'UP'"};previewMemoSelection();`);
-        assert(visible()===(index===3), 'only manual No preview hides '+page+'/'+rank+'/'+index);
+        assert(visible()===(page===0 || index===3), 'LINK No sync or manual direction stays visible '+page+'/'+rank+'/'+index);
         run(`selectedMemoValue=automaticValues[${index}];previewMemoSelection();`);
         assert(visible(), 'return preview restores');
         run(`selectedMemoValue=${index === 0 ? "automaticValues[0]==='1'?'2':'1'" : "automaticValues[3]==='UP'?'DOWN':'UP'"};confirmMemoPicker.click();`);
-        assert(visible()===(index===3), 'only confirmed manual No change hides');
+        assert(visible()===(page===0 || index===3), 'LINK No sync or confirmed manual direction stays visible');
         run(`openMemoPicker(${index});selectedMemoValue=automaticValues[${index}];confirmMemoPicker.click();`);
         assert(visible(), 'confirmed return restores independently of direction history');
       }
@@ -36,7 +36,7 @@
       run(`openMemoPicker(0);selectedMemoValue=automaticValues[0]==='1'?'2':'1';confirmMemoPicker.click();
         openMemoPicker(3);selectedMemoValue=automaticValues[3]==='UP'?'DOWN':'UP';confirmMemoPicker.click();
         openMemoPicker(3);selectedMemoValue=automaticValues[3];confirmMemoPicker.click();`);
-      assert(!visible(), 'restoring direction alone keeps changed blade hidden');
+      assert(visible()===(page===0), 'LINK No remains synchronized; TAB manual blade remains hidden');
       run(`openMemoPicker(0);selectedMemoValue=automaticValues[0];confirmMemoPicker.click();`);
       assert(visible(), 'restoring blade shows despite direction history');
       run(`openMemoPicker(0);selectedMemoValue=automaticValues[0]==='1'?'2':'1';previewMemoSelection();closeMemoPicker.click();`);

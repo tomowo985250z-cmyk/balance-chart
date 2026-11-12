@@ -302,17 +302,19 @@ guideToggle.addEventListener('click', () => {
   setGuidesVisible(visible);
   if (visible) applySelectedGuideAdjustment();
 });
-guideCandidateToggle.addEventListener('click', () => {
+function selectGuideNumber(index) {
   if (adjustmentLock?.page === currentChartPage) return;
   if (adjustmentEdit) adjustmentEdit.retainedGuideNumber = null;
   else retainedGuideNumbers[currentChartPage] = null;
   saveAdjustmentSelection();
-  guideCandidateIndex = (guideCandidateIndex + 1) % 3;
+  guideCandidateIndex = index;
   guideCandidateIndices[currentChartPage] = guideCandidateIndex;
   restoreAdjustmentSelection();
   selectingGuideNumber = true;
   try { renderDirectionLines(); } finally { selectingGuideNumber = false; }
-});
+}
+
+guideCandidateToggle.addEventListener('click', () => selectGuideNumber((guideCandidateIndex + 1) % 3));
 
 function updateTabIntersectionHighlight() {
   tabIntersectionHighlight = null;
@@ -536,6 +538,7 @@ let memoPickerDirectionChanged = false;
 let memoPickerScrollY = null;
 let memoPickerBackground = null;
 let memoPickerTouchY = 0;
+let memoPickerLinkSelection = null;
 const memoValues = ['', '', '', ''];
 const adjustmentSelections = Array.from({ length: 6 }, () => ['', '', '', '']);
 let selectedHour = 0;
@@ -749,7 +752,7 @@ function renderMemoWheel(options, selected, index) {
     option.setAttribute('aria-selected', String(value === selected));
     option.textContent = formatMemoInputValue(value, index);
     option.addEventListener('click', () => {
-      const immediate = index === 2 || index === 3;
+      const immediate = index === 2 || index === 3 || (index === 0 && currentChartPage === 0);
       if (immediate) selectMemoOption(option);
       centerMemoOption(option, immediate ? 'instant' : 'smooth');
     });
@@ -786,6 +789,10 @@ function openMemoPicker(index) {
   }
   if (memoPickerBackground) hideMemoPicker();
   activeMemoIndex = index;
+  memoPickerLinkSelection = index === 0 && currentChartPage === 0 && guideNumberChoices.length
+    ? structuredClone({ values: memoValues, selections: adjustmentSelections,
+      rank: guideCandidateIndex, retained: adjustmentEdit ? adjustmentEdit.retainedGuideNumber : retainedGuideNumbers[0],
+      forecast: adjustmentForecast }) : null;
   memoPickerManualDirection = Boolean(adjustmentForecast?.manualDirection);
   memoPickerDirectionChanged = false;
   const guide = getVisibleGuideAdjustment();
@@ -828,12 +835,46 @@ function hideMemoPicker() {
 
 function previewMemoSelection() {
   if (adjustmentLock) return;
+  if (syncLinkMemoNumber()) return;
   const values = [...memoValues];
   values[activeMemoIndex] = selectedMemoValue;
   if (activeMemoIndex === 1 && values[1] !== memoValues[1]) values[2] = '';
   memoPickerDirectionChanged ||= activeMemoIndex === 3 && selectedMemoValue !== memoValues[3];
   updateAdjustmentForecast(values, false, isManualBladeSelection(values),
     memoPickerManualDirection || memoPickerDirectionChanged);
+}
+
+// LINKのNo.入力は、左下のNo.ボタンと同じ候補選択・既存予測を使用する。
+function syncLinkMemoNumber() {
+  if (!memoPickerLinkSelection || currentChartPage !== 0 || activeMemoIndex !== 0 || adjustmentLock) return false;
+  const index = guideNumberChoices.findIndex(choice => String(choice.blade) === selectedMemoValue);
+  if (index < 0) return false;
+  selectGuideNumber(index);
+  return true;
+}
+
+function cancelMemoPicker() {
+  const previous = memoPickerLinkSelection;
+  memoPickerLinkSelection = null;
+  hideMemoPicker();
+  if (previous && currentChartPage === 0 && !adjustmentLock) {
+    memoValues.splice(0, 4, ...previous.values);
+    adjustmentSelections.splice(0, 6, ...previous.selections);
+    guideCandidateIndex = guideCandidateIndices[0] = previous.rank;
+    if (adjustmentEdit) adjustmentEdit.retainedGuideNumber = previous.retained;
+    else retainedGuideNumbers[0] = previous.retained;
+    // 描画中に元の入力・予測を自動候補で上書きしない。
+    const restoring = restoringAppState;
+    restoringAppState = true;
+    try { renderDirectionLines(); } finally { restoringAppState = restoring; }
+    adjustmentForecast = previous.forecast;
+    updateMemoButtons();
+    if (adjustmentForecast?.manualDirection) syncManualDirectionGuides(memoValues);
+    updateGuideSelectionVisibility(memoValues);
+    renderAdjustmentForecast();
+    return;
+  }
+  updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection);
 }
 
 function syncManualDirectionGuides(values, restoreFixed = false) {
@@ -1176,9 +1217,15 @@ function renderAdjustmentForecast() {
 }
 
 memoButtons.forEach((button, index) => button.addEventListener('click', () => openMemoPicker(index)));
-closeMemoPicker.addEventListener('click', () => { hideMemoPicker(); updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); });
+closeMemoPicker.addEventListener('click', cancelMemoPicker);
 confirmMemoPicker.addEventListener('click', () => {
   if (adjustmentLock || activeMemoIndex === null) return;
+  if (syncLinkMemoNumber()) {
+    memoPickerLinkSelection = null;
+    hideMemoPicker();
+    renderAdjustmentForecast();
+    return;
+  }
   if (activeMemoIndex === 0) {
     if (adjustmentEdit) adjustmentEdit.retainedGuideNumber = null;
     else retainedGuideNumbers[currentChartPage] = null;
@@ -1190,7 +1237,7 @@ confirmMemoPicker.addEventListener('click', () => {
   hideMemoPicker();
   updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), manualDirection);
 });
-memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) { hideMemoPicker(); updateAdjustmentForecast(memoValues, false, isManualBladeSelection(memoValues), memoPickerManualDirection); } });
+memoPicker.addEventListener('click', (event) => { if (event.target === memoPicker) cancelMemoPicker(); });
 memoPicker.addEventListener('touchstart', event => {
   if (event.touches.length === 1) memoPickerTouchY = event.touches[0].clientY;
 }, { passive: true });

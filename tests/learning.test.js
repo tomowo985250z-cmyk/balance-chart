@@ -1054,7 +1054,7 @@
     assert(run('[...dotOverlay.querySelectorAll(".adjustment-forecast [data-color]")].every(node=>{const point=adjustmentForecast.points.find(item=>item.color===node.dataset.color),matrix=node.transform.baseVal.getItem(0).matrix;return Math.abs(matrix.e-point.x)<1e-4&&Math.abs(matrix.f-point.y)<1e-4;})'),'comparison uses frozen forecast coordinates');
     run('renderDots(); renderDots(); renderDirectionLines();');
     assert(run('adjustmentForecast.phase==="comparison" && dotOverlay.querySelectorAll(".forecast-body").length===2'),'comparison survives repeated dot and guide redraws');
-    run('memoValues[3]=""; openMemoPicker(0);');
+    run('memoValues[3]=""; openMemoPicker(2);');
     assert(run('adjustmentForecast.phase==="comparison" && dotOverlay.querySelectorAll(".forecast-body").length===2'),'incomplete new adjustment keeps previous comparison');
     run(`memoPicker.hidden=true; memoValues.splice(0,4,'1','TAB','1','DOWN'); currentChartPage=1; renderDots(); updateAdjustmentForecast();`);
     assert(run('adjustmentForecast.phase')==='preview','valid new forecast replaces previous comparison');

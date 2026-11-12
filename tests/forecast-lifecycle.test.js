@@ -56,8 +56,8 @@
       run('guideToggle.click()'); assert(run('!dotOverlay.querySelector(".forecast-body")'), 'global OFF hides predictions');
       run('guideToggle.click()'); checkSaved(blue);
       run("memoOne.click();selectedMemoValue='3';confirmMemoPicker.click()");
-      assert(run('!dotOverlay.querySelector(".forecast-body")'), 'manual No hides predictions');
-      run('applySelectedGuideAdjustment()'); checkSaved(blue);
+      assert(run('memoValues[0]===\'3\' && !adjustmentForecast.manualBlade && !!dotOverlay.querySelector(".forecast-body")'), 'LINK No input switches visible predictions to selected No.');
+      selectRank(1); checkSaved(blue);
       run("memoFour.click();selectedMemoValue='DOWN';confirmMemoPicker.click()");
       assert(run('Boolean(dotOverlay.querySelector(".forecast-body"))'), 'manual direction shows recalculated predictions');
       run(`memoFour.click();selectedMemoValue='${generatedAction[3]}';confirmMemoPicker.click()`); checkSaved(blue);

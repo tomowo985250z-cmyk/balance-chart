@@ -24,14 +24,14 @@
     const learning = run('JSON.stringify(learning.inspect())');
     run(`window.originalBlade=memoValues[0]; memoOne.click();
       selectedMemoValue=originalBlade==='1'?'2':'1'; previewMemoSelection();`);
-    assert(run('!dotOverlay.querySelector(".forecast-body")'), 'manual blade wheel preview hidden');
+    assert(run('!!dotOverlay.querySelector(".forecast-body") && memoValues[0]===selectedMemoValue && String(forecastGuides.red.blade)===selectedMemoValue'), 'LINK No wheel preview synchronizes guides and visible forecast');
     run('closeMemoPicker.click()');
     assert(run('!!dotOverlay.querySelector(".forecast-body")'), 'cancel restores automatic blade display');
     run(`memoOne.click(); selectedMemoValue=originalBlade==='1'?'2':'1'; confirmMemoPicker.click();`);
-    assert(run('!dotOverlay.querySelector(".forecast-body") && adjustmentForecast.points.length>0'), 'manual blade hides DOM but keeps calculated points');
+    assert(run('!!dotOverlay.querySelector(".forecast-body") && adjustmentForecast.points.length>0 && !adjustmentForecast.manualBlade'), 'LINK No confirmation keeps synchronized calculated points visible');
     assert(run('JSON.stringify(learning.inspect())') === learning, 'manual blade display does not change learning');
     await reload();
-    assert(run('adjustmentForecast.manualBlade && !dotOverlay.querySelector(".forecast-body")'), 'manual display choice survives reload');
+    assert(run('!adjustmentForecast.manualBlade && !!dotOverlay.querySelector(".forecast-body") && memoValues[0]===String(guideNumberChoices[guideCandidateIndex].blade)'), 'synchronized LINK No and forecast survive reload');
     run(`applySelectedGuideAdjustment(); memoThree.click(); selectedMemoValue='1/4'; confirmMemoPicker.click();`);
     assert(run('!!dotOverlay.querySelector(".forecast-body")'), 'automatic selection restores display');
     // Use the same postMessage path as the embedded SVG; actual model getters stay unchanged.

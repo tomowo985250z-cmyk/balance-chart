@@ -167,12 +167,15 @@
       }
       run('updateAdjustmentForecast(memoValues,true);window.fixedProduction=JSON.stringify(adjustmentForecast);renderDirectionLines()');
       assert(run('JSON.stringify(adjustmentForecast)===fixedProduction'), 'fixed forecast preserved on rerender');
-      // 個別入力を隠している既存の表示判定は、量の確定による再順位付けでも維持する。
+      // LINK No.の連動は量の再順位付けでも維持し、候補欠測時は予測を作らない。
       run(`guideCandidateToggle.click();window.automaticProduction=[...memoValues];
         memoOne.click();selectedMemoValue=automaticProduction[0]==='1'?'2':'1';confirmMemoPicker.click();
         window.manualProduction=memoValues[0];
         memoThree.click();selectedMemoValue='3/4';confirmMemoPicker.click();`);
-      assert(run('memoValues[0]===manualProduction && adjustmentForecast.manualBlade'), 'manual blade survives committed amount rerank');
+      assert(run(`memoValues[0]===manualProduction && memoValues[0]===String(guideNumberChoices[guideCandidateIndex].blade)
+        && (guideNumberChoices[guideCandidateIndex].candidate
+          ? adjustmentForecast && !adjustmentForecast.manualBlade && String(forecastGuides.red.blade)===memoValues[0]
+          : !adjustmentForecast && !forecastGuides.red && !forecastGuides.blue)`), 'synchronized LINK No survives committed amount rerank without inventing unavailable candidates');
       run('guideCandidateToggle.click()');
       run('for(let i=0;i<3 && !guideNumberChoices[guideCandidateIndex].candidate;i++)guideCandidateToggle.click()');
       assert(run('!adjustmentForecast.manualBlade && memoValues[0]===String(forecastGuides.red.blade)'), 'No cycle restores selected guide after manual input');

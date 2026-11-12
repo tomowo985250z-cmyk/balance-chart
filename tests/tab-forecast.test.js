@@ -98,8 +98,8 @@
       run('setGuidesVisible(true)');assert(both(),'ON restores both colors');
       for(const field of [0,3]) {
         run(`openMemoPicker(${field});selectedMemoValue=${field===0?'memoValues[0]==="1"?"2":"1"':'memoValues[3]==="UP"?"DOWN":"UP"'};previewMemoSelection()`);
-        assert(run(`Boolean(dotOverlay.querySelector('.forecast-body'))===${field===3}
-          && (dotOverlay.querySelector('.direction-lines').style.opacity!=='0')===${field===3}`),'only manual No preview hides both colors and guides');
+        assert(run(`Boolean(dotOverlay.querySelector('.forecast-body'))===(currentChartPage===0 || ${field===3})
+          && (dotOverlay.querySelector('.direction-lines').style.opacity!=='0')===(currentChartPage===0 || ${field===3})`),'LINK No preview synchronizes; TAB manual No preview hides both colors and guides');
         run('closeMemoPicker.click()');
         assert(both() && run('JSON.stringify(adjustmentForecast.points)')===points,'cancel restores both original coordinates');
       }

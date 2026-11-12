@@ -58,7 +58,10 @@
           })`), 'forecast coordinates retain existing calculation');
           assert(run(`getForecastDisplayPoints(adjustmentForecast).every(point=>!point.savedValues || point.savedValues.every((value,index)=>value===memoValues[index]))`), 'no cached predictions from another No or direction');
           run(`window.numberAutomatic=[...memoValues];openMemoPicker(0);selectedMemoValue=numberAutomatic[0]==='1'?'2':'1';previewMemoSelection()`);
-          assert(run(`dotOverlay.querySelector('.direction-lines').style.opacity==='0' && !dotOverlay.querySelector('.forecast-body')`), 'manual No hides guides and dots');
+          assert(run(page===0
+            ? `memoValues[0]===selectedMemoValue && String(guideNumberChoices[guideCandidateIndex].blade)===selectedMemoValue
+              && (!forecastGuides.red || (forecastGuides.red.blade===Number(selectedMemoValue) && dotOverlay.querySelector('.direction-lines').style.opacity!=='0'))`
+            : `dotOverlay.querySelector('.direction-lines').style.opacity==='0' && !dotOverlay.querySelector('.forecast-body')`), 'LINK No synchronizes guides; TAB manual No hides guides and dots');
           run('closeMemoPicker.click()');
           run(`openMemoPicker(3);selectedMemoValue=numberAutomatic[3]==='UP'?'DOWN':'UP';confirmMemoPicker.click()`);
           assert(run(`dotOverlay.querySelector('.direction-lines').style.opacity!=='0' && !!dotOverlay.querySelector('.forecast-body')`), 'manual direction updates visible guides and dots');
