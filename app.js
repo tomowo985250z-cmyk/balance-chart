@@ -411,12 +411,12 @@ function renderTwoAdjustmentReference() {
     const order = add('ol', 'two-adjustment-order', '');
     winner.stages.forEach(item => {
       const action = item.action;
-      const step = add('li', '', `${item.fixed ? '確定済み固定 ' : ''}${action.type} No.${action.blade} `, order);
-      add('strong', 'two-adjustment-direction', action.direction, step);
-      step.append(' ');
+      const step = add('li', '', `${item.fixed ? '確定済み固定 ' : ''}${formatMemoValue(String(action.blade), 0, action.type)} ／ ${action.type} ／ `, order);
       const quantity = add('span', 'two-adjustment-quantity', '', step);
       add('strong', 'two-adjustment-amount', action.amountText, quantity);
-      add('span', '', action.type === 'TAB' ? '°' : 'フラット', quantity);
+      add('span', '', formatMemoValue(action.amountText, 2, action.type).slice(action.amountText.length), quantity);
+      step.append(' ／ ');
+      add('strong', 'two-adjustment-direction', action.direction, step);
     });
     const predictions = add('div', 'two-adjustment-predictions', '');
     for (const [color, label] of [['red', 'HOV'], ['blue', '巡航']]) {
