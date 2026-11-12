@@ -394,10 +394,6 @@ function renderTwoAdjustmentReference() {
   if (best) guideCandidateToggle.setAttribute('aria-description', 'LINK＋TABの2段階参考予測で選ばれたNo.です。');
   else guideCandidateToggle.removeAttribute('aria-description');
   twoAdjustmentNote.hidden = !winner;
-  const values = winner?.stages.map(item => {
-    const action = item.action;
-    return `${item.fixed ? '確定済み固定 ' : ''}${action.type} No.${action.blade} ${action.direction} ${action.amountText}${action.type === 'TAB' ? '°' : 'フラット'}`;
-  });
   const worsening = winner ? ['red', 'blue'].filter(color => winner.metrics.worsened[color])
     .map(color => color === 'red' ? 'HOV悪化' : '巡航悪化').join('・') : '';
   twoAdjustmentNote.replaceChildren();
@@ -413,7 +409,15 @@ function renderTwoAdjustmentReference() {
     add('h2', 'two-adjustment-title', '2段階の参考予測', header);
     add('p', 'two-adjustment-help', '実測ではない参考値', header);
     const order = add('ol', 'two-adjustment-order', '');
-    values.forEach(value => add('li', '', value, order));
+    winner.stages.forEach(item => {
+      const action = item.action;
+      const step = add('li', '', `${item.fixed ? '確定済み固定 ' : ''}${action.type} No.${action.blade} `, order);
+      add('strong', 'two-adjustment-direction', action.direction, step);
+      step.append(' ');
+      const quantity = add('span', 'two-adjustment-quantity', '', step);
+      add('strong', 'two-adjustment-amount', action.amountText, quantity);
+      add('span', '', action.type === 'TAB' ? '°' : 'フラット', quantity);
+    });
     const predictions = add('div', 'two-adjustment-predictions', '');
     for (const [color, label] of [['red', 'HOV'], ['blue', '巡航']]) {
       const prediction = add('div', `two-adjustment-prediction two-adjustment-${color}`, '', predictions);
