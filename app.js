@@ -397,13 +397,34 @@ function renderTwoAdjustmentReference() {
   const values = winner?.stages.map(item => {
     const action = item.action;
     return `${item.fixed ? '確定済み固定 ' : ''}${action.type} No.${action.blade} ${action.direction} ${action.amountText}${action.type === 'TAB' ? '°' : 'フラット'}`;
-  }).join(' → ');
+  });
   const worsening = winner ? ['red', 'blue'].filter(color => winner.metrics.worsened[color])
     .map(color => color === 'red' ? 'HOV悪化' : '巡航悪化').join('・') : '';
-  twoAdjustmentNote.textContent = winner
-    ? `2段階の参考予測（点線の四角・実測ではありません）\n${values}\n最終 HOV ${winner.metrics.ips.red.toFixed(3)} ／ 巡航 ${winner.metrics.ips.blue.toFixed(3)} IPS`
-      + (worsening ? `\n${worsening}（調整起点との比較）` : '')
-      + (winner.metrics.hovSafe ? '' : '\nHOV 0.2 IPS以内に到達する候補はありません。') : '';
+  twoAdjustmentNote.replaceChildren();
+  if (winner) {
+    const add = (tag, className, text, parent = twoAdjustmentNote) => {
+      const element = document.createElement(tag);
+      element.className = className;
+      element.textContent = text;
+      parent.append(element);
+      return element;
+    };
+    const header = add('div', 'two-adjustment-header', '');
+    add('h2', 'two-adjustment-title', '2段階の参考予測', header);
+    add('p', 'two-adjustment-help', '実測ではない参考値', header);
+    const order = add('ol', 'two-adjustment-order', '');
+    values.forEach(value => add('li', '', value, order));
+    const predictions = add('div', 'two-adjustment-predictions', '');
+    for (const [color, label] of [['red', 'HOV'], ['blue', '巡航']]) {
+      const prediction = add('div', `two-adjustment-prediction two-adjustment-${color}`, '', predictions);
+      add('span', 'two-adjustment-label', label, prediction);
+      const reading = add('span', 'two-adjustment-reading', '', prediction);
+      add('strong', 'two-adjustment-value', winner.metrics.ips[color].toFixed(3), reading);
+      add('span', 'two-adjustment-unit', ' IPS', reading);
+    }
+    if (worsening) add('p', 'two-adjustment-warning', `${worsening}（起点との比較）`);
+    if (!winner.metrics.hovSafe) add('p', 'two-adjustment-warning', 'HOV 0.2 IPS以内に到達する候補はありません。');
+  }
   dotOverlay.querySelector('.two-adjustment-reference-points')?.remove();
   if (!winner) return;
   const ns = 'http://www.w3.org/2000/svg', layer = document.createElementNS(ns, 'g');
